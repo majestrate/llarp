@@ -2,8 +2,6 @@
 #include <llarp/encrypted_frame.hpp>
 #include "logger.hpp"
 
-#define OverheadSize (PUBKEYSIZE + TUNNONCESIZE + SHORTHASHSIZE)
-
 namespace llarp
 {
   Encrypted::Encrypted(const byte_t* buf, size_t sz)
@@ -51,7 +49,7 @@ namespace llarp
     llarp_buffer_t buf;
     buf.base = body;
     buf.cur  = buf.base;
-    buf.sz   = size - OverheadSize;
+    buf.sz   = size - EncryptedFrame::OverheadSize;
 
     // set our pubkey
     memcpy(pubkey, llarp::seckey_topublic(ourSecretKey), PUBKEYSIZE);
@@ -87,9 +85,9 @@ namespace llarp
   bool
   EncryptedFrame::DecryptInPlace(byte_t* ourSecretKey, llarp_crypto* crypto)
   {
-    if(size <= OverheadSize)
+    if(size <= size_t(EncryptedFrame::OverheadSize))
     {
-      llarp::Warn("encrypted frame too small, ", size, " <= ", OverheadSize);
+      llarp::Warn("encrypted frame too small, ", size, " <= ", size_t(EncryptedFrame::OverheadSize));
       return false;
     }
     // format of frame is
@@ -136,7 +134,7 @@ namespace llarp
 
     buf.base = body;
     buf.cur  = body;
-    buf.sz   = size - OverheadSize;
+    buf.sz   = size - EncryptedFrame::OverheadSize;
 
     if(!Decrypt(buf, shared, nonce))
     {
