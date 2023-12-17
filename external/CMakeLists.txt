@@ -54,4 +54,4 @@ endmacro()
 
 system_or_submodule(OXENC oxenc liboxenc>=1.0.4 oxen-encoding)
 system_or_submodule(CLI11 CLI11 CLI11>=2.2.0 CLI11)
-system_or_submodule(LIBOQS liboqs liboqs>=0.9.0 oqs)
+system_or_submodule(OQS oqs liboqs>=0.9.0 liboqs)

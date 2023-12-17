@@ -11,6 +11,7 @@ int main() {
 }
 ]])
 
+
 check_cxx_source_compiles("${std_optional_code}" was_compiled)
 if(was_compiled)
   message(STATUS "we have std::optional")
@@ -30,8 +31,11 @@ int main() {
 }
 ]])
 
+set(filesystem_is_good 0)
 check_cxx_source_compiles("${filesystem_code}" filesystem_compiled)
-if(NOT filesystem_compiled)
+if(filesystem_compiled)
+set(filesystem_is_good 1)
+else()
   message(STATUS "trying extra link flags for std::filesystem")
   foreach(fslib stdc++fs c++fs)
     set(CMAKE_REQUIRED_LIBRARIES -l${fslib})

@@ -24,6 +24,9 @@ add_library(lokinet-util
 
 add_dependencies(lokinet-util genversion)
 
+
+# todo: add to platforms directory in root
+
 # lokinet-platform holds all platform specific code
 add_library(lokinet-platform
   STATIC
@@ -42,39 +45,22 @@ add_library(lokinet-platform
   vpn/platform.cpp
 )
 
+
+
 if (ANDROID)
   target_sources(lokinet-platform PRIVATE android/ifaddrs.c util/nop_service_manager.cpp)
 endif()
 
 if(CMAKE_SYSTEM_NAME MATCHES "Linux")
-  target_sources(lokinet-platform PRIVATE linux/dbus.cpp)
   if(WITH_SYSTEMD)
-    target_sources(lokinet-platform PRIVATE linux/sd_service_manager.cpp)
+    target_sources(lokinet-platform PRIVATE linux/sd_service_manager.cpp linux/dbus.cpp)
   else()
     target_sources(lokinet-platform PRIVATE util/nop_service_manager.cpp)
   endif()
-endif()
-
-if (WIN32)
-  target_sources(lokinet-platform PRIVATE
-    net/win32.cpp
-    vpn/win32.cpp
-    win32/service_manager.cpp
-    win32/exec.cpp
-    win32/dll.cpp
-    win32/exception.cpp
-    win32/wintun.cpp
-    win32/windivert.cpp)
-  target_include_directories(lokinet-platform PRIVATE ${CMAKE_BINARY_DIR}/wintun/include/ ${CMAKE_BINARY_DIR}/WinDivert-${WINDIVERT_VERSION}/include/)
-else()
   target_sources(lokinet-platform PRIVATE
     net/posix.cpp)
 endif()
 
-if(APPLE)
-  add_subdirectory(apple)
-  target_sources(lokinet-platform PRIVATE util/nop_service_manager.cpp)
-endif()
 
 # lokinet-dns is the dns parsing and hooking library that we use to
 # parse modify and reconstitute dns wire proto, dns queries and RR
@@ -216,19 +202,6 @@ add_library(lokinet-layer-link
   messages/link_message_parser.cpp
 )
 
-# lokinet-plainquic is for holding the tunneled plainquic code, not quic wire protocol code
-add_library(lokinet-plainquic
-  STATIC
-  quic/address.cpp
-  quic/client.cpp
-  quic/connection.cpp
-  quic/endpoint.cpp
-  quic/null_crypto.cpp
-  quic/server.cpp
-  quic/stream.cpp
-  quic/tunnel.cpp
-)
-
 # lokinet-context holds the contextualized god objects for a lokinet instance
 # it is what any main function would link to in practice but it is hidden behind an interface library (lokinet-amalgum)
 add_library(lokinet-context
@@ -333,12 +306,7 @@ add_library(lokinet-base INTERFACE)
 target_include_directories(lokinet-base
   INTERFACE ${PROJECT_SOURCE_DIR} ${PROJECT_SOURCE_DIR}/include
 )
-target_link_libraries(lokinet-base INTERFACE oxen::logging lokinet-cryptography)
-
-if(WITH_PEERSTATS)
-  target_compile_definitions(lokinet-base INTERFACE -DLOKINET_PEERSTATS_BACKEND)
-  target_link_libraries(lokinet-base INTERFACE sqlite_orm)
-endif()
+target_link_libraries(lokinet-base INTERFACE lokinet-cryptography)
 
 # interface libraries for internal linkage
 add_library(lokinet-layers INTERFACE)
@@ -394,10 +362,6 @@ lokinet_link_lib(lokinet-dht
   lokinet-nodedb
 )
 
-lokinet_link_lib(lokinet-plainquic
-  lokinet-platform
-  lokinet-config
-)
 
 lokinet_link_lib(lokinet-dns
   lokinet-platform
@@ -464,7 +428,6 @@ if(use_old_impl)
     lokinet-dns
     lokinet-nodedb
     lokinet-context
-    lokinet-plainquic
     lokinet-layer-routing
     lokinet-layer-onion
     lokinet-dht
@@ -486,10 +449,6 @@ target_link_libraries(lokinet-layers INTERFACE
 
 # per component external deps
 
-target_link_libraries(lokinet-config PUBLIC oxenmq::oxenmq)
-target_link_libraries(lokinet-platform PUBLIC oxenmq::oxenmq)
-target_link_libraries(lokinet-dns PUBLIC libunbound)
-
 target_link_libraries(lokinet-cryptography PUBLIC
   oxenc::oxenc
   sodium
@@ -497,42 +456,15 @@ target_link_libraries(lokinet-cryptography PUBLIC
 
 target_link_libraries(lokinet-context PUBLIC
   CLI11
-  oxenmq::oxenmq
-  uvw
 )
 
 target_link_libraries(lokinet-platform PUBLIC
   Threads::Threads
   base_libs
-  uvw
 )
 
 target_link_libraries(lokinet-util PUBLIC
-  nlohmann_json::nlohmann_json
   filesystem
   oxenc::oxenc
 )
 
-target_link_libraries(lokinet-plainquic PUBLIC
-  ngtcp2_static
-  uvw
-)
-
-if(WITH_EMBEDDED_LOKINET)
-  include(GNUInstallDirs)
-  add_library(lokinet-shared SHARED lokinet_shared.cpp)
-  target_link_libraries(lokinet-shared PUBLIC lokinet-amalgum)
-  if(WIN32)
-    set(CMAKE_SHARED_LIBRARY_PREFIX_CXX "")
-  endif()
-  set_target_properties(lokinet-shared PROPERTIES OUTPUT_NAME lokinet)
-  if(WIN32)
-    target_link_libraries(lokinet-shared PUBLIC ws2_32 iphlpapi -fstack-protector)
-    install(TARGETS lokinet-shared DESTINATION bin COMPONENT liblokinet)
-  elseif(NOT APPLE)
-    install(TARGETS lokinet-shared LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT liblokinet)
-  endif()
-endif()
-
-file(GLOB_RECURSE docs_SRC */*.hpp *.hpp)
-set(DOCS_SRC ${docs_SRC} PARENT_SCOPE)

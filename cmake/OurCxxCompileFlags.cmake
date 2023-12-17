@@ -17,4 +17,3 @@ if(WARN_DEPRECATED)
 else()
   list(APPEND warning_flags -Wno-deprecated-declarations)
 endif()
-`

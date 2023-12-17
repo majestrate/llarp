@@ -1,6 +1,7 @@
 # -flto
 include(CheckIPOSupported)
 option(WITH_LTO "enable lto on compile time" ON)
+
 if(WITH_LTO)
   if(WIN32)
     message(FATAL_ERROR "LTO not supported on win32 targets, please set -DWITH_LTO=OFF")

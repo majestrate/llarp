@@ -29,11 +29,18 @@
 # 
 # Parts of this file are originally copyright (c) 2012-2013 The Cryptonote developers
 
-find_package(Git REQUIRED)
+
+find_program(GIT git REQUIRED)
+
+message(STATUS "generate version using: ${GIT} rev-parse --short HEAD")
 
 # Check what commit we're on
-execute_process(COMMAND "${GIT}" rev-parse --short HEAD RESULT_VARIABLE RET OUTPUT_VARIABLE COMMIT OUTPUT_STRIP_TRAILING_WHITESPACE)
-
+execute_process(COMMAND "${GIT}" rev-parse --short HEAD 
+    RESULT_VARIABLE RET 
+    OUTPUT_VARIABLE COMMIT 
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
+    
 if(RET)
 	# Something went wrong, set the version tag to -unknown
     message(WARNING "Cannot determine current commit. Make sure that you are building either from a Git working tree or from a source archive.")
@@ -59,4 +66,4 @@ else()
     endif()
 endif()
 
-configure_file("${SRC}" "${DEST}" @ONLY)
+configure_file("${CMAKE_SOURCE_DIR}/llarp/constants/version.cpp.in" "${CMAKE_BINARY_DIR}/llarp/constants/version.cpp" @ONLY)

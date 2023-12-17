@@ -31,3 +31,6 @@ if(WITH_SYSTEMD AND LINUX)
   target_link_libraries(base_libs INTERFACE PkgConfig::SD)
   target_compile_definitions(base_libs INTERFACE WITH_SYSTEMD)
 endif()
+
+pkg_check_modules(EVENT libevent REQUIRED)
+target_link_libraries(base_libs INTERFACE PkgConfig:EVENT)

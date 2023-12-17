@@ -37,6 +37,7 @@ endif()
 include(MacroEnsureOutOfSourceBuild)
 macro_ensure_out_of_source_build("${PROJECT_NAME} requires an out-of-source build.  Create a build directory and run 'cmake ${CMAKE_SOURCE_DIR} [options]'.")
 
+include(CheckCXXSourceCompiles)
 # set cxx standards
 include(OurCxxStandards)
 
@@ -46,10 +47,15 @@ include(OurCxxCompileFlags)
 include(OurCxxSanitizers)
 include(OurCxxCoverage)
 
+# option()s for BUILD_*
+include(OurBuildOptions)
+
 include(GenVersion)
 include(TargetLinkLibrariesSystem)
 include(AddImportLibrary)
 include(Atomic)
+include(EnableLTO)
+
 
 
 # base interface target where we set up global link libraries, definitions, includes, etc.
@@ -59,18 +65,20 @@ add_library(filesystem INTERFACE)
 
 # add all our deps 
 include(Deps)
-# package maintainer and vendor quarks
-include(VendorOpts)
 
-
+# add all source directories
 add_subdirectory(external)
+add_subdirectory(crypto)
 add_subdirectory(llarp)
-add_subdirectory(platforms)
 
+if(BUILD_EXTRA_PLATFORMS)
+  add_subdirectory(platforms)
+endif()
 
 if(BUILD_TESTS)
   add_subdirectory(test)
 endif()
+
 if(BUILD_DOCS)
   add_subdirectory(docs)
 endif()
