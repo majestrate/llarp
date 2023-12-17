@@ -12,7 +12,8 @@
 				"pkg-config",
 				"libsodium-dev",
 				"libevent-dev",
-				"libsystemd-dev"
+				"libsystemd-dev",
+				"libspdlog-dev"
 			]
 		}
 	}
