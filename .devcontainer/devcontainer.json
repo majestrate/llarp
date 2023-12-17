@@ -1,5 +1,5 @@
 {
-	"image": "mcr.microsoft.com/devcontainers/universal:2",
+	"image": "mcr.microsoft.com/devcontainers/base:debian",
 	"features": {
 		"ghcr.io/devcontainers-contrib/features/apt-packages:1": {
 			"clean_ppas": true,
@@ -7,14 +7,13 @@
 			"packages": [
 				"build-essential",
 				"ccache",
-				"clang", "clang-tidy", "clang-tools", "clang-format",
+				"clang-16", "clang-tidy-16", "clang-tools-16", "clang-format-16",
 				"cmake",
 				"pkg-config",
 				"libsodium-dev",
 				"libevent-dev",
 				"libsystemd-dev"
-			],
-			"ppas": "ppa:deadsnakes/ppa"
+			]
 		}
 	}
 }
