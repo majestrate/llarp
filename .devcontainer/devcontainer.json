@@ -4,7 +4,16 @@
 		"ghcr.io/devcontainers-contrib/features/apt-packages:1": {
 			"clean_ppas": true,
 			"preserve_apt_list": true,
-			"packages": ["build-essential", "cmake", "libsodium-dev", "pkg-config", "libevent-dev", "libsystemd-dev", "ccache"],
+			"packages": [
+				"build-essential",
+				"ccache",
+				"clang", "clang-tidy", "clang-tools", "clang-format",
+				"cmake",
+				"pkg-config",
+				"libsodium-dev",
+				"libevent-dev",
+				"libsystemd-dev"
+			],
 			"ppas": "ppa:deadsnakes/ppa"
 		}
 	}
