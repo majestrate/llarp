@@ -1,0 +1,11 @@
+{
+	"image": "mcr.microsoft.com/devcontainers/universal:2",
+	"features": {
+		"ghcr.io/devcontainers-contrib/features/apt-packages:1": {
+			"clean_ppas": true,
+			"preserve_apt_list": true,
+			"packages": ["build-essential", "cmake", "libsodium-dev", "pkg-config", "libevent-dev", "libsystemd-dev"],
+			"ppas": "ppa:deadsnakes/ppa"
+		}
+	}
+}
