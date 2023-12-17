@@ -24,17 +24,9 @@ if(SUBMODULE_CHECK)
     endfunction ()
 
     message(STATUS "Checking submodules")
-    check_submodule(nlohmann)
-    check_submodule(ghc-filesystem)
-    check_submodule(oxen-logging fmt spdlog)
-    check_submodule(pybind11)
-    check_submodule(sqlite_orm)
-    check_submodule(oxen-mq)
     check_submodule(oxen-encoding)
-    check_submodule(uvw)
-    check_submodule(cpr)
-    check_submodule(ngtcp2)
     check_submodule(CLI11)
+    check_submodule(liboqs)
   endif()
 endif()
 
@@ -61,105 +53,5 @@ macro(system_or_submodule BIGNAME smallname pkgconf subdir)
 endmacro()
 
 system_or_submodule(OXENC oxenc liboxenc>=1.0.4 oxen-encoding)
-system_or_submodule(OXENMQ oxenmq liboxenmq>=1.2.14 oxen-mq)
-
-set(JSON_BuildTests OFF CACHE INTERNAL "")
-set(JSON_Install OFF CACHE INTERNAL "")
-system_or_submodule(NLOHMANN nlohmann_json nlohmann_json>=3.7.0 nlohmann)
-
-if (STATIC OR FORCE_SPDLOG_SUBMODULE OR FORCE_FMT_SUBMODULE)
-    set(OXEN_LOGGING_FORCE_SUBMODULES ON CACHE INTERNAL "")
-endif()
-set(OXEN_LOGGING_SOURCE_ROOT "${PROJECT_SOURCE_DIR}" CACHE INTERNAL "")
-add_subdirectory(oxen-logging)
-
-if(WITH_HIVE)
-  add_subdirectory(pybind11 EXCLUDE_FROM_ALL)
-endif()
-
 system_or_submodule(CLI11 CLI11 CLI11>=2.2.0 CLI11)
-
-if(WITH_PEERSTATS)
-  add_library(sqlite_orm INTERFACE)
-  target_include_directories(sqlite_orm SYSTEM INTERFACE sqlite_orm/include)
-  if(NOT TARGET sqlite3)
-    add_library(sqlite3 INTERFACE)
-    pkg_check_modules(SQLITE3 REQUIRED IMPORTED_TARGET sqlite3)
-    target_link_libraries(sqlite3 INTERFACE PkgConfig::SQLITE3)
-  endif()
-  target_link_libraries(sqlite_orm INTERFACE sqlite3)
-endif()
-
-add_library(uvw INTERFACE)
-target_include_directories(uvw INTERFACE uvw/src)
-target_link_libraries(uvw INTERFACE libuv)
-
-# ngtcp2 needs some massaging to build nicely:
-include(ngtcp2_lib)
-add_ngtcp2_lib()
-
-# cpr configuration.  Ideally we'd just do this via add_subdirectory, but cpr's cmake requires
-# 3.15+, and we target lower than that (and this is fairly simple to build).
-if(WITH_BOOTSTRAP)
-  if(NOT BUILD_STATIC_DEPS)
-    find_package(CURL REQUIRED COMPONENTS HTTP HTTPS SSL)
-
-    # CURL::libcurl wasn't added to FindCURL until cmake 3.12, so add it if necessary
-    if (CMAKE_VERSION VERSION_LESS 3.12 AND NOT TARGET CURL::libcurl)
-      add_library(libcurl UNKNOWN IMPORTED GLOBAL)
-      set_target_properties(libcurl PROPERTIES
-        IMPORTED_LOCATION ${CURL_LIBRARIES}
-        INTERFACE_INCLUDE_DIRECTORIES "${CURL_INCLUDE_DIRS}")
-      add_library(CURL_libcurl INTERFACE)
-      target_link_libraries(CURL_libcurl INTERFACE libcurl)
-      add_library(CURL::libcurl ALIAS CURL_libcurl)
-    endif()
-  endif()
-
-  file(GLOB cpr_sources ${conf_depends} cpr/cpr/*.cpp)
-
-  add_library(cpr STATIC EXCLUDE_FROM_ALL ${cpr_sources})
-  target_link_libraries(cpr PUBLIC CURL::libcurl)
-  target_include_directories(cpr PUBLIC cpr/include)
-  target_compile_definitions(cpr PUBLIC CPR_CURL_NOSIGNAL)
-  add_library(cpr::cpr ALIAS cpr)
-
-  file(READ cpr/CMakeLists.txt cpr_cmake_head LIMIT 1000)
-  if(cpr_cmake_head MATCHES "project\\(cpr VERSION ([0-9]+)\.([0-9]+)\.([0-9]+) LANGUAGES CXX\\)")
-    set(cpr_VERSION_MAJOR ${CMAKE_MATCH_1})
-    set(cpr_VERSION_MINOR ${CMAKE_MATCH_2})
-    set(cpr_VERSION_PATCH ${CMAKE_MATCH_3})
-    set(cpr_VERSION "${cpr_VERSION_MAJOR}.${cpr_VERSION_MINOR}.${cpr_VERSION_PATCH}")
-    set(cpr_VERSION_NUM "(${cpr_VERSION_MAJOR} * 0x10000 + ${cpr_VERSION_MINOR} * 0x100 + ${cpr_VERSION_PATCH})")
-
-    configure_file(cpr/cmake/cprver.h.in "${CMAKE_CURRENT_BINARY_DIR}/cpr_generated_includes/cpr/cprver.h")
-    target_include_directories(cpr PUBLIC "${CMAKE_CURRENT_BINARY_DIR}/cpr_generated_includes")
-  else()
-    message(FATAL_ERROR "Could not identify cpr submodule version!")
-  endif()
-
-endif()
-
-
-# libcrypt defaults, only on with macos and non static linux
-set(default_libcrypt OFF)
-
-if(LINUX AND NOT STATIC_LINK)
-  set(default_libcrypt ON)
-endif()
-if(MACOS)
-  set(default_libcrypt ON)
-endif()
-
-option(WITH_LIBCRYPT "enable fast password hash with libcrypt" ${default_libcrypt})
-
-add_library(lokinet-libcrypt INTERFACE)
-if(WITH_LIBCRYPT)
-  pkg_check_modules(LIBCRYPT libcrypt IMPORTED_TARGET REQUIRED)
-  add_definitions(-DHAVE_CRYPT)
-  target_link_libraries(lokinet-libcrypt INTERFACE PkgConfig::LIBCRYPT)
-  message(STATUS "using libcrypt ${LIBCRYPT_VERSION}")
-else()
-  # TODO static build lib crypt?
-  message(STATUS "not building with libcrypt")
-endif()
+system_or_submodule(LIBOQS liboqs liboqs>=0.9.0 oqs)
