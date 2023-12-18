@@ -154,21 +154,8 @@ namespace llarp
     return bencode_end(buff);
   }
 
-  IpAddress
-  AddressInfo::toIpAddress() const
-  {
-    SockAddr addr(ip);
-    addr.setPort(port);
-    return IpAddress(addr);
-  }
 
-  void
-  AddressInfo::fromSockAddr(const SockAddr& addr)
-  {
-    const auto* addr6 = static_cast<const sockaddr_in6*>(addr);
-    memcpy(ip.s6_addr, addr6->sin6_addr.s6_addr, sizeof(ip.s6_addr));
-    port = addr.getPort();
-  }
+
 
   std::string
   AddressInfo::ToString() const
@@ -178,17 +165,4 @@ namespace llarp
     return fmt::format("[{}]:{}", tmp, port);
   }
 
-  void
-  to_json(nlohmann::json& j, const AddressInfo& a)
-  {
-    char tmp[128] = {0};
-    inet_ntop(AF_INET6, (void*)&a.ip, tmp, sizeof(tmp));
-
-    j = nlohmann::json{
-        {"rank", a.rank},
-        {"dialect", a.dialect},
-        {"pubkey", a.pubkey.ToString()},
-        {"in6_addr", tmp},
-        {"port", a.port}};
-  }
 }  // namespace llarp

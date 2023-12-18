@@ -3,16 +3,13 @@
 #include "llarp/constants/version.hpp"
 #include "llarp/crypto/types.hpp"
 #include "llarp/net/address_info.hpp"
-#include "llarp/net/exit_info.hpp"
 #include "llarp/util/aligned.hpp"
 #include "llarp/util/bencode.hpp"
-#include "llarp/util/status.hpp"
+
 #include "router_version.hpp"
 
-#include "llarp/dns/srv_data.hpp"
-
 #include <functional>
-#include <nlohmann/json.hpp>
+
 #include <vector>
 
 #define MAX_RC_SIZE (1024)
@@ -83,8 +80,7 @@ namespace llarp
     llarp::PubKey pubkey;
     // signature
     llarp::Signature signature;
-    /// node nickname, yw kee
-    llarp::AlignedBuffer<NICKLEN> nickname;
+
 
     llarp_time_t last_updated = 0s;
     uint64_t version = llarp::constants::proto_version;
@@ -94,17 +90,7 @@ namespace llarp
 
     std::string signed_bt_dict;
 
-    std::vector<dns::SRVData> srvRecords;
-
-    util::StatusObject
-    ExtractStatus() const;
-
-    nlohmann::json
-    ToJson() const
-    {
-      return ExtractStatus();
-    }
-
+ 
     std::string
     ToString() const;
 
@@ -121,7 +107,7 @@ namespace llarp
     operator==(const RouterContact& other) const
     {
       return addrs == other.addrs && enckey == other.enckey && pubkey == other.pubkey
-          && signature == other.signature && nickname == other.nickname
+          && signature == other.signature 
           && last_updated == other.last_updated && netID == other.netID;
     }
 
@@ -186,7 +172,7 @@ namespace llarp
     llarp_time_t
     Age(llarp_time_t now) const;
 
-    bool
+    constexpr bool
     OtherIsNewer(const RouterContact& other) const
     {
       return last_updated < other.last_updated;

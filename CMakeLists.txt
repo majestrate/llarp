@@ -1,11 +1,10 @@
 cmake_minimum_required(VERSION 3.24) 
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-
+set(PROJECT_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
 
 set(LANGS C CXX)
-
 find_program(CCACHE_PROGRAM ccache)
 if(CCACHE_PROGRAM)
   foreach(lang ${LANGS})
@@ -63,12 +62,9 @@ add_library(base_libs INTERFACE)
 # std filesystem 
 add_library(filesystem INTERFACE)
 
-# add all our deps 
-include(Deps)
-
-# add all source directories
+# add dependencies 
 add_subdirectory(external)
-add_subdirectory(crypto)
+# add main source
 add_subdirectory(llarp)
 
 if(BUILD_EXTRA_PLATFORMS)
@@ -83,14 +79,3 @@ if(BUILD_DOCS)
   add_subdirectory(docs)
 endif()
 
-
-# uninstall target
-if(NOT TARGET uninstall)
-  configure_file(
-    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/cmake_uninstall.cmake.in"
-    "${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake"
-    IMMEDIATE @ONLY)
-
-  add_custom_target(uninstall
-    COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake)
-endif()

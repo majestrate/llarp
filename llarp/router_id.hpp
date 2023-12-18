@@ -1,7 +1,7 @@
 #pragma once
 
-#include "util/aligned.hpp"
-#include "util/status.hpp"
+#include <llarp/util/aligned.hpp>
+
 
 namespace llarp
 {
@@ -19,8 +19,6 @@ namespace llarp
     RouterID(const Data& data) : AlignedBuffer<SIZE>(data)
     {}
 
-    util::StatusObject
-    ExtractStatus() const;
 
     std::string
     ToString() const;

@@ -6,6 +6,7 @@ find_package(PkgConfig REQUIRED)
 set(CMAKE_THREAD_PREFER_PTHREAD TRUE)
 set(THREADS_PREFER_PTHREAD_FLAG TRUE)
 find_package(Threads REQUIRED)
+target_link_libraries(base_libs INTERFACE Threads::Threads)
 
 # TODO: if linux else if nop 
 pkg_check_modules(SD libsystemd IMPORTED_TARGET)
@@ -34,3 +35,7 @@ endif()
 
 pkg_check_modules(EVENT libevent REQUIRED)
 target_link_libraries(base_libs INTERFACE PkgConfig:EVENT)
+
+pkg_check_modules(SPDLOG spdlog>=1.10 REQUIRED)
+target_link_libraries(base_libs INTERFACE PkgConfig:SPDLOG)
+

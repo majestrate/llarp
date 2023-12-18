@@ -6,12 +6,12 @@ namespace llarp::net
   ProtocolInfo::ProtocolInfo(std::string_view data)
   {
     const auto parts = split(data, "/");
-    protocol = ParseIPProtocol(std::string{parts[0]});
+    protocol = get_ip_proto_by_name(std::string{parts[0]});
     if (parts.size() == 2)
     {
       huint16_t portHost{};
       std::string portStr{parts[1]};
-      std::string protoName = IPProtocolName(protocol);
+      std::string protoName = ip_proto_to_string(protocol);
       if (const auto* serv = ::getservbyname(portStr.c_str(), protoName.c_str()))
       {
         portHost.h = serv->s_port;
@@ -180,34 +180,7 @@ namespace llarp::net
         buf);
   }
 
-  util::StatusObject
-  ProtocolInfo::ExtractStatus() const
-  {
-    util::StatusObject status{
-        {"protocol", static_cast<uint32_t>(protocol)},
-    };
-    if (port)
-      status["port"] = ToHost(*port).h;
-    return status;
-  }
 
-  util::StatusObject
-  TrafficPolicy::ExtractStatus() const
-  {
-    std::vector<util::StatusObject> rangesStatus;
-    std::transform(
-        ranges.begin(), ranges.end(), std::back_inserter(rangesStatus), [](const auto& range) {
-          return range.ToString();
-        });
 
-    std::vector<util::StatusObject> protosStatus;
-    std::transform(
-        protocols.begin(),
-        protocols.end(),
-        std::back_inserter(protosStatus),
-        [](const auto& proto) { return proto.ExtractStatus(); });
-
-    return util::StatusObject{{"ranges", rangesStatus}, {"protocols", protosStatus}};
-  }
 
 }  // namespace llarp::net

@@ -66,4 +66,4 @@ else()
     endif()
 endif()
 
-configure_file("${CMAKE_SOURCE_DIR}/llarp/constants/version.cpp.in" "${CMAKE_BINARY_DIR}/llarp/constants/version.cpp" @ONLY)
+configure_file("${PROJECT_ROOT_DIR}/llarp/constants/version.cpp.in" "${CMAKE_BINARY_DIR}/llarp/constants/version.cpp" @ONLY)

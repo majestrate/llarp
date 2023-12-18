@@ -1,11 +1,13 @@
 include(Version)
 
-target_sources(lokinet-cryptography PRIVATE
+add_library(lokinet-cryptography
+  STATIC
   crypto/crypto_libsodium.cpp
   crypto/crypto.cpp
   crypto/encrypted_frame.cpp
   crypto/types.cpp
 )
+
 
 add_library(lokinet-util
   STATIC
@@ -32,11 +34,9 @@ add_library(lokinet-platform
   STATIC
   # for networking
   ev/ev.cpp
-  ev/libuv.cpp
+  ev/libevent.cpp
   net/interface_info.cpp
   net/ip.cpp
-  net/ip_address.cpp
-  net/ip_packet.cpp
   net/ip_range.cpp
   net/net_int.cpp
   net/sock_addr.cpp
@@ -62,35 +62,12 @@ if(CMAKE_SYSTEM_NAME MATCHES "Linux")
 endif()
 
 
-# lokinet-dns is the dns parsing and hooking library that we use to
-# parse modify and reconstitute dns wire proto, dns queries and RR
-# should have no concept of dns caching, this is left as an implementation
-# detail of dns resolvers (LATER: make separate lib for dns resolvers)
-add_library(lokinet-dns
-  STATIC
-  dns/message.cpp
-  dns/name.cpp
-  dns/platform.cpp
-  dns/question.cpp
-  dns/rr.cpp
-  dns/serialize.cpp
-  dns/server.cpp
-  dns/srv_data.cpp)
-
-# platform specific bits and bobs for setting dns
-add_library(lokinet-dns-platform INTERFACE)
-if(WITH_SYSTEMD)
-  add_library(lokinet-dns-systemd STATIC dns/nm_platform.cpp dns/sd_platform.cpp)
-  target_link_libraries(lokinet-dns-platform INTERFACE lokinet-dns-systemd)
-endif()
-
 # lokinet-nodedb holds all types and logic for storing parsing and constructing
 # nodedb data published to the network and versions of it stored locally
 add_library(lokinet-nodedb
   STATIC
   bootstrap.cpp
   net/address_info.cpp
-  net/exit_info.cpp
   net/traffic_policy.cpp
   nodedb.cpp
   pow.cpp
@@ -257,29 +234,6 @@ add_library(lokinet-service-deprecated-kitchensink
   exit/session.cpp
   handlers/exit.cpp
   handlers/tun.cpp
-  service/name.cpp
-  service/address.cpp
-  service/async_key_exchange.cpp
-  service/auth.cpp
-  service/convotag.cpp
-  service/context.cpp
-  service/endpoint_state.cpp
-  service/endpoint_util.cpp
-  service/endpoint.cpp
-  service/hidden_service_address_lookup.cpp
-  service/identity.cpp
-  service/info.cpp
-  service/intro_set.cpp
-  service/intro.cpp
-  service/lns_tracker.cpp
-  service/lookup.cpp
-  service/name.cpp
-  service/outbound_context.cpp
-  service/protocol.cpp
-  service/router_lookup_job.cpp
-  service/sendcontext.cpp
-  service/session.cpp
-  service/tag.cpp
 )
 
 add_library(lokinet-layer-platform
@@ -332,19 +286,13 @@ if(TARGET lokinet-hive-tooling)
   lokinet_link_lib(lokinet-hive-tooling lokinet-context)
 endif()
 
-if(TARGET lokinet-dns-systemd)
-  lokinet_link_lib(lokinet-dns-systemd
-    lokinet-dns
-    lokinet-platform
-  )
-endif()
 
 lokinet_link_lib(lokinet-platform lokinet-util)
 
 lokinet_link_lib(lokinet-config
   lokinet-util
   lokinet-nodedb
-  lokinet-dns
+
   lokinet-platform
 )
 
@@ -360,13 +308,6 @@ lokinet_link_lib(lokinet-context
 lokinet_link_lib(lokinet-dht
   lokinet-util
   lokinet-nodedb
-)
-
-
-lokinet_link_lib(lokinet-dns
-  lokinet-platform
-  lokinet-dns-platform
-  lokinet-config
 )
 
 lokinet_link_lib(lokinet-nodedb
@@ -425,7 +366,6 @@ set(use_old_impl ON)
 if(use_old_impl)
   # flow layer deprecated-kitchensink (remove me after refactor)
   lokinet_link_lib(lokinet-service-deprecated-kitchensink
-    lokinet-dns
     lokinet-nodedb
     lokinet-context
     lokinet-layer-routing
@@ -449,9 +389,11 @@ target_link_libraries(lokinet-layers INTERFACE
 
 # per component external deps
 
-target_link_libraries(lokinet-cryptography PUBLIC
+target_link_libraries(lokinet-cryptography PRIVATE
   oxenc::oxenc
   sodium
+  oqs
+  base_libs
 )
 
 target_link_libraries(lokinet-context PUBLIC
@@ -459,7 +401,6 @@ target_link_libraries(lokinet-context PUBLIC
 )
 
 target_link_libraries(lokinet-platform PUBLIC
-  Threads::Threads
   base_libs
 )
 

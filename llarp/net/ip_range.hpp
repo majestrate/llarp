@@ -28,7 +28,7 @@ namespace llarp
     explicit IPRange(std::string _range)
     {
       if (not FromString(_range))
-        throw std::invalid_argument{"IP string '{}' cannot be parsed as IP range"_format(_range)};
+        throw std::invalid_argument{fmt::format("IP string '{}' cannot be parsed as IP range", _range)};
     }
 
     static constexpr IPRange

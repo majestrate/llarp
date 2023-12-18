@@ -1,7 +1,6 @@
 #pragma once
 
 #include "types.hpp"
-#include <nlohmann/json.hpp>
 #include <iostream>
 #include <fmt/format.h>
 #include <fmt/chrono.h>
@@ -22,8 +21,6 @@ namespace llarp
   uint64_t
   ToMS(Duration_t duration);
 
-  nlohmann::json
-  to_json(const Duration_t& t);
 
   // Returns a string such as "27m13s ago" or "in 1h12m" or "now".  You get precision of minutes
   // (for >=1h), seconds (>=10s), or milliseconds.  The `now_threshold` argument controls how close

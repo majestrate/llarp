@@ -2,10 +2,9 @@
 
 #include "uint128.hpp"
 #include "address_info.hpp"
-#include "ip_address.hpp"
 #include "net_int.hpp"
-#include "net.h"
 #include "ip_range.hpp"
+#include "sock_addr.hpp"
 #include <llarp/util/mem.hpp>
 #include <llarp/util/bits.hpp>
 
@@ -84,7 +83,7 @@ namespace llarp
           addr6.sin6_addr = IN6ADDR_ANY_INIT;
           return SockAddr{addr6};
         }
-        throw std::invalid_argument{fmt::format("{} is not a valid address family")};
+        throw std::invalid_argument{fmt::format("{} is not a valid address family", af)};
       }
 
       inline SockAddr

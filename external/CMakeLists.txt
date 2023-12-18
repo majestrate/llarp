@@ -1,6 +1,9 @@
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
+include(Deps)
+
 option(SUBMODULE_CHECK "Enables checking that vendored library submodules are up to date" ON)
 if(SUBMODULE_CHECK)
-  find_package(Git)
+  find_package(Git REQUIRED)
   if(GIT_FOUND)
     function(check_submodule relative_path)
       execute_process(COMMAND git rev-parse "HEAD" WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/${relative_path} OUTPUT_VARIABLE localHead)
@@ -54,4 +57,21 @@ endmacro()
 
 system_or_submodule(OXENC oxenc liboxenc>=1.0.4 oxen-encoding)
 system_or_submodule(CLI11 CLI11 CLI11>=2.2.0 CLI11)
-system_or_submodule(OQS oqs liboqs>=0.9.0 liboqs)
+
+
+set(OQS_BUILD_ONLY_LIB ON)
+# only build ntruprime 
+set(OQS_ENABLE_KEM_NTRUPRIME ON)
+# none of these are needed 
+set(OQS_ENABLE_KEM_BIKE OFF)
+set(OQS_ENABLE_KEM_KYBER OFF)
+set(OQS_ENABLE_KEM_HQC OFF)
+set(OQS_ENABLE_KEM_CLASSIC_MCELIECE OFF)
+set(OQS_ENABLE_KEM_FRODOKEM OFF)
+set(OQS_ENABLE_SIG_SPHINCS OFF)
+set(OQS_ENABLE_SIG_FALCON OFF)
+set(OQS_ENABLE_SIG_DILITHIUM OFF)
+
+
+add_subdirectory(liboqs)
+target_include_directories(base_libs INTERFACE ${CMAKE_CURRENT_BINARY_DIR}/liboqs/include)

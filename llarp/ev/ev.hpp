@@ -11,10 +11,6 @@
 #include <future>
 #include <utility>
 
-namespace uvw
-{
-  class Loop;
-}
 
 namespace llarp
 {
@@ -32,17 +28,20 @@ namespace llarp
 
     struct IPPacket;
   }  // namespace net
+}
 
+namespace llarp::eventloop
+{
   /// distinct event loop waker upper; used to idempotently schedule a task on the next event loop
   ///
   /// Created via EventLoop::make_waker(...).
-  class EventLoopWakeup
+  class LappWakeup
   {
    public:
     /// Destructor: remove the task from the event loop task.  (Note that destruction here only
     /// initiates removal of the task from the underlying event loop: it is *possible* for the
     /// callback to fire again if already triggered depending on the underlying implementation).
-    virtual ~EventLoopWakeup() = default;
+    virtual ~LoopWakeup() = default;
 
     /// trigger this task to run on the next event loop iteration; does nothing if already
     /// triggered.
@@ -51,64 +50,76 @@ namespace llarp
   };
 
   /// holds a repeated task on the event loop; the task is removed on destruction
-  class EventLoopRepeater
+  class PeriodicTask
   {
    public:
     // Destructor: if the task has been started then it is removed from the event loop.  Note
     // that it is possible for a task to fire *after* destruction of this container;
     // destruction only initiates removal of the periodic task.
-    virtual ~EventLoopRepeater() = default;
+    virtual ~PeriodicTask() = default;
 
     // Starts the repeater to call `task` every `every` period.
     virtual void
-    start(llarp_time_t every, std::function<void()> task) = 0;
+    start(std::chrono::duration every, std::function<void()> task) = 0;
   };
 
-  // this (nearly!) abstract base class
-  // is overriden for each platform
-  class EventLoop
+
+template<typename Callable>
+  class IdempotentCallable
   {
-   public:
-    // Runs the event loop. This does not return until sometime after `stop()` is called (and so
-    // typically you want to run this in its own thread).
-    virtual void
-    run() = 0;
+    public: 
+    virtual void 
+    reset_idempotency() = 0
+  };
 
-    virtual bool
-    running() const = 0;
+  /// @brief a threadsafe domain in which a callable can execute and modify state.
+  class StatefulDomain 
+  {
 
-    // Returns a current steady clock time value representing the current time with event loop tick
-    // granularity.  That is, the value is typically only updated at the beginning of an event loop
-    // tick.
-    virtual llarp_time_t
-    time_now() const = 0;
+    protected:
+    /// @brief determines if we are current executing in a way which we can directly execute a callable without
+    virtual bool 
+    in_our_domain() const =0;
+        public: 
 
-    // Calls a function/lambda/etc.  If invoked from within the event loop itself this calls the
-    // given lambda immediately; otherwise it passes it to `call_soon()` to be queued to run at the
+// Calls a function/lambda/etc.  If invoked from within the event loop itself this calls the
+    // given lambda immediately; otherwise it passes it to `defer()` to be queued to run at the
     // next event loop iteration.
     template <typename Callable>
     void
-    call(Callable&& f)
+  execute(Callable&& f)
     {
-      if (inEventLoop())
+      if (not in_our_domain())
       {
+        defer(std::forward<Callable>(f));
+        return;
+      }
+
+      
         f();
         wakeup();
-      }
-      else
-        call_soon(std::forward<Callable>(f));
+
+        
+    }
+
+
+    /// @brief convience warpper for execute()
+    template <typename Callable>
+    void operator()(Callable & f) 
+    {
+      execute(std::forward<Callable>(f));
     }
 
     // Queues a function to be called on the next event loop cycle and triggers it to be called as
-    // soon as possible; can be called from any thread.  Note that, unlike `call()`, this queues the
+    // soon as possible; can be called from any thread.  Note that, unlike `execute()`, this queues the
     // job even if called from the event loop thread itself and so you *usually* want to use
-    // `call()` instead.
+    // `execute()` instead.
     virtual void
-    call_soon(std::function<void(void)> f) = 0;
+    defer(std::function<void(void)> f) = 0;
 
-    // Adds a timer to the event loop to invoke the given callback after a delay.
-    virtual void
-    call_later(llarp_time_t delay_ms, std::function<void(void)> callback) = 0;
+    // Adds a timer to this statefule domain to invoke the given callback after a delay.
+    // virtual void
+    // defer_later(llarp_time_t delay_ms, std::function<void(void)> callback) = 0;
 
     // Created a repeated timer that fires ever `repeat` time unit.  Lifetime of the event
     // is tied to `owner`: callbacks will be invoked so long as `owner` remains alive, but
@@ -143,10 +154,22 @@ namespace llarp
           });
     }
 
-    // Wraps a lambda with a lambda that triggers it to be called via loop->call()
+/// @brief wrap a callable so that it is called idempotently in our domain.
+/// @tparam Callable 
+/// @param f 
+/// @return an IdempotentCallable 
+template <typename Callable>
+IdempotentCallable<Collable> 
+idempotent_caller(Callable f)
+{
+
+}
+
+
+    // Wraps a lambda with a lambda that triggers it to be called via domain->execute()
     // when invoked.  E.g.:
     //
-    //     auto x = loop->make_caller([] (int a) { std::cerr << a; });
+    //     auto x = domain->make_caller([] (int a) { std::cerr << a; });
     //     x(42);
     //     x(99);
     //
@@ -172,6 +195,28 @@ namespace llarp
         });
       };
     }
+  };
+
+  // this (nearly!) abstract base class
+  // is overriden for each platform
+  class MainLoop
+  {
+   public:
+    // Runs the event loop. This does not return until sometime after `stop()` is called (and so
+    // typically you want to run this in its own thread).
+    virtual void
+    run() = 0;
+
+    virtual bool
+    running() const = 0;
+
+    // Returns a current steady clock time value representing the current time with event loop tick
+    // granularity.  That is, the value is typically only updated at the beginning of an event loop
+    // tick.
+    virtual llarp_time_t
+    time_now() const = 0;
+
+    
 
     virtual bool
     add_network_interface(

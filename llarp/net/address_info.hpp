@@ -1,8 +1,8 @@
 #pragma once
 
 #include <llarp/crypto/types.hpp>
-#include "ip_address.hpp"
-#include "net.h"
+
+#include "net.hpp"
 #include <llarp/util/bencode.hpp>
 #include <llarp/util/mem.h>
 
@@ -41,14 +41,6 @@ namespace llarp
     bool
     DecodeKey(const llarp_buffer_t& k, llarp_buffer_t* buf);
 
-    /// Return an IpAddress representing the address portion of this AddressInfo
-    IpAddress
-    toIpAddress() const;
-
-    /// Updates our ip and port to reflect that of the given SockAddr
-    void
-    fromSockAddr(const SockAddr& address);
-
     /// get this as an explicit v4 or explicit v6
     net::ipaddr_t
     IP() const;
@@ -67,8 +59,6 @@ namespace llarp
     ToString() const;
   };
 
-  void
-  to_json(nlohmann::json& j, const AddressInfo& a);
 
   bool
   operator==(const AddressInfo& lhs, const AddressInfo& rhs);
