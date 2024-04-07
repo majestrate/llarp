@@ -282,12 +282,11 @@ namespace llarp
 
       if (outer_version == 1)
       {
-        bool decode_result = DecodeVersion_1(btlist);
+        DecodeVersion_1(btlist);
 
         // advance the llarp_buffer_t since lokimq serialization is unaware of it.
-        buf->cur += btlist.current_buffer().data() - buf_view.data() + 1;
-
-        return decode_result;
+        // buf->cur += btlist.end() - buf_view.data() + 1;
+        throw std::runtime_error{"version 1 router contact not allowed"};
       }
       else
       {

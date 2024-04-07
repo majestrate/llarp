@@ -257,7 +257,7 @@ namespace llarp
         log::warning(logcat, "Failed to encode profiling data: {}", e.what());
         return false;
       }
-      buf.resize(d.end() - buf.data());
+      buf.resize(d.view().end() - buf.data());
     }
 
     try
