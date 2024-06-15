@@ -10,6 +10,6 @@ namespace llarp
   const char* const VERSION_FULL  = "lokinet-@lokinet_VERSION_MAJOR@.@lokinet_VERSION_MINOR@.@lokinet_VERSION_PATCH@-@VERSIONTAG@";
 
   const char* const RELEASE_MOTTO = "@RELEASE_MOTTO@";
-  const char* const DEFAULT_NETID = "lokinet";
+  const char* const DEFAULT_NETID = "opennet";
   // clang-format on
 }  // namespace llarp
