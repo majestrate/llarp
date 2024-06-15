@@ -1052,31 +1052,6 @@ namespace llarp
       connectToNum = strictConnect;
     }
 
-    if (isSvcNode and now >= m_NextDecommissionWarn)
-    {
-      constexpr auto DecommissionWarnInterval = 5min;
-      if (auto registered = LooksRegistered(), funded = LooksFunded();
-          not(registered and funded and not decom))
-      {
-        // complain about being deregistered/decommed/unfunded
-        log::error(
-            logcat,
-            "We are running as a service node but we seem to be {}",
-            not registered ? "deregistered"
-                : decom    ? "decommissioned"
-                           : "not fully staked");
-        m_NextDecommissionWarn = now + DecommissionWarnInterval;
-      }
-      else if (TooFewPeers())
-      {
-        log::error(
-            logcat,
-            "We appear to be an active service node, but have only {} known peers.",
-            nodedb()->NumLoaded());
-        m_NextDecommissionWarn = now + DecommissionWarnInterval;
-      }
-    }
-
     // if we need more sessions to routers and we are not a service node kicked from the network or
     // we are a client we shall connect out to others
     if (connected < connectToNum and (LooksFunded() or not isSvcNode))

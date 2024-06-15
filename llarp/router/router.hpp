@@ -562,11 +562,7 @@ namespace llarp
 
     bool m_isServiceNode = false;
 
-    // Delay warning about being decommed/dereged until we've had enough time to sync up with oxend
-    static constexpr auto DECOMM_WARNING_STARTUP_DELAY = 15s;
-
     llarp_time_t m_LastStatsReport = 0s;
-    llarp_time_t m_NextDecommissionWarn = time_now_ms() + DECOMM_WARNING_STARTUP_DELAY;
     std::shared_ptr<llarp::KeyManager> m_keyManager;
     std::shared_ptr<PeerDb> m_peerDb;
 
