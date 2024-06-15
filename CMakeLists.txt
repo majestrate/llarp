@@ -25,17 +25,17 @@ endif()
 
 
 project(lokinet
-    VERSION 0.9.11
+    VERSION 0.10.0
     DESCRIPTION "lokinet - IP packet onion router"
     LANGUAGES ${LANGS})
 
 if(APPLE)
     # Apple build number: must be incremented to submit a new build for the same lokinet version,
     # should be reset to 0 when the lokinet version increments.
-    set(LOKINET_APPLE_BUILD 5)
+    set(LOKINET_APPLE_BUILD 0)
 endif()
 
-set(RELEASE_MOTTO "Our Lord And Savior" CACHE STRING "Release motto")
+set(RELEASE_MOTTO "Just like me frfr" CACHE STRING "Release motto")
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 
