@@ -527,34 +527,25 @@ namespace llarp
   bool
   Router::LooksDecommissioned() const
   {
-    return IsServiceNode() and whitelistRouters and _rcLookupHandler.HaveReceivedWhitelist()
-        and _rcLookupHandler.IsGreylisted(pubkey());
+    return false;
   }
 
   bool
   Router::LooksFunded() const
   {
-    return IsServiceNode() and whitelistRouters and _rcLookupHandler.HaveReceivedWhitelist()
-        and _rcLookupHandler.SessionIsAllowed(pubkey());
+    return true;
   }
 
   bool
   Router::LooksRegistered() const
   {
-    return IsServiceNode() and whitelistRouters and _rcLookupHandler.HaveReceivedWhitelist()
-        and _rcLookupHandler.IsRegistered(pubkey());
+    return true;
   }
 
   bool
   Router::ShouldTestOtherRouters() const
   {
-    if (not IsServiceNode())
-      return false;
-    if (not whitelistRouters)
-      return true;
-    if (not _rcLookupHandler.HaveReceivedWhitelist())
-      return false;
-    return _rcLookupHandler.SessionIsAllowed(pubkey());
+    return IsServiceNode();
   }
 
   bool
