@@ -4,11 +4,9 @@ if(APPLE)
   add_executable(llarpd lokinet.swift)
   target_compile_options(llarpd BEFORE PRIVATE -target x86_64-apple-macos${CMAKE_OSX_DEPLOYMENT_TARGET})
 else()
-  add_executable(llarpd lokinet.cpp)
+  add_executable(llarpd main.cpp)
 endif()
-add_executable(llarp-vpn lokinet-vpn.cpp)
-enable_lto(llarpd llarp-vpn)
-list(APPEND exetargets llarp-vpn)
+
 
 set(should_install ON)
 set(SETCAP)

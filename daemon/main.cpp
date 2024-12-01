@@ -348,7 +348,7 @@ namespace
 #endif
 
   int
-  lokinet_main(int argc, char** argv)
+  llarp_main(int argc, char** argv)
   {
     if (auto result = Lokinet_INIT())
       return result;
@@ -363,21 +363,21 @@ namespace
 #endif
 
     CLI::App cli{
-        "LokiNET is a free, open source, private, decentralized, market-based sybil resistant and "
+        "LLARP is a free, open source, private, decentralized "
         "IP "
         "based onion routing network",
-        "lokinet"};
+        "llarpd"};
     command_line_options options{};
 
     // flags: boolean values in command_line_options struct
-    cli.add_flag("--version", options.version, "Lokinet version");
+    cli.add_flag("--version", options.version, "llarpd version");
     cli.add_flag("-g,--generate", options.generate, "Generate default configuration and exit");
     cli.add_flag(
-        "-r,--router", options.router, "Run lokinet in routing mode instead of client-only mode");
+        "-r,--router", options.router, "Run llarpd in routing mode instead of client-only mode");
     cli.add_flag("-f,--force", options.overwrite, "Force writing config even if file exists");
 
     // options: string
-    cli.add_option("config,--config", options.configPath, "Path to lokinet.ini configuration file")
+    cli.add_option("config,--config", options.configPath, "Path to config.ini configuration file")
         ->capture_default_str();
 
     if constexpr (llarp::platform::is_windows)
@@ -608,17 +608,17 @@ namespace
       }
       catch (llarp::util::bind_socket_error& ex)
       {
-        llarp::LogError(fmt::format("{}, is lokinet already running? 🤔", ex.what()));
+        llarp::LogError(fmt::format("{}, is llarpd already running? 🤔", ex.what()));
         exit_code.set_value(1);
         return;
       }
       catch (std::exception& ex)
       {
-        llarp::LogError(fmt::format("failed to start up lokinet: {}", ex.what()));
+        llarp::LogError(fmt::format("failed to start up llarpd: {}", ex.what()));
         exit_code.set_value(1);
         return;
       }
-      llarp::util::SetThreadName("llarp-mainloop");
+      llarp::util::SetThreadName("llarpd-mainloop");
 
       auto result = ctx->Run(opts);
       exit_code.set_value(result);
@@ -649,7 +649,7 @@ main(int argc, char* argv[])
   llarp::log::add_sink(llarp::logRingBuffer, llarp::log::DEFAULT_PATTERN_MONO);
 
 #ifndef _WIN32
-  return lokinet_main(argc, argv);
+  return llarp_main(argc, argv);
 #else
   SERVICE_TABLE_ENTRY DispatchTable[] = {
       {strdup("lokinet"), (LPSERVICE_MAIN_FUNCTION)win32_daemon_entry}, {NULL, NULL}};

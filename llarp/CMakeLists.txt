@@ -243,17 +243,6 @@ add_library(lokinet-context
   router/route_poker.cpp
 )
 
-# lokinet-rpc holds all rpc related compilation units
-add_library(lokinet-rpc
-  STATIC
-  rpc/json_binary_proxy.cpp
-  rpc/json_conversions.cpp
-  rpc/lokid_rpc_client.cpp
-  rpc/rpc_request_parser.cpp
-  rpc/rpc_server.cpp
-  rpc/endpoint_rpc.cpp
-)
-
 # optional peer stats library
 add_library(lokinet-peerstats
   STATIC
@@ -386,7 +375,6 @@ lokinet_link_lib(lokinet-context
   lokinet-peerstats
   lokinet-layers
   lokinet-consensus
-  lokinet-rpc
 )
 
 lokinet_link_lib(lokinet-dht
@@ -413,12 +401,6 @@ lokinet_link_lib(lokinet-nodedb
 lokinet_link_lib(lokinet-util
   lokinet-nodedb
   lokinet-platform
-)
-
-lokinet_link_lib(lokinet-rpc
-  lokinet-context
-  lokinet-peerstats
-  lokinet-util
 )
 
 # inter lokinet-layer public/private linkage.
@@ -469,7 +451,6 @@ if(use_old_impl)
     lokinet-layer-onion
     lokinet-dht
     lokinet-platform
-    lokinet-rpc
   )
   target_link_libraries(lokinet-layers INTERFACE lokinet-service-deprecated-kitchensink)
 endif()
@@ -486,8 +467,6 @@ target_link_libraries(lokinet-layers INTERFACE
 
 # per component external deps
 
-target_link_libraries(lokinet-config PUBLIC oxenmq::oxenmq)
-target_link_libraries(lokinet-platform PUBLIC oxenmq::oxenmq)
 target_link_libraries(lokinet-dns PUBLIC libunbound)
 
 target_link_libraries(lokinet-cryptography PUBLIC
@@ -497,7 +476,6 @@ target_link_libraries(lokinet-cryptography PUBLIC
 
 target_link_libraries(lokinet-context PUBLIC
   CLI11
-  oxenmq::oxenmq
   uvw
 )
 

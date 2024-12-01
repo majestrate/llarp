@@ -60,11 +60,6 @@ namespace llarp
     struct Context;
   }
 
-  namespace rpc
-  {
-    struct LokidRpcClient;
-  }
-
   namespace path
   {
     struct PathContext;
@@ -106,9 +101,6 @@ namespace llarp
 
     virtual vpn::Platform*
     GetVPNPlatform() const = 0;
-
-    virtual const std::shared_ptr<rpc::LokidRpcClient>&
-    RpcClient() const = 0;
 
     virtual llarp_dht_context*
     dht() const = 0;
@@ -200,9 +192,6 @@ namespace llarp
     /// (active or decommed).
     virtual std::optional<std::string>
     OxendErrorState() const = 0;
-
-    virtual bool
-    StartRpcServer() = 0;
 
     virtual bool
     Run() = 0;
