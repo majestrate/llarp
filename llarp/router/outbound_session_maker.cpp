@@ -13,8 +13,6 @@
 #include <llarp/crypto/crypto.hpp>
 #include <utility>
 
-#include <llarp/rpc/lokid_rpc_client.hpp>
-
 namespace llarp
 {
   struct PendingSession
