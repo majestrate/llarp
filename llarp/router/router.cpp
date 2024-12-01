@@ -57,9 +57,7 @@ namespace llarp
       , _dht{llarp_dht_context_new(this)}
       , inbound_link_msg_parser{this}
       , _hiddenServiceContext{this}
-
       , m_RoutePoker{std::make_shared<RoutePoker>()}
-      , m_RPCServer{nullptr}
       , _randomStartDelay{
             platform::is_simulation ? std::chrono::milliseconds{(llarp::randint() % 1250) + 2000}
                                     : 0s}
@@ -341,50 +339,7 @@ namespace llarp
   Router::EnsureIdentity()
   {
     _encryption = m_keyManager->encryptionKey;
-
-    if (whitelistRouters)
-    {
-#if defined(ANDROID) || defined(IOS)
-      LogError("running a service node on mobile device is not possible.");
-      return false;
-#else
-#if defined(_WIN32)
-      LogError("running a service node on windows is not possible.");
-      return false;
-#endif
-#endif
-      constexpr int maxTries = 5;
-      int numTries = 0;
-      while (numTries < maxTries)
-      {
-        numTries++;
-        try
-        {
-          _identity = RpcClient()->ObtainIdentityKey();
-          const RouterID pk{pubkey()};
-          LogWarn("Obtained lokid identity key: ", pk);
-          RpcClient()->StartPings();
-          break;
-        }
-        catch (const std::exception& e)
-        {
-          LogWarn(
-              "Failed attempt ",
-              numTries,
-              " of ",
-              maxTries,
-              " to get lokid identity keys because: ",
-              e.what());
-
-          if (numTries == maxTries)
-            throw;
-        }
-      }
-    }
-    else
-    {
-      _identity = m_keyManager->identityKey;
-    }
+    _identity = m_keyManager->identityKey;
 
     if (_identity.IsZero())
       return false;
@@ -426,20 +381,11 @@ namespace llarp
 
     whitelistRouters = false;
 
-    log::debug(logcat, "Starting RPC server");
-    if (not StartRpcServer())
-      throw std::runtime_error("Failed to start rpc server");
-
     _nodedb = std::move(nodedb);
 
     m_isServiceNode = conf.router.m_isRelay;
     log::debug(
         logcat, m_isServiceNode ? "Running as a relay (service node)" : "Running as a client");
-
-    if (whitelistRouters)
-    {
-      m_lokidRpcClient->ConnectAsync(lokidRPCAddr);
-    }
 
     log::debug(logcat, "Initializing key manager");
     if (not m_keyManager->initialize(conf, true, isSNode))
@@ -865,11 +811,7 @@ namespace llarp
           nodedb()->NumLoaded(),
           NumberOfConnectedRouters(),
           NumberOfConnectedClients());
-      fmt::format_to(
-          out,
-          " | {} active paths | block {} ",
-          pathContext().CurrentTransitPaths(),
-          (m_lokidRpcClient ? m_lokidRpcClient->BlockHeight() : 0));
+      fmt::format_to(out, " | {} active paths ", pathContext().CurrentTransitPaths());
       auto maybe_last = _rcGossiper.LastGossipAt();
       fmt::format_to(
           out,
@@ -1210,12 +1152,6 @@ namespace llarp
   }
 
   bool
-  Router::StartRpcServer()
-  {
-    return true;
-  }
-
-  bool
   Router::Run()
   {
     if (_running || _stopping)
@@ -1382,8 +1318,6 @@ namespace llarp
           // this will do a dht lookup if needed
           _outboundSessionMaker.CreateSessionTo(
               router, [previous_fails = fails, this](const auto& router, const auto result) {
-                auto rpc = RpcClient();
-
                 if (result != SessionResult::Establish)
                 {
                   // failed connection mark it as so
@@ -1412,11 +1346,6 @@ namespace llarp
                   {
                     LogDebug("Successful SN connection test to ", router);
                   }
-                }
-                if (rpc)
-                {
-                  // inform as needed
-                  rpc->InformConnection(router, result == SessionResult::Establish);
                 }
               });
         }

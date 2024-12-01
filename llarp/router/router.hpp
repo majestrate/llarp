@@ -25,8 +25,6 @@
 #include "route_poker.hpp"
 #include <llarp/routing/handler.hpp>
 #include <llarp/routing/message_parser.hpp>
-#include <llarp/rpc/lokid_rpc_client.hpp>
-#include <llarp/rpc/rpc_server.hpp>
 #include <llarp/service/context.hpp>
 #include <stdexcept>
 #include <llarp/util/buffer.hpp>
@@ -88,12 +86,6 @@ namespace llarp
 
     const llarp::net::Platform&
     Net() const override;
-
-    const std::shared_ptr<rpc::LokidRpcClient>&
-    RpcClient() const override
-    {
-      return m_lokidRpcClient;
-    }
 
     llarp_dht_context*
     dht() const override
@@ -292,13 +284,8 @@ namespace llarp
     void
     PumpLL();
 
-    std::unique_ptr<rpc::RPCServer> m_RPCServer;
-
     const llarp_time_t _randomStartDelay;
 
-    std::shared_ptr<rpc::LokidRpcClient> m_lokidRpcClient;
-
-    oxenmq::address lokidRPCAddr;
     Profiling _routerProfiling;
     fs::path _profilesFile;
     OutboundMessageHandler _outboundMessageHandler;
@@ -390,9 +377,6 @@ namespace llarp
 
     bool
     Configure(std::shared_ptr<Config> conf, bool isSNode, std::shared_ptr<NodeDB> nodedb) override;
-
-    bool
-    StartRpcServer() override;
 
     void
     Freeze() override;

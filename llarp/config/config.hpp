@@ -27,8 +27,6 @@
 #include <vector>
 #include <unordered_set>
 
-#include <oxenmq/address.h>
-
 namespace llarp
 {
   using SectionValues_t = llarp::ConfigParser::SectionValues_t;
@@ -189,7 +187,7 @@ namespace llarp
   struct ApiConfig
   {
     bool m_enableRPCServer = false;
-    std::vector<oxenmq::address> m_rpcBindAddresses;
+    std::vector<std::string> m_rpcBindAddresses;
 
     void
     defineConfigOptions(ConfigDefinition& conf, const ConfigGenParameters& params);

@@ -22,7 +22,6 @@
 #include <llarp/util/meta/memfn.hpp>
 #include <llarp/nodedb.hpp>
 #include <llarp/quic/tunnel.hpp>
-#include <llarp/rpc/endpoint_rpc.hpp>
 #include <llarp/util/str.hpp>
 #include <llarp/util/logging/buffer.hpp>
 #include <llarp/dns/srv_data.hpp>

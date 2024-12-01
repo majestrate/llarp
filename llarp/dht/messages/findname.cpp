@@ -3,7 +3,6 @@
 #include <llarp/dht/context.hpp>
 #include "gotname.hpp"
 #include <llarp/router/abstractrouter.hpp>
-#include <llarp/rpc/lokid_rpc_client.hpp>
 #include <llarp/path/path_context.hpp>
 #include <llarp/routing/dht_message.hpp>
 
@@ -40,32 +39,12 @@ namespace llarp::dht
   bool
   FindNameMessage::HandleMessage(struct llarp_dht_context* dht, std::vector<Ptr_t>& replies) const
   {
-    (void)replies;
     auto r = dht->impl->GetRouter();
     if (pathID.IsZero() or not r->IsServiceNode())
       return false;
-    auto rpc = r->RpcClient();
-    if (rpc == nullptr)
-    {
-      // opennet case.
-      replies.emplace_back(new GotNameMessage(dht::Key_t{}, TxID, service::EncryptedName{}));
-      return true;
-    }
-    rpc->LookupLNSNameHash(NameHash, [r, pathID = pathID, TxID = TxID](auto maybe) {
-      auto path = r->pathContext().GetPathForTransfer(pathID);
-      if (path == nullptr)
-        return;
-      routing::DHTMessage msg;
-      if (maybe.has_value())
-      {
-        msg.M.emplace_back(new GotNameMessage(dht::Key_t{}, TxID, *maybe));
-      }
-      else
-      {
-        msg.M.emplace_back(new GotNameMessage(dht::Key_t{}, TxID, service::EncryptedName{}));
-      }
-      path->SendRoutingMessage(msg, r);
-    });
+
+    // opennet case.
+    replies.emplace_back(new GotNameMessage(dht::Key_t{}, TxID, service::EncryptedName{}));
     return true;
   }
 
