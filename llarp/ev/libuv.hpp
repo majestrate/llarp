@@ -89,6 +89,8 @@ namespace llarp::uv
     std::atomic<bool> m_Run;
     using AtomicQueue_t = llarp::thread::Queue<std::function<void(void)>>;
     AtomicQueue_t m_LogicCalls;
+    AtomicQueue_t m_DiskCalls;
+    std::unique_ptr<std::thread> m_DiskThread;
 
 #ifdef LOKINET_DEBUG
     uint64_t last_time;
