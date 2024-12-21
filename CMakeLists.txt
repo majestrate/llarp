@@ -31,6 +31,7 @@ set(RELEASE_MOTTO "Just like me frfr" CACHE STRING "Release motto")
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 
 set(DEFAULT_WITH_BOOTSTRAP OFF)
+set(DEFAULT_IOURING OFF)
 
 # Core options
 option(USE_AVX2 "enable avx2 code" OFF)
@@ -47,6 +48,7 @@ option(WITH_HIVE "build simulation stubs" OFF)
 option(BUILD_PACKAGE "builds extra components for making an installer (with 'make package')" OFF)
 option(WITH_BOOTSTRAP "build lokinet-bootstrap tool" ${DEFAULT_WITH_BOOTSTRAP})
 option(WITH_PEERSTATS "build with experimental peerstats db support" OFF)
+option(WITH_IOURING "build with io_uring event loop (Experimental)" ${DEFAULT_IOURING})
 option(STRIP_SYMBOLS "strip off all debug symbols into an external archive for all executables built" OFF)
 
 set(BOOTSTRAP_FALLBACK_MAINNET "${PROJECT_SOURCE_DIR}/contrib/bootstrap/opennet.signed" CACHE PATH "Fallback bootstrap path (opennet)")

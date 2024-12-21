@@ -88,6 +88,17 @@ namespace llarp
     cleanup(bool cancel) const;
   };
 
+  /// Abstract type to poll on a file descriptor on the event loop.
+  class EventLoopPoller
+  {
+   public:
+    virtual ~EventLoopPoller() = default;
+
+    /// stop polling on the event loop.
+    virtual void
+    close() = 0;
+  };
+
   // this (nearly!) abstract base class
   // is overriden for each platform
   class EventLoop
@@ -196,6 +207,10 @@ namespace llarp
         });
       };
     }
+
+    /// add a new event loop poller
+    virtual std::shared_ptr<EventLoopPoller>
+    add_poller(int fd, std::function<void(void)> callback) = 0;
 
     virtual bool
     add_network_interface(

@@ -10,7 +10,6 @@
 #include <optional>
 #include <memory>
 #include <unbound.h>
-#include <uvw.hpp>
 
 #include "oxen/log.hpp"
 #include "sd_platform.hpp"
@@ -116,8 +115,7 @@ namespace llarp::dns
     {
       ub_ctx* m_ctx = nullptr;
       std::weak_ptr<EventLoop> m_Loop;
-      std::shared_ptr<uvw::PollHandle> m_Poller;
-
+      std::shared_ptr<EventLoopPoller> m_Poller;
       std::optional<SockAddr> m_LocalAddr;
       std::unordered_set<std::shared_ptr<Query>> m_Pending;
 
@@ -206,10 +204,9 @@ namespace llarp::dns
                   fmt::format("Failed to create UDP socket for unbound: {}", strerror(errno))};
             }
 
-#define CLOSE close
             if (0 != bind(fd, static_cast<const sockaddr*>(addr), addr.sockaddr_len()))
             {
-              CLOSE(fd);
+              ::close(fd);
               throw std::invalid_argument{
                   fmt::format("Failed to bind UDP socket for unbound: {}", strerror(errno))};
             }
@@ -217,8 +214,7 @@ namespace llarp::dns
             auto* sa = reinterpret_cast<struct sockaddr*>(&sas);
             socklen_t sa_len = sizeof(sas);
             int rc = getsockname(fd, sa, &sa_len);
-            CLOSE(fd);
-#undef CLOSE
+            ::close(fd);
             if (rc != 0)
             {
               throw std::invalid_argument{
@@ -318,13 +314,7 @@ namespace llarp::dns
         // setup mainloop
         if (auto loop = m_Loop.lock())
         {
-          if (auto loop_ptr = loop->MaybeGetUVWLoop())
-          {
-            m_Poller = loop_ptr->resource<uvw::PollHandle>(ub_fd(m_ctx));
-            m_Poller->on<uvw::PollEvent>([this](auto&, auto&) { ub_process(m_ctx); });
-            m_Poller->start(uvw::PollHandle::Event::READABLE);
-            return;
-          }
+          m_Poller = loop->add_poller(ub_fd(m_ctx), [ctx = m_ctx]() { ub_process(ctx); });
         }
         throw std::runtime_error{"no uvw loop"};
       }

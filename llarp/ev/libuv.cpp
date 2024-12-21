@@ -1,6 +1,7 @@
 #include "libuv.hpp"
 #include <uv.h>
 #include <memory>
+#include <stdexcept>
 #include <thread>
 #include <type_traits>
 #include <cstring>
@@ -316,7 +317,7 @@ namespace llarp::uv
       on_recv(
           *this,
           SockAddr{event.sender.ip, huint16_t{static_cast<uint16_t>(event.sender.port)}},
-          OwnedBuffer{std::move(event.data), event.length});
+          OwnedBuffer{reinterpret_cast<const byte_t*>(event.data.get()), event.length});
     });
   }
 
@@ -459,11 +460,91 @@ namespace llarp::uv
   {
     if (not m_DiskCalls.enabled())
       return;
-
     m_DiskCalls.pushBack([work = std::shared_ptr<EventLoopWork>(work.release()), self = this]() {
       work->work();
       self->call_soon([work]() { work->cleanup(false); });
     });
+  }
+
+  class Poller : public EventLoopPoller
+  {
+    struct Impl
+    {
+      Poller* const m_Parent;
+      std::function<void()> m_Callback;
+      uv_poll_t m_Poller;
+
+      static void
+      on_poll(uv_poll_t* h, int status, int)
+      {
+        auto* self = reinterpret_cast<Poller::Impl*>(h->data);
+        if (status == UV_EBADF)
+        {
+          self->m_Parent->close();
+        }
+        if (status >= 0)
+          self->m_Callback();
+      }
+
+      static void
+      on_closed(uv_handle_t* h)
+      {
+        auto* self = reinterpret_cast<Poller::Impl*>(h->data);
+        self->m_Parent->m_Impl.reset();
+      }
+
+      explicit Impl(Poller* parent, std::function<void()> cb)
+          : m_Parent{parent}, m_Callback{std::move(cb)}
+      {
+        m_Poller.data = this;
+      }
+    };
+
+    std::unique_ptr<Impl> m_Impl;
+
+    auto*
+    poller()
+    {
+      return &m_Impl->m_Poller;
+    }
+    uv_handle_t*
+    handle()
+    {
+      return (uv_handle_t*)poller();
+    }
+
+   public:
+    Poller(uvw::Loop& loop, int fd, std::function<void()> callback)
+        : m_Impl{std::make_unique<Impl>(this, std::move(callback))}
+    {
+      auto* loop_ptr = loop.raw();
+      uv_poll_init(loop_ptr, poller(), fd);
+      if (auto err = uv_poll_start(poller(), UV_READABLE, &Impl::on_poll); err < 0)
+      {
+        throw std::runtime_error{fmt::format("uv_poll_start(): {}", uv_strerror(err))};
+      }
+    }
+
+    ~Poller() override
+    {
+      if (m_Impl)
+        uv_poll_stop(poller());
+    }
+
+    void
+    close() override
+    {
+      if (not m_Impl)
+        return;
+      uv_poll_stop(poller());
+      uv_close(handle(), &Impl::on_closed);
+    }
+  };
+
+  std::shared_ptr<EventLoopPoller>
+  Loop::add_poller(int fd, std::function<void()> callback)
+  {
+    return std::make_shared<Poller>(*m_Impl, fd, std::move(callback));
   }
 
 }  // namespace llarp::uv

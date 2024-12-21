@@ -970,7 +970,7 @@ namespace llarp
       }
 
       m_IfName = m_NetIf->Info().ifname;
-      LogInfo(Name(), " got network interface ", m_IfName);
+      LogInfo(Name(), " got network interface ", m_IfName, " fd=", m_NetIf->PollFD());
 
       auto handle_packet = [netif = m_NetIf, pkt_router = m_PacketRouter](auto pkt) {
         pkt.reply = [netif](auto pkt) { netif->WritePacket(std::move(pkt)); };

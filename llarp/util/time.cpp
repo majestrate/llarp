@@ -1,4 +1,5 @@
 #include "time.hpp"
+#include <linux/time_types.h>
 #include <chrono>
 #include <iomanip>
 #include "types.hpp"
@@ -25,6 +26,29 @@ namespace llarp
   ToMS(Duration_t ms)
   {
     return ms.count();
+  }
+
+  template <typename tspec_t>
+  tspec_t
+  make_timespec(Duration_t d)
+  {
+    long long ms = ToMS(d);
+    tspec_t t{};
+    t.tv_sec = std::chrono::duration_cast<std::chrono::seconds>(d).count();
+    ms -= t.tv_sec * 1000;
+    t.tv_nsec = ms * 1000000;
+    return t;
+  }
+  __kernel_timespec
+  as_timespec(Duration_t d)
+  {
+    return make_timespec<__kernel_timespec>(d);
+  }
+
+  timespec
+  to_timespec(Duration_t d)
+  {
+    return make_timespec<timespec>(d);
   }
 
   /// get our uptime in ms

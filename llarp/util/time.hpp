@@ -5,6 +5,7 @@
 #include <iostream>
 #include <fmt/format.h>
 #include <fmt/chrono.h>
+#include <linux/time_types.h>
 
 using namespace std::chrono_literals;
 
@@ -17,6 +18,10 @@ namespace llarp
   /// get the uptime of the process
   Duration_t
   uptime();
+
+  __kernel_timespec as_timespec(Duration_t);
+
+  timespec to_timespec(Duration_t);
 
   /// convert to milliseconds
   uint64_t
