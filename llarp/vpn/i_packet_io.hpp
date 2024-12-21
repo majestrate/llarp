@@ -8,6 +8,7 @@ namespace llarp::vpn
   class I_Packet_IO
   {
    public:
+    std::function<void()> on_stop;
     virtual ~I_Packet_IO() = default;
 
     /// start any platform specific operations before running
@@ -16,7 +17,7 @@ namespace llarp::vpn
 
     /// stop operation and tear down anything that Start() set up.
     virtual void
-    Stop() {};
+    Stop();
 
     /// read next ip packet, return an empty packet if there are none ready.
     virtual net::IPPacket

@@ -66,6 +66,9 @@ namespace llarp::uv
     virtual std::shared_ptr<llarp::UDPHandle>
     make_udp(UDPReceiveFunc on_recv) override;
 
+    std::shared_ptr<EventLoopPoller>
+    add_poller(int fd, std::function<void()> callback) override;
+
     void
     FlushLogic();
 

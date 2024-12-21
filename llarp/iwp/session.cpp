@@ -75,6 +75,12 @@ namespace llarp
     bool
     Session::GotInboundLIM(const LinkIntroMessage* msg)
     {
+      if (not msg->Verify())
+      {
+        LogError("Inbound LIM verify Error from ", m_RemoteAddr);
+        return false;
+      }
+
       if (msg->rc.pubkey != m_ExpectedIdent)
       {
         LogError(
@@ -91,6 +97,11 @@ namespace llarp
     bool
     Session::GotOutboundLIM(const LinkIntroMessage* msg)
     {
+      if (not msg->Verify())
+      {
+        LogError("Outbound LIM verify error from ", m_RemoteAddr);
+        return false;
+      }
       if (msg->rc.pubkey != m_RemoteRC.pubkey)
       {
         LogError("ident key mismatch");
@@ -106,6 +117,10 @@ namespace llarp
           self->m_State = State::Ready;
           self->m_Parent->MapAddr(self->m_RemoteRC.pubkey, self.get());
           self->m_Parent->SessionEstablished(self.get(), false);
+        }
+        else
+        {
+          self->Close();
         }
       });
       return true;
@@ -291,6 +306,11 @@ namespace llarp
     bool
     Session::GotRenegLIM(const LinkIntroMessage* lim)
     {
+      if (not lim->Verify())
+      {
+        LogError("Regen LIM verify failure from ", m_RemoteAddr);
+        return false;
+      }
       LogDebug("renegotiate session on ", m_RemoteAddr);
       return m_Parent->SessionRenegotiate(lim->rc, m_RemoteRC);
     }
@@ -951,14 +971,14 @@ namespace llarp
     bool
     Session::IsEstablished() const
     {
-      return m_State == State::Ready;
+      return m_State == State::Ready || m_State == State::LinkIntro;
     }
 
     bool
     Session::Recv_LL(ILinkSession::Packet_t data)
     {
       m_RXRate += data.size();
-
+      LogDebug("iwp session from ", m_RemoteAddr, " got ", data.size(), " bytes");
       // TODO: differentiate between good and bad RX packets here
       m_Stats.totalPacketsRX++;
       switch (m_State)

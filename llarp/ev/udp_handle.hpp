@@ -9,8 +9,7 @@ namespace llarp
     using ReceiveFunc = EventLoop::UDPReceiveFunc;
 
     // Starts listening for incoming UDP packets on the given address. Returns true on success,
-    // false if the address could not be bound. If you send without calling this first then the
-    // socket will bind to a random high port on 0.0.0.0 (the "all addresses" address).
+    // false if the address could not be bound.
     virtual bool
     listen(const SockAddr& addr) = 0;
 
