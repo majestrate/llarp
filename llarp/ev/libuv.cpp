@@ -106,6 +106,9 @@ namespace llarp::uv
   };
 
   void
+  run_disk_thread(void*);
+
+  void
   Loop::FlushLogic()
   {
     llarp::LogTrace("Loop::FlushLogic() start");
@@ -124,7 +127,7 @@ namespace llarp::uv
     FlushLogic();
   }
 
-  Loop::Loop(size_t queue_size) : llarp::EventLoop{}, m_LogicCalls{queue_size}
+  Loop::Loop(size_t queue_size) : llarp::EventLoop{}, m_LogicCalls{queue_size}, m_DiskCalls{128}
   {
     if (!(m_Impl = uvw::Loop::create()))
       throw std::runtime_error{"Failed to construct libuv loop"};
@@ -143,6 +146,8 @@ namespace llarp::uv
     if (!(m_WakeUp = m_Impl->resource<uvw::AsyncHandle>()))
       throw std::runtime_error{"Failed to create libuv async"};
     m_WakeUp->on<uvw::AsyncEvent>([this](const auto&, auto&) { tick_event_loop(); });
+    m_DiskThread =
+        std::make_unique<std::thread>([queue = &m_DiskCalls]() { run_disk_thread(queue); });
   }
 
   bool
@@ -158,6 +163,8 @@ namespace llarp::uv
     m_EventLoopThreadID = std::this_thread::get_id();
     m_Impl->run();
     m_Impl->close();
+    m_DiskCalls.disable();
+    m_DiskThread->join();
     m_Impl.reset();
     llarp::LogInfo("we have stopped");
   }
@@ -436,10 +443,31 @@ namespace llarp::uv
   }
 
   void
+  run_disk_thread(void* arg)
+  {
+    using Queue_t = llarp::thread::Queue<std::function<void(void)>>;
+    llarp::util::SetThreadName("llarpd-disk");
+    LogInfo("Disk worker started");
+    auto* queue = reinterpret_cast<Queue_t*>(arg);
+    while (queue->enabled())
+    {
+      auto maybe = queue->popFrontWithTimeout(1s);
+      if (maybe)
+        maybe.value()();
+    }
+    LogInfo("Disk worker ended");
+  }
+
+  void
   Loop::queue_slow_work(std::unique_ptr<EventLoopWork> work)
   {
-    // TODO: move out of thread pool
-    queue_work(std::move(work));
+    if (not m_DiskCalls.enabled())
+      return;
+
+    m_DiskCalls.pushBack([work = std::shared_ptr<EventLoopWork>(work.release()), self = this]() {
+      work->work();
+      self->call_soon([work]() { work->cleanup(false); });
+    });
   }
 
 }  // namespace llarp::uv
