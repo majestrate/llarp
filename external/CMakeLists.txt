@@ -63,7 +63,7 @@ endmacro()
 
 
 system_or_submodule(FMT fmt libfmt=10.2.1 fmt)
-system_or_submodule(SPDLOG spdlog libspdlog=1.15.0 spdlog)
+system_or_submodule(SPDLOG spdlog libspdlog=1.14.1 spdlog)
 system_or_submodule(OXENC oxenc liboxenc>=1.0.4 oxen-encoding)
 
 set(JSON_BuildTests OFF CACHE INTERNAL "")
