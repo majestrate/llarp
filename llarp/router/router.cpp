@@ -67,6 +67,7 @@ namespace llarp
     m_NextExploreAt = Clock_t::now();
     m_Pump = _loop->make_waker([this]() { PumpLL(); });
     m_LoopWorkPumper = _loop->make_waker([this]() {
+      LogDebug("Queue router work");
       _loop->queue_work(std::move(m_CurrentEvLoopWork));
       m_CurrentEvLoopWork = std::make_unique<EventLoopWork>();
     });
@@ -703,13 +704,13 @@ namespace llarp
         &_rcLookupHandler,
         &_routerProfiling,
         _loop,
-        util::memFn(&AbstractRouter::QueueWork, this));
+        util::memFn(&Router::QueueWork, this));
     _linkManager.Init(&_outboundSessionMaker);
     _rcLookupHandler.Init(
         _dht,
         _nodedb,
         _loop,
-        util::memFn(&AbstractRouter::QueueWork, this),
+        util::memFn(&Router::QueueWork, this),
         &_linkManager,
         &_hiddenServiceContext,
         strictConnectPubkeys,
@@ -1510,22 +1511,10 @@ namespace llarp
   void
   Router::QueueWork(std::function<void(void)> func)
   {
-    auto add_work = [](Router& self, auto work) {
-      self.m_CurrentEvLoopWork->add_work(std::move(work));
-      self.m_LoopWorkPumper->Trigger();
-    };
-
-    if (_loop->inEventLoop())
-    {
-      add_work(*this, std::move(func));
-      return;
-    }
-    _loop->call_soon([weak = weak_from_this(), func = std::move(func), add_work]() {
-      auto ptr = weak.lock();
-      if (not ptr)
-        return;
-      auto& self = *dynamic_cast<Router*>(ptr.get());
-      add_work(self, std::move(func));
+    _loop->call([self = this, work = std::move(func)]() {
+      LogDebug("queue work and trigger pumper");
+      self->m_CurrentEvLoopWork->add_work(std::move(work));
+      self->m_LoopWorkPumper->Trigger();
     });
   }
 
@@ -1643,8 +1632,8 @@ namespace llarp
           util::memFn(&AbstractRouter::CheckRenegotiateValid, this),
           util::memFn(&Router::ConnectionTimedOut, this),
           util::memFn(&AbstractRouter::SessionClosed, this),
-          util::memFn(&AbstractRouter::TriggerPump, this),
-          util::memFn(&AbstractRouter::QueueWork, this));
+          util::memFn(&Router::TriggerPump, this),
+          util::memFn(&Router::QueueWork, this));
 
       const auto& net = Net();
 

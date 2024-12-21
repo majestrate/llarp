@@ -29,7 +29,6 @@ add_library(lokinet-platform
   STATIC
   # for networking
   ev/ev.cpp
-  ev/libuv.cpp
   net/interface_info.cpp
   net/ip.cpp
   net/ip_address.cpp
@@ -40,6 +39,7 @@ add_library(lokinet-platform
   vpn/packet_router.cpp
   vpn/egres_packet_router.cpp
   vpn/platform.cpp
+  vpn/i_packet_io.cpp
 )
 
 if (ANDROID)
@@ -47,6 +47,14 @@ if (ANDROID)
 endif()
 
 if(CMAKE_SYSTEM_NAME MATCHES "Linux")
+  if(WITH_IOURING)
+    target_sources(lokinet-platform PRIVATE ev/io_uring.cpp)
+    target_compile_definitions(lokinet-platform PRIVATE -DUSE_IO_URING)
+    target_link_libraries(lokinet-platform PUBLIC uring)
+  else()
+    target_sources(lokinet-platform PRIVATE ev/libuv.cpp)
+    target_link_libraries(lokinet-platform PUBLIC uvw)
+  endif()
   target_sources(lokinet-platform PRIVATE linux/dbus.cpp)
   if(WITH_SYSTEMD)
     target_sources(lokinet-platform PRIVATE linux/sd_service_manager.cpp)
@@ -463,7 +471,6 @@ target_link_libraries(lokinet-context PUBLIC
 target_link_libraries(lokinet-platform PUBLIC
   Threads::Threads
   base_libs
-  uvw
 )
 
 target_link_libraries(lokinet-util PUBLIC

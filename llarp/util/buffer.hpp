@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory_resource>
 #include <type_traits>
 #include "common.hpp"
 #include "mem.h"
@@ -252,20 +253,33 @@ namespace llarp
   // convertible to a llarp_buffer_t.
   struct OwnedBuffer
   {
-    std::unique_ptr<byte_t[]> buf;
+    using alloc_t = std::pmr::polymorphic_allocator<byte_t>;
+    struct destroyer
+    {
+      alloc_t& alloc;
+      size_t sz;
+      void
+      operator()(byte_t* ptr)
+      {
+        alloc.deallocate(ptr, sz);
+      }
+    };
+    using bufptr_t = std::unique_ptr<byte_t[], destroyer>;
+    alloc_t _alloc;
+    bufptr_t buf;
     size_t sz;
 
-    template <typename T, typename = std::enable_if_t<sizeof(T) == 1>>
-    OwnedBuffer(std::unique_ptr<T[]> buf, size_t sz)
-        : buf{reinterpret_cast<byte_t*>(buf.release())}, sz{sz}
-    {}
-
     // Create a new, uninitialized owned buffer of the given size.
-    explicit OwnedBuffer(size_t sz) : OwnedBuffer{std::make_unique<byte_t[]>(sz), sz}
+    explicit OwnedBuffer(std::pmr::memory_resource* res, size_t sz)
+        : _alloc{res}, buf{bufptr_t{_alloc.allocate(sz), destroyer{_alloc, sz}}}, sz{sz}
     {}
 
     // copy content from existing memory
-    explicit OwnedBuffer(const byte_t* ptr, size_t sz) : OwnedBuffer{sz}
+    explicit OwnedBuffer(
+        const byte_t* ptr,
+        size_t sz,
+        std::pmr::memory_resource* res = std::pmr::get_default_resource())
+        : OwnedBuffer{res, sz}
     {
       std::copy_n(ptr, sz, buf.get());
     }

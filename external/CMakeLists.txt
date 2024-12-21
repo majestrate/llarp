@@ -90,6 +90,7 @@ if(WITH_PEERSTATS)
   target_link_libraries(sqlite_orm INTERFACE sqlite3)
 endif()
 
+set(USE_LIBCPP OFF CACHE INTERNAL "")
 add_library(uvw INTERFACE)
 target_include_directories(uvw INTERFACE uvw/src)
 target_link_libraries(uvw INTERFACE libuv)
