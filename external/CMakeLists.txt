@@ -34,6 +34,8 @@ if(SUBMODULE_CHECK)
     check_submodule(cpr)
     check_submodule(ngtcp2)
     check_submodule(CLI11)
+    check_submodule(fmt)
+    check_submodule(spdlog)
   endif()
 endif()
 
@@ -59,15 +61,15 @@ macro(system_or_submodule BIGNAME smallname pkgconf subdir)
   endif()
 endmacro()
 
+
+system_or_submodule(FMT fmt libfmt=10.2.1 fmt)
+system_or_submodule(SPDLOG spdlog libspdlog=1.15.0 spdlog)
 system_or_submodule(OXENC oxenc liboxenc>=1.0.4 oxen-encoding)
 
 set(JSON_BuildTests OFF CACHE INTERNAL "")
 set(JSON_Install OFF CACHE INTERNAL "")
 system_or_submodule(NLOHMANN nlohmann_json nlohmann_json>=3.7.0 nlohmann)
 
-if (STATIC OR FORCE_SPDLOG_SUBMODULE OR FORCE_FMT_SUBMODULE)
-    set(OXEN_LOGGING_FORCE_SUBMODULES ON CACHE INTERNAL "")
-endif()
 set(OXEN_LOGGING_SOURCE_ROOT "${PROJECT_SOURCE_DIR}" CACHE INTERNAL "")
 add_subdirectory(oxen-logging)
 
