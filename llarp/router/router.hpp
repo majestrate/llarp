@@ -43,8 +43,6 @@
 #include <unordered_map>
 #include <vector>
 
-#include <oxenmq/address.h>
-
 namespace llarp
 {
   struct Router : public AbstractRouter
