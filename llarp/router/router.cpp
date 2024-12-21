@@ -39,8 +39,6 @@
 
 #include <llarp/constants/platform.hpp>
 
-#include <oxenmq/oxenmq.h>
-
 static constexpr std::chrono::milliseconds ROUTER_TICK_INTERVAL = 250ms;
 
 namespace llarp
