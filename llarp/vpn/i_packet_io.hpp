@@ -13,7 +13,7 @@ namespace llarp::vpn
 
     /// start any platform specific operations before running
     virtual void
-    Start() {};
+    Start(){};
 
     /// stop operation and tear down anything that Start() set up.
     virtual void

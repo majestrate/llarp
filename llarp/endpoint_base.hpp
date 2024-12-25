@@ -53,26 +53,6 @@ namespace llarp
       Duration_t lastRecvAt;
     };
 
-    /// info about a quic mapping
-    struct QUICMappingInfo
-    {
-      /// srv data if it was provided
-      std::optional<dns::SRVData> srv;
-      /// address we are bound on
-      SockAddr localAddr;
-      /// the remote's lns name if we have one
-      std::optional<std::string> remoteName;
-      /// the remote's address
-      AddressVariant_t remoteAddr;
-      /// the remote's port we are connecting to
-      uint16_t remotePort;
-    };
-
-    /// maybe get quic mapping info given its stream id
-    /// returns std::nullopt if we have no stream given that id
-    std::optional<QUICMappingInfo>
-    GetQUICMappingInfoByID(int stream_id) const;
-
     /// add an srv record to this endpoint's descriptor
     void
     PutSRVRecord(dns::SRVData srv);
@@ -109,9 +89,6 @@ namespace llarp
     /// get our local address
     virtual AddressVariant_t
     LocalAddress() const = 0;
-
-    virtual quic::TunnelManager*
-    GetQUICTunnel() = 0;
 
     virtual std::optional<AddressVariant_t>
     GetEndpointWithConvoTag(service::ConvoTag tag) const = 0;

@@ -32,7 +32,6 @@ if(SUBMODULE_CHECK)
     check_submodule(oxen-encoding)
     check_submodule(uvw)
     check_submodule(cpr)
-    check_submodule(ngtcp2)
     check_submodule(CLI11)
     check_submodule(fmt)
     check_submodule(spdlog)
@@ -90,14 +89,12 @@ if(WITH_PEERSTATS)
   target_link_libraries(sqlite_orm INTERFACE sqlite3)
 endif()
 
-set(USE_LIBCPP OFF CACHE INTERNAL "")
-add_library(uvw INTERFACE)
-target_include_directories(uvw INTERFACE uvw/src)
-target_link_libraries(uvw INTERFACE libuv)
-
-# ngtcp2 needs some massaging to build nicely:
-include(ngtcp2_lib)
-add_ngtcp2_lib()
+if(WITH_LIBUV)
+  set(USE_LIBCPP OFF CACHE INTERNAL "")
+  add_library(uvw INTERFACE)
+  target_include_directories(uvw INTERFACE uvw/src)
+  target_link_libraries(uvw INTERFACE libuv)
+endif()
 
 # cpr configuration.  Ideally we'd just do this via add_subdirectory, but cpr's cmake requires
 # 3.15+, and we target lower than that (and this is fairly simple to build).

@@ -165,9 +165,6 @@ namespace llarp
       void
       Flush();
 
-      quic::TunnelManager*
-      GetQUICTunnel() override;
-
       huint128_t
       GetIPForIdent(const PubKey pk);
       /// async obtain snode session and call callback when it's ready to send
@@ -230,8 +227,6 @@ namespace llarp
 
       SockAddr m_LocalResolverAddr;
       std::vector<SockAddr> m_UpstreamResolvers;
-
-      std::shared_ptr<quic::TunnelManager> m_QUIC;
 
       using PacketQueue_t = std::
           priority_queue<net::IPPacket, std::vector<net::IPPacket>, net::IPPacket::CompareOrder>;

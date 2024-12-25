@@ -38,11 +38,6 @@
 
 namespace llarp
 {
-  namespace quic
-  {
-    class TunnelManager;
-  }
-
   namespace service
   {
     struct AsyncKeyExchange;
@@ -136,7 +131,7 @@ namespace llarp
       };
 
       virtual void
-      Thaw() {};
+      Thaw(){};
 
       void
       ResetInternalState() override;
@@ -489,11 +484,6 @@ namespace llarp
       std::optional<AuthInfo>
       MaybeGetAuthInfoForEndpoint(service::Address addr);
 
-      /// Returns a pointer to the quic::Tunnel object handling quic connections for this endpoint.
-      /// Returns nullptr if quic is not supported.
-      quic::TunnelManager*
-      GetQUICTunnel() override;
-
      protected:
       /// parent context that owns this endpoint
       Context* const context;
@@ -556,7 +546,6 @@ namespace llarp
       std::unique_ptr<EndpointState> m_state;
       std::shared_ptr<IAuthPolicy> m_AuthPolicy;
       std::unordered_map<Address, AuthInfo> m_RemoteAuthInfos;
-      std::unique_ptr<quic::TunnelManager> m_quic;
 
       /// (lns name, optional exit range, optional auth info) for looking up on startup
       std::unordered_map<std::string, std::pair<std::optional<IPRange>, std::optional<AuthInfo>>>
@@ -588,6 +577,9 @@ namespace llarp
 
       /// for rate limiting introset lookups
       util::DecayingHashSet<Address> m_IntrosetLookupFilter;
+
+     private:
+      std::shared_ptr<EventLoopWakeup> m_RecvQueueFlusher;
     };
 
     using Endpoint_ptr = std::shared_ptr<Endpoint>;
