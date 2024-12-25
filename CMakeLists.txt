@@ -51,6 +51,9 @@ option(WITH_PEERSTATS "build with experimental peerstats db support" OFF)
 option(WITH_IOURING "build with io_uring event loop (Experimental)" ${DEFAULT_IOURING})
 option(STRIP_SYMBOLS "strip off all debug symbols into an external archive for all executables built" OFF)
 
+
+set(WITH_LIBUV NOT ${WITH_IOURING})
+
 set(BOOTSTRAP_FALLBACK_MAINNET "${PROJECT_SOURCE_DIR}/contrib/bootstrap/opennet.signed" CACHE PATH "Fallback bootstrap path (opennet)")
 set(BOOTSTRAP_FALLBACK_TESTNET "${PROJECT_SOURCE_DIR}/contrib/bootstrap/testnet.signed" CACHE PATH "Fallback bootstrap path (testnet)")
 

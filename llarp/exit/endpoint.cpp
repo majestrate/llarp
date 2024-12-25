@@ -3,7 +3,6 @@
 #include <llarp/handlers/exit.hpp>
 #include <llarp/path/path_context.hpp>
 #include <llarp/router/abstractrouter.hpp>
-#include <llarp/quic/tunnel.hpp>
 
 namespace llarp
 {
@@ -115,13 +114,7 @@ namespace llarp
       const service::ConvoTag tag{path.as_array()};
       if (t == service::ProtocolType::QUIC)
       {
-        auto quic = m_Parent->GetQUICTunnel();
-        if (not quic)
-          return false;
-        m_TxRate += buf.size();
-        quic->receive_packet(tag, std::move(buf));
-        m_LastActive = m_Parent->Now();
-        return true;
+        return false;
       }
       // queue overflow
       if (m_UpstreamQueue.size() > MaxUpstreamQueueSize)
@@ -162,24 +155,21 @@ namespace llarp
     bool
     Endpoint::QueueInboundTraffic(std::vector<byte_t> buf, service::ProtocolType type)
     {
-      if (type != service::ProtocolType::QUIC)
-      {
-        llarp::net::IPPacket pkt{std::move(buf)};
-        if (pkt.empty())
-          return false;
+      llarp::net::IPPacket pkt{std::move(buf)};
+      if (pkt.empty())
+        return false;
 
-        huint128_t src;
-        if (m_RewriteSource)
-          src = m_Parent->GetIfAddr();
-        else
-          src = pkt.srcv6();
-        if (pkt.IsV6())
-          pkt.UpdateIPv6Address(src, m_IP);
-        else
-          pkt.UpdateIPv4Address(xhtonl(net::TruncateV6(src)), xhtonl(net::TruncateV6(m_IP)));
+      huint128_t src;
+      if (m_RewriteSource)
+        src = m_Parent->GetIfAddr();
+      else
+        src = pkt.srcv6();
+      if (pkt.IsV6())
+        pkt.UpdateIPv6Address(src, m_IP);
+      else
+        pkt.UpdateIPv4Address(xhtonl(net::TruncateV6(src)), xhtonl(net::TruncateV6(m_IP)));
 
-        buf = pkt.steal();
-      }
+      buf = pkt.steal();
 
       const uint8_t queue_idx = buf.size() / llarp::routing::ExitPadSize;
       if (m_DownstreamQueues.find(queue_idx) == m_DownstreamQueues.end())

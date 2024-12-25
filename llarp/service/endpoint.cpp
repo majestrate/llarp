@@ -32,8 +32,6 @@
 #include <llarp/util/meta/memfn.hpp>
 #include <llarp/link/link_manager.hpp>
 #include <llarp/tooling/dht_event.hpp>
-#include <llarp/quic/server.hpp>
-#include <llarp/quic/tunnel.hpp>
 #include <llarp/util/priority_queue.hpp>
 
 #include <optional>
@@ -60,9 +58,7 @@ namespace llarp
       m_state->m_Router = r;
       m_state->m_Name = "endpoint";
       m_RecvQueue.enable();
-
-      if (Loop()->MaybeGetUVWLoop())
-        m_quic = std::make_unique<quic::TunnelManager>(*this);
+      m_RecvQueueFlusher = r->loop()->make_waker([self = this]() { self->FlushRecvData(); });
     }
 
     bool
@@ -143,12 +139,6 @@ namespace llarp
           introSet().exitTrafficPolicy = GetExitPolicy();
           introSet().ownedRanges = GetOwnedRanges();
         }
-      }
-      // add quic ethertype if we have listeners set up
-      if (auto* quic = GetQUICTunnel())
-      {
-        if (quic->hasListeners())
-          introSet().supportedProtocols.push_back(ProtocolType::QUIC);
       }
 
       introSet().intros.clear();
@@ -1218,13 +1208,14 @@ namespace llarp
         auto& ev = *maybe;
         ProtocolMessage::ProcessAsync(ev.fromPath, ev.pathid, ev.msg);
       }
+      Router()->TriggerPump();
     }
 
     void
     Endpoint::QueueRecvData(RecvDataEvent ev)
     {
       m_RecvQueue.tryPushBack(std::move(ev));
-      Router()->TriggerPump();
+      m_RecvQueueFlusher->Trigger();
     }
 
     bool
@@ -1292,8 +1283,7 @@ namespace llarp
     {
       if ((msg->proto == ProtocolType::Exit
            && (m_state->m_ExitEnabled || m_ExitMap.ContainsValue(msg->sender.Addr())))
-          || msg->proto == ProtocolType::TrafficV4 || msg->proto == ProtocolType::TrafficV6
-          || (msg->proto == ProtocolType::QUIC and m_quic))
+          || msg->proto == ProtocolType::TrafficV4 || msg->proto == ProtocolType::TrafficV6)
       {
         m_InboundTrafficQueue.tryPushBack(std::move(msg));
         Router()->TriggerPump();
@@ -2223,12 +2213,6 @@ namespace llarp
       if (itr == m_RemoteAuthInfos.end())
         return std::nullopt;
       return itr->second;
-    }
-
-    quic::TunnelManager*
-    Endpoint::GetQUICTunnel()
-    {
-      return m_quic.get();
     }
 
   }  // namespace service
