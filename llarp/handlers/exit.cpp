@@ -163,19 +163,6 @@ namespace llarp
       return true;
     }
 
-    util::StatusObject
-    ExitEndpoint::ExtractStatus() const
-    {
-      util::StatusObject obj{{"permitExit", m_PermitExit}, {"ip", m_IfAddr.ToString()}};
-      util::StatusObject exitsObj{};
-      for (const auto& item : m_ActiveExits)
-      {
-        exitsObj[item.first.ToString()] = item.second->ExtractStatus();
-      }
-      obj["exits"] = exitsObj;
-      return obj;
-    }
-
     bool
     ExitEndpoint::SupportsV6() const
     {

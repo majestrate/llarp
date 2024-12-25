@@ -5,17 +5,6 @@ namespace llarp
 {
   namespace service
   {
-    util::StatusObject
-    Introduction::ExtractStatus() const
-    {
-      util::StatusObject obj{
-          {"router", router.ToHex()},
-          {"path", pathID.ToHex()},
-          {"expiresAt", to_json(expiresAt)},
-          {"latency", to_json(latency)},
-          {"version", uint64_t(version)}};
-      return obj;
-    }
 
     bool
     Introduction::DecodeKey(const llarp_buffer_t& key, llarp_buffer_t* buf)

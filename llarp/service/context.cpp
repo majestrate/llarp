@@ -56,19 +56,6 @@ namespace llarp
       return true;
     }
 
-    util::StatusObject
-    Context::ExtractStatus() const
-    {
-      util::StatusObject obj{};
-      auto itr = m_Endpoints.begin();
-      while (itr != m_Endpoints.end())
-      {
-        obj[itr->first] = itr->second->ExtractStatus();
-        ++itr;
-      }
-      return obj;
-    }
-
     void
     Context::ForEachService(
         std::function<bool(const std::string&, const std::shared_ptr<Endpoint>&)> visit) const

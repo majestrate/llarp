@@ -4,20 +4,6 @@ namespace llarp
 {
   namespace service
   {
-    util::StatusObject
-    Session::ExtractStatus() const
-    {
-      util::StatusObject obj{
-          {"lastSend", to_json(lastSend)},
-          {"lastRecv", to_json(lastRecv)},
-          {"replyIntro", replyIntro.ExtractStatus()},
-          {"remote", Addr().ToString()},
-          {"seqno", seqno},
-          {"tx", messagesSend},
-          {"rx", messagesRecv},
-          {"intro", intro.ExtractStatus()}};
-      return obj;
-    }
 
     Address
     Session::Addr() const

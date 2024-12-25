@@ -60,9 +60,6 @@ namespace llarp
       void
       BlacklistSNode(const RouterID snode) override;
 
-      util::StatusObject
-      ExtractStatus() const;
-
       bool
       ShouldBundleRC() const override
       {

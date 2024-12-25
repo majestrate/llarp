@@ -67,9 +67,6 @@ namespace llarp
     ToString() const;
   };
 
-  void
-  to_json(nlohmann::json& j, const AddressInfo& a);
-
   bool
   operator==(const AddressInfo& lhs, const AddressInfo& rhs);
 

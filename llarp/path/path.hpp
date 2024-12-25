@@ -56,9 +56,6 @@ namespace llarp
       TunnelNonce nonce;
       // lifetime
       llarp_time_t lifetime = default_lifetime;
-
-      util::StatusObject
-      ExtractStatus() const;
     };
 
     inline bool
@@ -98,9 +95,6 @@ namespace llarp
           std::weak_ptr<PathSet> parent,
           PathRole startingRoles,
           std::string shortName);
-
-      util::StatusObject
-      ExtractStatus() const;
 
       PathRole
       Role() const

@@ -87,17 +87,6 @@ namespace llarp
       return true;
     }
 
-    util::StatusObject
-    ResourceRecord::ToJSON() const
-    {
-      return util::StatusObject{
-          {"name", rr_name},
-          {"type", rr_type},
-          {"class", rr_class},
-          {"ttl", ttl},
-          {"rdata", std::string{reinterpret_cast<const char*>(rData.data()), rData.size()}}};
-    }
-
     std::string
     ResourceRecord::ToString() const
     {

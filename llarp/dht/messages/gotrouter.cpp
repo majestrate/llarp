@@ -127,10 +127,6 @@ namespace llarp
           auto* router = dht.GetRouter();
           router->NotifyRouterEvent<tooling::RCGossipReceivedEvent>(router->pubkey(), rc);
           router->GossipRCIfNeeded(rc);
-
-          auto peerDb = router->peerDb();
-          if (peerDb)
-            peerDb->handleGossipedRC(rc);
         }
       }
       return true;

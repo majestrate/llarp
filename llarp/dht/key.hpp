@@ -32,9 +32,6 @@ namespace llarp
         return rid.ToString();
       }
 
-      util::StatusObject
-      ExtractStatus() const;
-
       std::string
       ToString() const
       {

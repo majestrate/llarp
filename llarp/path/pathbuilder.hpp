@@ -1,7 +1,6 @@
 #pragma once
 
 #include "pathset.hpp"
-#include <llarp/util/status.hpp>
 #include <llarp/util/decaying_hashset.hpp>
 
 #include <atomic>
@@ -67,9 +66,6 @@ namespace llarp
       Builder(AbstractRouter* p_router, size_t numDesiredPaths, size_t numHops);
 
       virtual ~Builder() = default;
-
-      util::StatusObject
-      ExtractStatus() const;
 
       bool
       ShouldBuildMore(llarp_time_t now) const override;

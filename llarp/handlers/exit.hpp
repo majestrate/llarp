@@ -78,9 +78,6 @@ namespace llarp
       bool
       VisitEndpointsFor(const PubKey& pk, std::function<bool(exit::Endpoint* const)> visit) const;
 
-      util::StatusObject
-      ExtractStatus() const;
-
       bool
       SupportsV6() const;
 

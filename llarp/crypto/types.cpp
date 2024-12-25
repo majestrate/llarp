@@ -2,6 +2,7 @@
 
 #include <llarp/util/buffer.hpp>
 #include <llarp/util/file.hpp>
+#include <llarp/util/fs.hpp>
 
 #include <iterator>
 
@@ -28,6 +29,7 @@ namespace llarp
     return oxenc::to_hex(begin(), end());
   }
 
+  template <>
   bool
   SecretKey::LoadFromFile(const fs::path& fname)
   {
@@ -86,6 +88,7 @@ namespace llarp
     return crypto_scalarmult_ed25519_base_noclamp(pubkey.data(), data()) != -1;
   }
 
+  template <>
   bool
   SecretKey::SaveToFile(const fs::path& fname) const
   {
@@ -106,6 +109,7 @@ namespace llarp
     return true;
   }
 
+  template <>
   bool
   IdentitySecret::LoadFromFile(const fs::path& fname)
   {

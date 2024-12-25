@@ -4,7 +4,6 @@
 #include "router.hpp"
 #include <llarp/constants/link_layer.hpp>
 #include <llarp/util/meta/memfn.hpp>
-#include <llarp/util/status.hpp>
 
 #include <algorithm>
 #include <cstdlib>
@@ -110,21 +109,6 @@ namespace llarp
       }
       removedSomePaths = true;
     });
-  }
-
-  util::StatusObject
-  OutboundMessageHandler::ExtractStatus() const
-  {
-    util::StatusObject status{
-        "queueStats",
-        {{"queued", m_queueStats.queued},
-         {"dropped", m_queueStats.dropped},
-         {"sent", m_queueStats.sent},
-         {"queueWatermark", m_queueStats.queueWatermark},
-         {"perTickMax", m_queueStats.perTickMax},
-         {"numTicks", m_queueStats.numTicks}}};
-
-    return status;
   }
 
   void

@@ -6,13 +6,11 @@
 #include "llarp/net/exit_info.hpp"
 #include "llarp/util/aligned.hpp"
 #include "llarp/util/bencode.hpp"
-#include "llarp/util/status.hpp"
 #include "router_version.hpp"
 
 #include "llarp/dns/srv_data.hpp"
 
 #include <functional>
-#include <nlohmann/json.hpp>
 #include <vector>
 
 #define MAX_RC_SIZE (1024)
@@ -95,15 +93,6 @@ namespace llarp
     std::string signed_bt_dict;
 
     std::vector<dns::SRVData> srvRecords;
-
-    util::StatusObject
-    ExtractStatus() const;
-
-    nlohmann::json
-    ToJson() const
-    {
-      return ExtractStatus();
-    }
 
     std::string
     ToString() const;

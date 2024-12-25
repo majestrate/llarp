@@ -356,13 +356,6 @@ namespace llarp
       m_BuildStats.attempts++;
     }
 
-    util::StatusObject
-    BuildStats::ExtractStatus() const
-    {
-      return util::StatusObject{
-          {"success", success}, {"attempts", attempts}, {"timeouts", timeouts}, {"fails", fails}};
-    }
-
     std::string
     BuildStats::ToString() const
     {

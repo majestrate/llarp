@@ -59,12 +59,6 @@ namespace llarp
       return true;
     }
 
-    util::StatusObject
-    Question::ToJSON() const
-    {
-      return util::StatusObject{{"qname", qname}, {"qtype", qtype}, {"qclass", qclass}};
-    }
-
     bool
     Question::IsName(const std::string& other) const
     {

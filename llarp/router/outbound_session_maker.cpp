@@ -9,7 +9,6 @@
 #include <llarp/link/i_link_manager.hpp>
 #include <llarp/util/meta/memfn.hpp>
 #include <llarp/util/thread/threading.hpp>
-#include <llarp/util/status.hpp>
 #include <llarp/crypto/crypto.hpp>
 #include <utility>
 
@@ -164,14 +163,6 @@ namespace llarp
     } while (remainingDesired > 0);
     LogDebug(
         "connecting to ", numDesired - remainingDesired, " out of ", numDesired, " random routers");
-  }
-
-  // TODO: this
-  util::StatusObject
-  OutboundSessionMaker::ExtractStatus() const
-  {
-    util::StatusObject status{};
-    return status;
   }
 
   void
@@ -335,13 +326,6 @@ namespace llarp
       util::Lock l(_mutex);
       pendingSessions.emplace(router, nullptr);
     }
-
-    auto peerDb = _router->peerDb();
-    if (peerDb)
-    {
-      peerDb->modifyPeerStats(router, [](PeerStats& stats) { stats.numConnectionAttempts++; });
-    }
-
     _router->NotifyRouterEvent<tooling::ConnectionAttemptEvent>(_router->pubkey(), router);
   }
 

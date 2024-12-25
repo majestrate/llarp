@@ -2,7 +2,6 @@
 
 #include "server.hpp"
 #include <llarp/util/types.hpp>
-#include <llarp/peerstats/peer_db.hpp>
 
 #include <functional>
 #include <optional>
@@ -95,12 +94,6 @@ namespace llarp
 
     virtual void
     CheckPersistingSessions(llarp_time_t now) = 0;
-
-    virtual void
-    updatePeerDb(std::shared_ptr<PeerDb> peerDb) = 0;
-
-    virtual util::StatusObject
-    ExtractStatus() const = 0;
   };
 
 }  // namespace llarp

@@ -126,9 +126,6 @@ namespace llarp
       SessionStats
       GetSessionStats() const override;
 
-      util::StatusObject
-      ExtractStatus() const override;
-
       bool
       IsInbound() const override
       {

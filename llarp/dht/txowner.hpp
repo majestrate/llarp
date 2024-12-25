@@ -1,7 +1,6 @@
 #pragma once
 
 #include "key.hpp"
-#include <llarp/util/status.hpp>
 #include <cstdint>
 
 namespace llarp
@@ -22,16 +21,6 @@ namespace llarp
 
       TXOwner(const Key_t& k, uint64_t id) : node(k), txid(id)
       {}
-
-      util::StatusObject
-      ExtractStatus() const
-      {
-        util::StatusObject obj{
-            {"txid", txid},
-            {"node", node.ToHex()},
-        };
-        return obj;
-      }
 
       bool
       operator==(const TXOwner& other) const

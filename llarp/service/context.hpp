@@ -26,9 +26,6 @@ namespace llarp
       bool
       StopAll();
 
-      util::StatusObject
-      ExtractStatus() const;
-
       bool
       hasEndpoints();
 
