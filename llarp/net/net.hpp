@@ -16,19 +16,11 @@
 #include <vector>
 
 // for addrinfo
-#ifndef _WIN32
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
-#else
-#include <winsock2.h>
-#include <ws2tcpip.h>
-#include <wspiapi.h>
-#endif
 
-#ifndef _WIN32
 #include <arpa/inet.h>
-#endif
 
 #include "bogon_ranges.hpp"
 

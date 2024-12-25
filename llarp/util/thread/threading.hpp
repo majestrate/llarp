@@ -11,13 +11,8 @@
 #include <iostream>
 #include <thread>
 
-#if defined(WIN32) && !defined(__GNUC__)
-#include <process.h>
-using pid_t = int;
-#else
 #include <sys/types.h>
 #include <unistd.h>
-#endif
 
 #ifdef TRACY_ENABLE
 #include <Tracy.hpp>
@@ -151,11 +146,7 @@ namespace llarp
     inline pid_t
     GetPid()
     {
-#ifdef WIN32
-      return _getpid();
-#else
       return ::getpid();
-#endif
     }
 
     // type for detecting contention on a resource

@@ -477,12 +477,9 @@ namespace llarp
         }
 
         GetRouter()->loop()->add_ticker([this] { Flush(); });
-#ifndef _WIN32
         m_Resolver = std::make_shared<dns::Server>(
             m_Router->loop(), m_DNSConf, if_nametoindex(m_ifname.c_str()));
         m_Resolver->Start();
-
-#endif
       }
       return true;
     }

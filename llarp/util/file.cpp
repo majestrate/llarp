@@ -11,11 +11,7 @@
 #include <sys/types.h>
 #include <system_error>
 
-#ifdef WIN32
-#include <io.h>
-#else
 #include <unistd.h>
-#endif
 
 namespace llarp::util
 {
@@ -107,13 +103,9 @@ namespace llarp::util
       }
     }
 
-#ifndef WIN32
     if (ec)
       llarp::LogError("failed to ensure ", str, ", ", ec.message());
     return ec;
-#else
-    return {};
-#endif
   }
 
 }  // namespace llarp::util

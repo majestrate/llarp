@@ -19,7 +19,7 @@ namespace llarp
 
     EncryptedFrame(size_t sz)
         : Encrypted<EncryptedFrameSize>(
-            std::min(sz, EncryptedFrameBodySize) + EncryptedFrameOverheadSize)
+              std::min(sz, EncryptedFrameBodySize) + EncryptedFrameOverheadSize)
     {}
 
     void

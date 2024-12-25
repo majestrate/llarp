@@ -9,9 +9,6 @@ option(BUILD_DAEMON "build lokinet daemon and associated utils" ON)
 
 
 set(LANGS C CXX)
-if(APPLE AND BUILD_DAEMON)
-  set(LANGS ${LANGS} OBJC Swift)
-endif()
 
 find_program(CCACHE_PROGRAM ccache)
 if(CCACHE_PROGRAM)
@@ -29,21 +26,11 @@ project(lokinet
     DESCRIPTION "lokinet - IP packet onion router"
     LANGUAGES ${LANGS})
 
-if(APPLE)
-    # Apple build number: must be incremented to submit a new build for the same lokinet version,
-    # should be reset to 0 when the lokinet version increments.
-    set(LOKINET_APPLE_BUILD 0)
-endif()
-
 set(RELEASE_MOTTO "Just like me frfr" CACHE STRING "Release motto")
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 
 set(DEFAULT_WITH_BOOTSTRAP OFF)
-if(APPLE)
-  set(DEFAULT_WITH_BOOTSTRAP OFF)
-endif()
-
 
 # Core options
 option(USE_AVX2 "enable avx2 code" OFF)
@@ -115,8 +102,6 @@ endif()
 include(cmake/gui-option.cmake)
 
 include(cmake/solaris.cmake)
-include(cmake/win32.cmake)
-include(cmake/macos.cmake)
 
 # No in-source building
 include(MacroEnsureOutOfSourceBuild)
@@ -129,17 +114,15 @@ include(cmake/unix.cmake)
 include(cmake/check_for_std_optional.cmake)
 include(cmake/check_for_std_filesystem.cmake)
 
-if(NOT WIN32)
-  if(IOS OR ANDROID)
-    set(NON_PC_TARGET ON)
+if(ANDROID)
+  set(NON_PC_TARGET ON)
+else()
+  include(TargetArch)
+  target_architecture(COMPILE_ARCH)
+  if(COMPILE_ARCH MATCHES i386 OR COMPILE_ARCH MATCHES x86_64)
+    set(NON_PC_TARGET OFF)
   else()
-    include(TargetArch)
-    target_architecture(COMPILE_ARCH)
-    if(COMPILE_ARCH MATCHES i386 OR COMPILE_ARCH MATCHES x86_64)
-      set(NON_PC_TARGET OFF)
-    else()
-      set(NON_PC_TARGET ON)
-    endif()
+    set(NON_PC_TARGET ON)
   endif()
 endif()
 
@@ -209,20 +192,19 @@ if (WOW64_CROSS_COMPILE OR WIN64_CROSS_COMPILE)
   include(cmake/cross_compile.cmake)
 endif()
 
-if(NOT APPLE)
-  if(NATIVE_BUILD)
-    if(CMAKE_SYSTEM_PROCESSOR MATCHES "ppc*|power*")
-      add_compile_options(-mcpu=native -mtune=native)
-    else()
-      add_compile_options(-march=native -mtune=native)
-    endif()
-  elseif(NOT NON_PC_TARGET)
-    if (USE_AVX2)
-      add_compile_options(-march=haswell -mtune=haswell -mfpmath=sse)
-    else()
-      # Public binary releases
-      add_compile_options(-march=nocona -mtune=haswell -mfpmath=sse)
-    endif()
+
+if(NATIVE_BUILD)
+  if(CMAKE_SYSTEM_PROCESSOR MATCHES "ppc*|power*")
+    add_compile_options(-mcpu=native -mtune=native)
+  else()
+    add_compile_options(-march=native -mtune=native)
+  endif()
+elseif(NOT NON_PC_TARGET)
+  if (USE_AVX2)
+    add_compile_options(-march=haswell -mtune=haswell -mfpmath=sse)
+  else()
+    # Public binary releases
+    add_compile_options(-march=nocona -mtune=haswell -mfpmath=sse)
   endif()
 endif()
 
@@ -313,10 +295,6 @@ add_subdirectory(docs)
 
 include(cmake/gui.cmake)
 
-if(APPLE)
-  macos_target_setup()
-endif()
-
 # uninstall target
 if(NOT TARGET uninstall)
   configure_file(
@@ -328,7 +306,7 @@ if(NOT TARGET uninstall)
     COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake)
 endif()
 
-if(BUILD_PACKAGE AND NOT APPLE)
+if(BUILD_PACKAGE)
   include(cmake/installer.cmake)
 endif()
 

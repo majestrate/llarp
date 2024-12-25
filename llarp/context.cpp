@@ -169,7 +169,6 @@ namespace llarp
     {
       SigINT();
     }
-#ifndef _WIN32
     if (sig == SIGUSR1)
     {
       if (router and not router->IsServiceNode())
@@ -182,7 +181,6 @@ namespace llarp
     {
       Reload();
     }
-#endif
   }
 
   void

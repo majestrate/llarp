@@ -76,15 +76,6 @@ if(HAVE_LIBSENDFILE)
   list(APPEND LIBUV_LIBRARIES sendfile)
 endif()
 
-if(WIN32)
-  # check_library_exists() does not work for Win32 API calls in X86 due to name
-  # mangling calling conventions
-  list(APPEND LIBUV_LIBRARIES iphlpapi)
-  list(APPEND LIBUV_LIBRARIES psapi)
-  list(APPEND LIBUV_LIBRARIES userenv)
-  list(APPEND LIBUV_LIBRARIES ws2_32)
-endif()
-
 include(FindPackageHandleStandardArgs)
 
 # handle the QUIETLY and REQUIRED arguments and set LIBUV_FOUND to TRUE

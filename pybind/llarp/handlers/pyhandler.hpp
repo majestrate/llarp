@@ -16,7 +16,7 @@ namespace llarp
     {
       PythonEndpoint(std::string name, Context_ptr routerContext)
           : llarp::service::Endpoint(
-              routerContext->router.get(), &routerContext->router->hiddenServiceContext())
+                routerContext->router.get(), &routerContext->router->hiddenServiceContext())
           , OurName(std::move(name))
       {}
       const std::string OurName;
@@ -98,7 +98,7 @@ namespace llarp
       }
 
       void
-      SendPacketToRemote(const llarp_buffer_t&, service::ProtocolType) override{};
+      SendPacketToRemote(const llarp_buffer_t&, service::ProtocolType) override {};
 
       std::string
       GetOurAddress() const

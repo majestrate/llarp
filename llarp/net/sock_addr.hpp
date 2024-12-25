@@ -1,13 +1,7 @@
 #pragma once
 
-#ifndef _WIN32
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#else
-#include <winsock2.h>
-#include <ws2tcpip.h>
-#include <wspiapi.h>
-#endif
 
 #include <string_view>
 #include <string>
@@ -61,9 +55,12 @@ namespace llarp
     SockAddr&
     operator=(const in6_addr& addr);
 
-    explicit operator const sockaddr*() const;
-    explicit operator const sockaddr_in*() const;
-    explicit operator const sockaddr_in6*() const;
+    explicit
+    operator const sockaddr*() const;
+    explicit
+    operator const sockaddr_in*() const;
+    explicit
+    operator const sockaddr_in6*() const;
 
     size_t
     sockaddr_len() const;
