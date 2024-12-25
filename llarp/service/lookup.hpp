@@ -83,19 +83,6 @@ namespace llarp
         return false;
       }
 
-      util::StatusObject
-      ExtractStatus() const
-      {
-        auto now = time_now_ms();
-        util::StatusObject obj{
-            {"txid", txid},
-            {"endpoint", endpoint.ToHex()},
-            {"name", name},
-            {"timedOut", IsTimedOut(now)},
-            {"createdAt", m_created.count()}};
-        return obj;
-      }
-
      protected:
       IServiceLookup(
           ILookupHolder* parent, uint64_t tx, std::string name, llarp_time_t timeout = 10s);

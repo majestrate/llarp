@@ -2,7 +2,6 @@
 
 #include <llarp/path/pathbuilder.hpp>
 #include "sendcontext.hpp"
-#include <llarp/util/status.hpp>
 
 #include <unordered_map>
 #include <unordered_set>
@@ -25,9 +24,6 @@ namespace llarp
 
       void
       Tick(llarp_time_t now) override;
-
-      util::StatusObject
-      ExtractStatus() const;
 
       void
       BlacklistSNode(const RouterID) override{};

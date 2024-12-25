@@ -340,35 +340,6 @@ namespace llarp
       return m_Stats;
     }
 
-    util::StatusObject
-    Session::ExtractStatus() const
-    {
-      const auto now = m_Parent->Now();
-
-      return {
-          {"txRateCurrent", m_Stats.currentRateTX},
-          {"rxRateCurrent", m_Stats.currentRateRX},
-          {"rxPktsRcvd", m_Stats.totalPacketsRX},
-
-          // leave 'tx' and 'rx' as duplicates of 'xRateCurrent' for compat
-          {"tx", m_Stats.currentRateTX},
-          {"rx", m_Stats.currentRateRX},
-
-          {"txPktsAcked", m_Stats.totalAckedTX},
-          {"txPktsDropped", m_Stats.totalDroppedTX},
-          {"txPktsInFlight", m_Stats.totalInFlightTX},
-
-          {"state", StateToString(m_State)},
-          {"inbound", m_Inbound},
-          {"replayFilter", m_ReplayFilter.size()},
-          {"txMsgQueueSize", m_TXMsgs.size()},
-          {"rxMsgQueueSize", m_RXMsgs.size()},
-          {"remoteAddr", m_RemoteAddr.ToString()},
-          {"remoteRC", m_RemoteRC.ExtractStatus()},
-          {"created", to_json(m_CreatedAt)},
-          {"uptime", to_json(now - m_CreatedAt)}};
-    }
-
     bool
     Session::TimedOut(llarp_time_t now) const
     {

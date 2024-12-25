@@ -4,7 +4,6 @@
 #include "key.hpp"
 #include "txowner.hpp"
 #include <llarp/util/logging.hpp>
-#include <llarp/util/status.hpp>
 
 #include <set>
 #include <vector>
@@ -32,29 +31,6 @@ namespace llarp
 
       void
       OnFound(const Key_t& askedPeer, const V& value);
-
-      util::StatusObject
-      ExtractStatus() const
-      {
-        util::StatusObject obj{
-            {"whoasked", whoasked.ExtractStatus()}, {"target", target.ExtractStatus()}};
-        std::vector<util::StatusObject> foundObjs;
-        std::transform(
-            valuesFound.begin(),
-            valuesFound.end(),
-            std::back_inserter(foundObjs),
-            [](const auto& item) -> util::StatusObject { return item.ExtractStatus(); });
-
-        obj["found"] = foundObjs;
-        std::vector<std::string> asked;
-        std::transform(
-            peersAsked.begin(),
-            peersAsked.end(),
-            std::back_inserter(asked),
-            [](const auto& item) -> std::string { return item.ToString(); });
-        obj["asked"] = asked;
-        return obj;
-      }
 
       virtual bool
       Validate(const V& value) const = 0;

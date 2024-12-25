@@ -61,9 +61,6 @@ namespace llarp
       /// determine if we are using this TLD
       bool
       HasTLD(const std::string& tld) const;
-
-      util::StatusObject
-      ToJSON() const override;
     };
   }  // namespace dns
 }  // namespace llarp

@@ -21,9 +21,6 @@ namespace llarp
       void
       ClearAllEndpoints();
 
-      util::StatusObject
-      ExtractStatus() const;
-
       /// send close to all exit sessions and remove all sessions
       void
       Stop();

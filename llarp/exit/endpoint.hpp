@@ -37,10 +37,6 @@ namespace llarp
       void
       Close();
 
-      /// implement istateful
-      util::StatusObject
-      ExtractStatus() const;
-
       /// return true if we are expired right now
       bool
       IsExpired(llarp_time_t now) const;

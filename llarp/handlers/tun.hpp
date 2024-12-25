@@ -83,9 +83,6 @@ namespace llarp
       void
       Tick(llarp_time_t now) override;
 
-      util::StatusObject
-      ExtractStatus() const override;
-
       std::unordered_map<std::string, std::string>
       NotifyParams() const override;
 

@@ -12,7 +12,6 @@
 #include "txowner.hpp"
 #include <llarp/service/intro_set.hpp>
 #include <llarp/util/time.hpp>
-#include <llarp/util/status.hpp>
 
 #include <memory>
 #include <set>
@@ -184,9 +183,6 @@ namespace llarp
 
       virtual void
       DelRCNodeAsync(const Key_t& val) = 0;
-
-      virtual util::StatusObject
-      ExtractStatus() const = 0;
 
       virtual void
       StoreRC(const RouterContact rc) const = 0;

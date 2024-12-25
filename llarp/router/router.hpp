@@ -15,7 +15,6 @@
 #include <llarp/messages/link_message_parser.hpp>
 #include <llarp/nodedb.hpp>
 #include <llarp/path/path_context.hpp>
-#include <llarp/peerstats/peer_db.hpp>
 #include <llarp/profiling.hpp>
 #include <llarp/router_contact.hpp>
 #include "outbound_message_handler.hpp"
@@ -30,7 +29,6 @@
 #include <llarp/util/buffer.hpp>
 #include <llarp/util/fs.hpp>
 #include <llarp/util/mem.hpp>
-#include <llarp/util/status.hpp>
 #include <llarp/util/str.hpp>
 #include <llarp/util/time.hpp>
 #include <llarp/util/service_manager.hpp>
@@ -93,12 +91,6 @@ namespace llarp
 
     std::optional<std::variant<nuint32_t, nuint128_t>>
     OurPublicIP() const override;
-
-    util::StatusObject
-    ExtractStatus() const override;
-
-    util::StatusObject
-    ExtractSummaryStatus() const override;
 
     const std::shared_ptr<NodeDB>&
     nodedb() const override
@@ -324,12 +316,6 @@ namespace llarp
       return _rcLookupHandler;
     }
 
-    std::shared_ptr<PeerDb>
-    peerDb() override
-    {
-      return m_peerDb;
-    }
-
     inline int
     OutboundUDPSocket() const override
     {
@@ -540,7 +526,6 @@ namespace llarp
 
     llarp_time_t m_LastStatsReport = 0s;
     std::shared_ptr<llarp::KeyManager> m_keyManager;
-    std::shared_ptr<PeerDb> m_peerDb;
 
     uint32_t path_build_count = 0;
 

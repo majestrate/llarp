@@ -1,7 +1,6 @@
 #pragma once
 
 #include "ip_range.hpp"
-#include <llarp/util/status.hpp>
 #include <set>
 #include <vector>
 
@@ -130,17 +129,6 @@ namespace llarp
           else
             ++itr;
         }
-      }
-
-      util::StatusObject
-      ExtractStatus() const
-      {
-        util::StatusObject obj;
-        for (const auto& [range, value] : m_Entries)
-        {
-          obj[range.ToString()] = value.ToString();
-        }
-        return obj;
       }
 
      private:

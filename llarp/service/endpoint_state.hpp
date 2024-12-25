@@ -8,7 +8,6 @@
 #include "endpoint_types.hpp"
 #include <llarp/util/compare_ptr.hpp>
 #include <llarp/util/decaying_hashtable.hpp>
-#include <llarp/util/status.hpp>
 #include "lns_tracker.hpp"
 
 #include <memory>
@@ -69,9 +68,6 @@ namespace llarp
 
       bool
       Configure(const NetworkConfig& conf);
-
-      util::StatusObject
-      ExtractStatus(util::StatusObject& obj) const;
     };
   }  // namespace service
 }  // namespace llarp

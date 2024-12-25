@@ -5,7 +5,6 @@
 #include <llarp/router_id.hpp>
 #include <llarp/routing/message.hpp>
 #include <llarp/service/intro_set.hpp>
-#include <llarp/util/status.hpp>
 #include <llarp/util/thread/threading.hpp>
 #include <llarp/util/time.hpp>
 
@@ -62,9 +61,6 @@ namespace llarp
       uint64_t success = 0;
       uint64_t fails = 0;
       uint64_t timeouts = 0;
-
-      util::StatusObject
-      ExtractStatus() const;
 
       double
       SuccessRatio() const;

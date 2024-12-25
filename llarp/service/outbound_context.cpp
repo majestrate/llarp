@@ -309,27 +309,6 @@ namespace llarp
       }
     }
 
-    util::StatusObject
-    OutboundContext::ExtractStatus() const
-    {
-      auto obj = path::Builder::ExtractStatus();
-      obj["estimatedRTT"] = to_json(estimatedRTT);
-      obj["currentConvoTag"] = currentConvoTag.ToHex();
-      obj["remoteIntro"] = remoteIntro.ExtractStatus();
-      obj["sessionCreatedAt"] = to_json(createdAt);
-      obj["lastGoodSend"] = to_json(lastGoodSend);
-      obj["lastRecv"] = to_json(m_LastInboundTraffic);
-      obj["lastIntrosetUpdate"] = to_json(m_LastIntrosetUpdateAt);
-      obj["seqno"] = sequenceNo;
-      obj["markedBad"] = markedBad;
-      obj["lastShift"] = to_json(lastShift);
-      obj["remoteIdentity"] = addr.ToString();
-      obj["currentRemoteIntroset"] = currentIntroSet.ExtractStatus();
-      obj["nextIntro"] = m_NextIntro.ExtractStatus();
-      obj["readyToSend"] = ReadyToSend();
-      return obj;
-    }
-
     void
     OutboundContext::KeepAlive()
     {

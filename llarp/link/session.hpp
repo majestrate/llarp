@@ -129,9 +129,6 @@ namespace llarp
     virtual SessionStats
     GetSessionStats() const = 0;
 
-    virtual util::StatusObject
-    ExtractStatus() const = 0;
-
     virtual void
     HandlePlaintext() = 0;
   };

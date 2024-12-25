@@ -46,9 +46,6 @@ namespace llarp
     void
     ConnectToRandomRouters(int numDesired) override;
 
-    util::StatusObject
-    ExtractStatus() const override;
-
     bool
     ShouldConnectTo(const RouterID& router) const override EXCLUDES(_mutex);
 

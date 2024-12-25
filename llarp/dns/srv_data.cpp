@@ -134,14 +134,4 @@ namespace llarp::dns
     };
   }
 
-  util::StatusObject
-  SRVData::ExtractStatus() const
-  {
-    return util::StatusObject{
-        {"proto", service_proto},
-        {"priority", priority},
-        {"weight", weight},
-        {"port", port},
-        {"target", target}};
-  }
 }  // namespace llarp::dns

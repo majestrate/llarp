@@ -4,7 +4,6 @@
 #include "tx.hpp"
 #include "txowner.hpp"
 #include <llarp/util/time.hpp>
-#include <llarp/util/status.hpp>
 
 #include <memory>
 #include <unordered_map>
@@ -26,42 +25,6 @@ namespace llarp
 
       const TX<K, V>*
       GetPendingLookupFrom(const TXOwner& owner) const;
-
-      util::StatusObject
-      ExtractStatus() const
-      {
-        util::StatusObject obj{};
-        std::vector<util::StatusObject> txObjs, timeoutsObjs, waitingObjs;
-        std::transform(
-            tx.begin(),
-            tx.end(),
-            std::back_inserter(txObjs),
-            [](const auto& item) -> util::StatusObject {
-              return util::StatusObject{
-                  {"owner", item.first.ExtractStatus()}, {"tx", item.second->ExtractStatus()}};
-            });
-        obj["tx"] = txObjs;
-        std::transform(
-            timeouts.begin(),
-            timeouts.end(),
-            std::back_inserter(timeoutsObjs),
-            [](const auto& item) -> util::StatusObject {
-              return util::StatusObject{
-                  {"time", to_json(item.second)}, {"target", item.first.ExtractStatus()}};
-            });
-        obj["timeouts"] = timeoutsObjs;
-        std::transform(
-            waiting.begin(),
-            waiting.end(),
-            std::back_inserter(waitingObjs),
-            [](const auto& item) -> util::StatusObject {
-              return util::StatusObject{
-                  {"target", item.first.ExtractStatus()},
-                  {"whoasked", item.second.ExtractStatus()}};
-            });
-        obj["waiting"] = waitingObjs;
-        return obj;
-      }
 
       bool
       HasLookupFor(const K& target) const

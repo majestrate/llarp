@@ -22,7 +22,6 @@
 #include <llarp/tooling/peer_stats_event.hpp>
 
 #include <llarp/tooling/router_event.hpp>
-#include <llarp/util/status.hpp>
 
 #include <fstream>
 #include <cstdlib>
@@ -90,119 +89,6 @@ namespace llarp
     _outboundMessageHandler.Pump();
     _linkManager.PumpLinks();
     llarp::LogTrace("Router::PumpLL() end");
-  }
-
-  util::StatusObject
-  Router::ExtractStatus() const
-  {
-    if (not _running)
-      util::StatusObject{{"running", false}};
-
-    return util::StatusObject{
-        {"running", true},
-        {"numNodesKnown", _nodedb->NumLoaded()},
-        {"dht", _dht->impl->ExtractStatus()},
-        {"services", _hiddenServiceContext.ExtractStatus()},
-        {"exit", _exitContext.ExtractStatus()},
-        {"links", _linkManager.ExtractStatus()},
-        {"outboundMessages", _outboundMessageHandler.ExtractStatus()}};
-  }
-
-  util::StatusObject
-  Router::ExtractSummaryStatus() const
-  {
-    if (!_running)
-      return util::StatusObject{{"running", false}};
-
-    auto services = _hiddenServiceContext.ExtractStatus();
-
-    auto link_types = _linkManager.ExtractStatus();
-
-    uint64_t tx_rate = 0;
-    uint64_t rx_rate = 0;
-    uint64_t peers = 0;
-    for (const auto& links : link_types)
-    {
-      for (const auto& link : links)
-      {
-        if (link.empty())
-          continue;
-        for (const auto& peer : link["sessions"]["established"])
-        {
-          tx_rate += peer["tx"].get<uint64_t>();
-          rx_rate += peer["rx"].get<uint64_t>();
-          peers++;
-        }
-      }
-    }
-
-    // Compute all stats on all path builders on the default endpoint
-    // Merge snodeSessions, remoteSessions and default into a single array
-    std::vector<nlohmann::json> builders;
-
-    if (services.is_object())
-    {
-      const auto& serviceDefault = services.at("default");
-      builders.push_back(serviceDefault);
-
-      auto snode_sessions = serviceDefault.at("snodeSessions");
-      for (const auto& session : snode_sessions)
-        builders.push_back(session);
-
-      auto remote_sessions = serviceDefault.at("remoteSessions");
-      for (const auto& session : remote_sessions)
-        builders.push_back(session);
-    }
-
-    // Iterate over all items on this array to build the global pathStats
-    uint64_t pathsCount = 0;
-    uint64_t success = 0;
-    uint64_t attempts = 0;
-    for (const auto& builder : builders)
-    {
-      if (builder.is_null())
-        continue;
-
-      const auto& paths = builder.at("paths");
-      if (paths.is_array())
-      {
-        for (const auto& [key, value] : paths.items())
-        {
-          if (value.is_object() && value.at("status").is_string()
-              && value.at("status") == "established")
-            pathsCount++;
-        }
-      }
-
-      const auto& buildStats = builder.at("buildStats");
-      if (buildStats.is_null())
-        continue;
-
-      success += buildStats.at("success").get<uint64_t>();
-      attempts += buildStats.at("attempts").get<uint64_t>();
-    }
-    double ratio = static_cast<double>(success) / (attempts + 1);
-
-    util::StatusObject stats{
-        {"running", true},
-        {"version", llarp::VERSION_FULL},
-        {"uptime", to_json(Uptime())},
-        {"numPathsBuilt", pathsCount},
-        {"numPeersConnected", peers},
-        {"numRoutersKnown", _nodedb->NumLoaded()},
-        {"ratio", ratio},
-        {"txRate", tx_rate},
-        {"rxRate", rx_rate},
-    };
-
-    if (services.is_object())
-    {
-      stats["authCodes"] = services["default"]["authCodes"];
-      stats["exitMap"] = services["default"]["exitMap"];
-      stats["networkReady"] = services["default"]["networkReady"];
-      stats["lokiAddress"] = services["default"]["identity"];
-    }
-    return stats;
   }
 
   bool
@@ -1009,29 +895,6 @@ namespace llarp
 
     _nodedb->Tick(now);
 
-    if (m_peerDb)
-    {
-      // TODO: throttle this?
-      // TODO: need to capture session stats when session terminates / is removed from link
-      // manager
-      _linkManager.updatePeerDb(m_peerDb);
-
-      if (m_peerDb->shouldFlush(now))
-      {
-        LogDebug("Queing database flush...");
-        QueueDiskIO([this]() {
-          try
-          {
-            m_peerDb->flushDatabase();
-          }
-          catch (std::exception& ex)
-          {
-            LogError("Could not flush peer stats database: ", ex.what());
-          }
-        });
-      }
-    }
-
     // get connected peers
     std::set<dht::Key_t> peersWeHave;
     _linkManager.ForEachPeer([&peersWeHave](ILinkSession* s) {
@@ -1073,12 +936,6 @@ namespace llarp
   void
   Router::ConnectionTimedOut(ILinkSession* session)
   {
-    if (m_peerDb)
-    {
-      RouterID id{session->GetPubKey()};
-      // TODO: make sure this is a public router (on whitelist)?
-      m_peerDb->modifyPeerStats(id, [&](PeerStats& stats) { stats.numConnectionTimeouts++; });
-    }
     _outboundSessionMaker.OnConnectTimeout(session);
   }
 
@@ -1097,11 +954,6 @@ namespace llarp
   Router::ConnectionEstablished(ILinkSession* session, bool inbound)
   {
     RouterID id{session->GetPubKey()};
-    if (m_peerDb)
-    {
-      // TODO: make sure this is a public router (on whitelist)?
-      m_peerDb->modifyPeerStats(id, [&](PeerStats& stats) { stats.numConnectionSuccesses++; });
-    }
     NotifyRouterEvent<tooling::LinkSessionEstablishedEvent>(pubkey(), id, inbound);
     return _outboundSessionMaker.OnSessionEstablished(session);
   }

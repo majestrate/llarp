@@ -45,19 +45,6 @@ namespace llarp
       }
     }
 
-    util::StatusObject
-    Context::ExtractStatus() const
-    {
-      util::StatusObject obj{};
-      auto itr = m_Exits.begin();
-      while (itr != m_Exits.end())
-      {
-        obj[itr->first] = itr->second->ExtractStatus();
-        ++itr;
-      }
-      return obj;
-    }
-
     void
     Context::CalculateExitTraffic(TrafficStats& stats)
     {

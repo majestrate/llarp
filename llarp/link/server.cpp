@@ -261,35 +261,6 @@ namespace llarp
     return false;
   }
 
-  util::StatusObject
-  ILinkLayer::ExtractStatus() const
-  {
-    std::vector<util::StatusObject> pending, established;
-
-    {
-      Lock_t l(m_PendingMutex);
-      std::transform(
-          m_Pending.cbegin(),
-          m_Pending.cend(),
-          std::back_inserter(pending),
-          [](const auto& item) -> util::StatusObject { return item.second->ExtractStatus(); });
-    }
-    {
-      Lock_t l(m_AuthedLinksMutex);
-      std::transform(
-          m_AuthedLinks.cbegin(),
-          m_AuthedLinks.cend(),
-          std::back_inserter(established),
-          [](const auto& item) -> util::StatusObject { return item.second->ExtractStatus(); });
-    }
-
-    return {
-        {"name", Name()},
-        {"rank", uint64_t(Rank())},
-        {"addr", m_ourAddr.ToString()},
-        {"sessions", util::StatusObject{{"pending", pending}, {"established", established}}}};
-  }
-
   bool
   ILinkLayer::TryEstablishTo(RouterContact rc)
   {

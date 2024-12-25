@@ -3,7 +3,6 @@
 #include "router_contact.hpp"
 #include <set>
 #include <unordered_map>
-#include "llarp/util/fs.hpp"
 
 namespace llarp
 {
@@ -15,8 +14,9 @@ namespace llarp
     bool
     BEncode(llarp_buffer_t* buf) const;
 
+    template <typename fspath_t>
     void
-    AddFromFile(fs::path fpath);
+    AddFromFile(const fspath_t& fpath);
 
     void
     Clear();

@@ -2,8 +2,6 @@
 
 #include <llarp/dht/key.hpp>
 #include <llarp/util/aligned.hpp>
-#include <llarp/util/status.hpp>
-
 #include <sodium/crypto_generichash.h>
 
 namespace llarp
@@ -33,12 +31,6 @@ namespace llarp
         std::copy(
             str.begin(), str.begin() + std::min(std::string::size_type(16), str.size()), begin());
         return *this;
-      }
-
-      util::StatusObject
-      ExtractStatus() const
-      {
-        return util::StatusObject{{"name", ToString()}};
       }
 
       std::string
