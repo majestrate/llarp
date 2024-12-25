@@ -336,6 +336,7 @@ lokinet_link_lib(lokinet-context
   lokinet-platform
   lokinet-layers
   lokinet-consensus
+  lokinet-cryptography
 )
 
 lokinet_link_lib(lokinet-dht
@@ -350,6 +351,7 @@ lokinet_link_lib(lokinet-dns
 )
 
 lokinet_link_lib(lokinet-nodedb
+  lokinet-cryptography
   lokinet-util
   lokinet-platform
 )
