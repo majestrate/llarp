@@ -316,7 +316,6 @@ namespace llarp::dns
         {
           m_Poller = loop->add_poller(ub_fd(m_ctx), [ctx = m_ctx]() { ub_process(ctx); });
         }
-        throw std::runtime_error{"no uvw loop"};
       }
 
       void
