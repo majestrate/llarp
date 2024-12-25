@@ -1,4 +1,4 @@
-# Lokinet project structure 
+# Lokinet project structure
 
 this codebase is a bit large. this is a high level map of the current code structure.
 
@@ -12,32 +12,31 @@ this codebase is a bit large. this is a high level map of the current code struc
 
 ## lokinet public headers `(/include)`
 
-`lokinet.h and lokinet/*.h`: C headers for embedded lokinet 
+`lokinet.h and lokinet/*.h`: C headers for embedded lokinet
 
 `llarp.hpp`: semi-internal C++ header for lokinet executables
 
 
-## lokinet core library `(/llarp)` 
+## lokinet core library `(/llarp)`
 
 * `/llarp`: contains a few straggling compilation units
 * `/llarp/android`: android platform compat shims
-* `/llarp/apple`: all apple platform specific code
 * `/llarp/config`: configuration structs, generation/parsing/validating of config files
-* `/llarp/consensus`: network consenus and inter relay testing 
-* `/llarp/constants`: contains all compile time constants 
+* `/llarp/consensus`: network consenus and inter relay testing
+* `/llarp/constants`: contains all compile time constants
 * `/llarp/crypto`: cryptography interface and implementation, includes various secure helpers
-* `/llarp/dht`: dht message structs, parsing, validation and handlers of dht related parts of the protocol 
+* `/llarp/dht`: dht message structs, parsing, validation and handlers of dht related parts of the protocol
 * `/llarp/dns`: dns subsytem, dns udp wire parsers, resolver, server, rewriter/interceptor, the works
-* `/llarp/ev`: event loop interfaces and implementations 
+* `/llarp/ev`: event loop interfaces and implementations
 * `/llarp/exit`: `.snode` endpoint "backend"
 * `/llarp/handlers`: packet endpoint "frontends"
 * `/llarp/iwp`: "internet wire protocol", hacky homegrown durable udp wire protocol used in lokinet
 * `/llarp/link`: linklayer (node to node) communcation subsystem
-* `/llarp/messages`: linklayer message parsing and handling 
+* `/llarp/messages`: linklayer message parsing and handling
 * `/llarp/net`: wrappers and helpers for ip addresses / ip ranges / sockaddrs, hides platform specific implemenation details
 * `/llarp/path`: onion routing path logic, both client and relay side, path selection algorithms.
 * `/llarp/peerstats`: deprecated
-* `/llarp/quic`: plainquic shims for quic protocol inside lokinet 
+* `/llarp/quic`: plainquic shims for quic protocol inside lokinet
 * `/llarp/router`: the relm of the god objects
 * `/llarp/routing`: routing messages (onion routed messages sent over paths), parsing, validation and handler interfaces.
 * `/llarp/rpc`: lokinet zmq rpc server and zmq client for externalizing logic (like with blockchain state and custom `.loki` endpoint orchestration)
@@ -46,7 +45,6 @@ this codebase is a bit large. this is a high level map of the current code struc
 * `/llarp/tooling`: network simulation tooling
 * `/llarp/util`: utility function dumping ground
 * `/llarp/vpn`: vpn tunnel implemenation for each supported platform
-* `/llarp/win32`: windows specific code
 
 
 ## component relations
@@ -76,7 +74,7 @@ these contain most of the os/platform specific bits
 
 ### `/llarp/link` /  `/llarp/iwp`
 
-node to node traffic logic and wire protocol dialects 
+node to node traffic logic and wire protocol dialects
 
 * `//TODO: make better definitions of interfaces`
 * `//TODO: separte implementation details from interfaces`
@@ -89,7 +87,7 @@ grab bag directory for non core related platform specific non source code
 * `/contrib/format.sh`: clang-format / jsonnetfmt / swiftformat helper, will check or correct code style.
 
 system layer and packaging related:
- 
+
 * `/contrib/NetworkManager`
 * `/contrib/apparmor`
 * `/contrib/systemd-resolved`

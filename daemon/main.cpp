@@ -6,12 +6,7 @@
 #include <llarp/util/fs.hpp>
 #include <llarp/util/str.hpp>
 
-#ifdef _WIN32
-#include <llarp/win32/service_manager.hpp>
-#include <dbghelp.h>
-#else
 #include <llarp/util/service_manager.hpp>
-#endif
 
 #include <csignal>
 
@@ -41,19 +36,7 @@ namespace
     // TODO: change this to use a std::filesystem::path once we stop using ghc::filesystem on some
     // platforms
     std::string configPath;
-
-    // windows options
-    bool win_install = false;
-    bool win_remove = false;
   };
-
-  // windows-specific function declarations
-  int
-  startWinsock();
-  void
-  install_win32_daemon();
-  void
-  uninstall_win32_daemon();
 
   // operational function definitions
   int
@@ -79,274 +62,6 @@ namespace
       std::cerr << "Received signal " << sig << ", but have no context yet. Ignoring!" << std::endl;
   }
 
-  // Windows specific code
-#ifdef _WIN32
-  extern "C" LONG FAR PASCAL
-  win32_signal_handler(EXCEPTION_POINTERS*);
-  extern "C" VOID FAR PASCAL
-  win32_daemon_entry(DWORD, LPTSTR*);
-  VOID
-  insert_description();
-
-  extern "C" BOOL FAR PASCAL
-  handle_signal_win32(DWORD fdwCtrlType)
-  {
-    UNREFERENCED_PARAMETER(fdwCtrlType);
-    handle_signal(SIGINT);
-    return TRUE;  // probably unreachable
-  };
-
-  int
-  startWinsock()
-  {
-    WSADATA wsockd;
-    int err;
-    err = ::WSAStartup(MAKEWORD(2, 2), &wsockd);
-    if (err)
-    {
-      perror("Failed to start Windows Sockets");
-      return err;
-    }
-    ::CreateMutex(nullptr, FALSE, "lokinet_win32_daemon");
-    return 0;
-  }
-
-  void
-  install_win32_daemon()
-  {
-    SC_HANDLE schSCManager;
-    SC_HANDLE schService;
-    std::array<char, 1024> szPath{};
-
-    if (!GetModuleFileName(nullptr, szPath.data(), MAX_PATH))
-    {
-      llarp::LogError("Cannot install service ", GetLastError());
-      return;
-    }
-
-    // Get a handle to the SCM database.
-    schSCManager = OpenSCManager(
-        nullptr,                 // local computer
-        nullptr,                 // ServicesActive database
-        SC_MANAGER_ALL_ACCESS);  // full access rights
-
-    if (nullptr == schSCManager)
-    {
-      llarp::LogError("OpenSCManager failed ", GetLastError());
-      return;
-    }
-
-    // Create the service
-    schService = CreateService(
-        schSCManager,               // SCM database
-        strdup("lokinet"),          // name of service
-        "Lokinet for Windows",      // service name to display
-        SERVICE_ALL_ACCESS,         // desired access
-        SERVICE_WIN32_OWN_PROCESS,  // service type
-        SERVICE_DEMAND_START,       // start type
-        SERVICE_ERROR_NORMAL,       // error control type
-        szPath.data(),              // path to service's binary
-        nullptr,                    // no load ordering group
-        nullptr,                    // no tag identifier
-        nullptr,                    // no dependencies
-        nullptr,                    // LocalSystem account
-        nullptr);                   // no password
-
-    if (schService == nullptr)
-    {
-      llarp::LogError("CreateService failed ", GetLastError());
-      CloseServiceHandle(schSCManager);
-      return;
-    }
-    else
-      llarp::LogInfo("Service installed successfully");
-
-    CloseServiceHandle(schService);
-    CloseServiceHandle(schSCManager);
-    insert_description();
-  }
-
-  VOID
-  insert_description()
-  {
-    SC_HANDLE schSCManager;
-    SC_HANDLE schService;
-    SERVICE_DESCRIPTION sd;
-    LPTSTR szDesc = strdup(
-        "LokiNET is a free, open source, private, "
-        "decentralized, \"market based sybil resistant\" "
-        "and IP based onion routing network");
-    // Get a handle to the SCM database.
-    schSCManager = OpenSCManager(
-        NULL,                    // local computer
-        NULL,                    // ServicesActive database
-        SC_MANAGER_ALL_ACCESS);  // full access rights
-
-    if (nullptr == schSCManager)
-    {
-      llarp::LogError("OpenSCManager failed ", GetLastError());
-      return;
-    }
-
-    // Get a handle to the service.
-    schService = OpenService(
-        schSCManager,            // SCM database
-        "lokinet",               // name of service
-        SERVICE_CHANGE_CONFIG);  // need change config access
-
-    if (schService == nullptr)
-    {
-      llarp::LogError("OpenService failed ", GetLastError());
-      CloseServiceHandle(schSCManager);
-      return;
-    }
-
-    // Change the service description.
-    sd.lpDescription = szDesc;
-
-    if (!ChangeServiceConfig2(
-            schService,                  // handle to service
-            SERVICE_CONFIG_DESCRIPTION,  // change: description
-            &sd))                        // new description
-    {
-      llarp::LogError("ChangeServiceConfig2 failed");
-    }
-    else
-      llarp::LogInfo("Service description updated successfully.");
-
-    CloseServiceHandle(schService);
-    CloseServiceHandle(schSCManager);
-  }
-
-  void
-  uninstall_win32_daemon()
-  {
-    SC_HANDLE schSCManager;
-    SC_HANDLE schService;
-
-    // Get a handle to the SCM database.
-    schSCManager = OpenSCManager(
-        nullptr,                 // local computer
-        nullptr,                 // ServicesActive database
-        SC_MANAGER_ALL_ACCESS);  // full access rights
-
-    if (nullptr == schSCManager)
-    {
-      llarp::LogError("OpenSCManager failed ", GetLastError());
-      return;
-    }
-
-    // Get a handle to the service.
-    schService = OpenService(
-        schSCManager,  // SCM database
-        "lokinet",     // name of service
-        0x10000);      // need delete access
-
-    if (schService == nullptr)
-    {
-      llarp::LogError("OpenService failed ", GetLastError());
-      CloseServiceHandle(schSCManager);
-      return;
-    }
-
-    // Delete the service.
-    if (!DeleteService(schService))
-    {
-      llarp::LogError("DeleteService failed ", GetLastError());
-    }
-    else
-      llarp::LogInfo("Service deleted successfully\n");
-
-    CloseServiceHandle(schService);
-    CloseServiceHandle(schSCManager);
-  }
-
-  /// minidump generation for windows jizz
-  /// will make a coredump when there is an unhandled exception
-  LONG
-  GenerateDump(EXCEPTION_POINTERS* pExceptionPointers)
-  {
-    const auto flags =
-        (MINIDUMP_TYPE)(MiniDumpWithFullMemory | MiniDumpWithFullMemoryInfo | MiniDumpWithHandleData | MiniDumpWithUnloadedModules | MiniDumpWithThreadInfo);
-
-    std::stringstream ss;
-    ss << "C:\\ProgramData\\lokinet\\crash-" << llarp::time_now_ms().count() << ".dmp";
-    const std::string fname = ss.str();
-    HANDLE hDumpFile;
-    SYSTEMTIME stLocalTime;
-    GetLocalTime(&stLocalTime);
-    MINIDUMP_EXCEPTION_INFORMATION ExpParam{};
-
-    hDumpFile = CreateFile(
-        fname.c_str(),
-        GENERIC_READ | GENERIC_WRITE,
-        FILE_SHARE_WRITE | FILE_SHARE_READ,
-        0,
-        CREATE_ALWAYS,
-        0,
-        0);
-
-    ExpParam.ExceptionPointers = pExceptionPointers;
-    ExpParam.ClientPointers = TRUE;
-
-    MiniDumpWriteDump(
-        GetCurrentProcess(), GetCurrentProcessId(), hDumpFile, flags, &ExpParam, NULL, NULL);
-
-    return 1;
-  }
-
-  VOID FAR PASCAL
-  SvcCtrlHandler(DWORD dwCtrl)
-  {
-    // Handle the requested control code.
-
-    switch (dwCtrl)
-    {
-      case SERVICE_CONTROL_STOP:
-        // tell service we are stopping
-        llarp::log::debug(logcat, "Windows service controller gave SERVICE_CONTROL_STOP");
-        llarp::sys::service_manager->system_changed_our_state(llarp::sys::ServiceState::Stopping);
-        handle_signal(SIGINT);
-        return;
-
-      case SERVICE_CONTROL_INTERROGATE:
-        // report status
-        llarp::log::debug(logcat, "Got win32 service interrogate signal");
-        llarp::sys::service_manager->report_changed_state();
-        return;
-
-      default:
-        llarp::log::debug(logcat, "Got win32 unhandled signal {}", dwCtrl);
-        break;
-    }
-  }
-
-  // The win32 daemon entry point is where we go when invoked as a windows service; we do the
-  // required service dance and then pretend we were invoked via main().
-  VOID FAR PASCAL
-  win32_daemon_entry(DWORD, LPTSTR* argv)
-  {
-    // Register the handler function for the service
-    auto* svc = dynamic_cast<llarp::sys::SVC_Manager*>(llarp::sys::service_manager);
-    svc->handle = RegisterServiceCtrlHandler("lokinet", SvcCtrlHandler);
-
-    if (svc->handle == nullptr)
-    {
-      llarp::LogError("failed to register daemon control handler");
-      return;
-    }
-
-    // we hard code the args to lokinet_main.
-    // we yoink argv[0] (lokinet.exe path) and pass in the new args.
-    std::array args = {
-        reinterpret_cast<char*>(argv[0]),
-        reinterpret_cast<char*>(strdup("c:\\programdata\\lokinet\\lokinet.ini")),
-        reinterpret_cast<char*>(0)};
-    lokinet_main(args.size() - 1, args.data());
-  }
-
-#endif
-
   int
   llarp_main(int argc, char** argv)
   {
@@ -355,12 +70,6 @@ namespace
 
     llarp::RuntimeOptions opts;
     opts.showBanner = false;
-
-#ifdef _WIN32
-    if (startWinsock())
-      return -1;
-    SetConsoleCtrlHandler(handle_signal_win32, TRUE);
-#endif
 
     CLI::App cli{
         "LLARP is a free, open source, private, decentralized "
@@ -380,12 +89,6 @@ namespace
     cli.add_option("config,--config", options.configPath, "Path to config.ini configuration file")
         ->capture_default_str();
 
-    if constexpr (llarp::platform::is_windows)
-    {
-      cli.add_flag("--install", options.win_install, "Install win32 daemon to SCM");
-      cli.add_flag("--remove", options.win_remove, "Remove win32 daemon from SCM");
-    }
-
     try
     {
       cli.parse(argc, argv);
@@ -403,20 +106,6 @@ namespace
       {
         std::cout << llarp::VERSION_FULL << std::endl;
         return 0;
-      }
-
-      if constexpr (llarp::platform::is_windows)
-      {
-        if (options.win_install)
-        {
-          install_win32_daemon();
-          return 0;
-        }
-        if (options.win_remove)
-        {
-          uninstall_win32_daemon();
-          return 0;
-        }
       }
 
       opts.isSNode = options.router;
@@ -493,10 +182,6 @@ namespace
 
     if (options.configOnly)
       return 0;
-
-#ifdef _WIN32
-    SetUnhandledExceptionFilter(&GenerateDump);
-#endif
 
     std::thread main_thread{[configFile, opts] { run_main_context(configFile, opts); }};
     auto ftr = exit_code.get_future();
@@ -597,10 +282,8 @@ namespace
       signal(SIGINT, handle_signal);
       signal(SIGTERM, handle_signal);
 
-#ifndef _WIN32
       signal(SIGHUP, handle_signal);
       signal(SIGUSR1, handle_signal);
-#endif
 
       try
       {
@@ -648,30 +331,5 @@ main(int argc, char* argv[])
   llarp::logRingBuffer = std::make_shared<llarp::log::RingBufferSink>(100);
   llarp::log::add_sink(llarp::logRingBuffer, llarp::log::DEFAULT_PATTERN_MONO);
 
-#ifndef _WIN32
   return llarp_main(argc, argv);
-#else
-  SERVICE_TABLE_ENTRY DispatchTable[] = {
-      {strdup("lokinet"), (LPSERVICE_MAIN_FUNCTION)win32_daemon_entry}, {NULL, NULL}};
-
-  // Try first to run as a service; if this works it fires off to win32_daemon_entry and doesn't
-  // return until the service enters STOPPED state.
-  if (StartServiceCtrlDispatcher(DispatchTable))
-    return 0;
-
-  auto error = GetLastError();
-
-  // We'll get this error if not invoked as a service, which is fine: we can just run directly
-  if (error == ERROR_FAILED_SERVICE_CONTROLLER_CONNECT)
-  {
-    llarp::sys::service_manager->disable();
-    return lokinet_main(argc, argv);
-  }
-  else
-  {
-    llarp::log::critical(
-        logcat, "Error launching service: {}", std::system_category().message(error));
-    return 1;
-  }
-#endif
 }

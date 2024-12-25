@@ -86,10 +86,8 @@ namespace llarp::uv
     std::optional<int>
     file_descriptor() override
     {
-#ifndef _WIN32
       if (int fd = handle->fd(); fd >= 0)
         return fd;
-#endif
       return std::nullopt;
     }
 
@@ -137,9 +135,7 @@ namespace llarp::uv
     loop_run_count = 0;
 #endif
 
-#ifndef _WIN32
     signal(SIGPIPE, SIG_IGN);
-#endif
 
     m_Run.store(true);
     m_nextID.store(0);

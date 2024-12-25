@@ -99,7 +99,7 @@ namespace llarp::handlers
     }
 
     void
-    SendPacketToRemote(const llarp_buffer_t&, service::ProtocolType) override{};
+    SendPacketToRemote(const llarp_buffer_t&, service::ProtocolType) override {};
 
     huint128_t
     ObtainIPForAddr(std::variant<service::Address, RouterID>) override

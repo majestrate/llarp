@@ -1,9 +1,6 @@
 
 #include "platform.hpp"
 
-#ifdef _WIN32
-#include "win32.hpp"
-#endif
 #ifdef __linux__
 #ifdef ANDROID
 #include "android.hpp"
@@ -27,18 +24,12 @@ namespace llarp::vpn
   {
     (void)ctx;
     std::shared_ptr<Platform> plat;
-#ifdef _WIN32
-    plat = std::make_shared<llarp::win32::VPNPlatform>(ctx);
-#endif
 #ifdef __linux__
 #ifdef ANDROID
     plat = std::make_shared<vpn::AndroidPlatform>(ctx);
 #else
     plat = std::make_shared<vpn::LinuxPlatform>();
 #endif
-#endif
-#ifdef __APPLE__
-    throw std::runtime_error{"not supported"};
 #endif
     return plat;
   }

@@ -1,5 +1,4 @@
 #pragma once
-#ifndef _WIN32
 // this file is a shim include for #include <net/if.h>
 #if defined(__linux__)
 #include <linux/if.h>
@@ -11,7 +10,6 @@ if_nametoindex(const char* __ifname) __THROW;
 #endif
 #else
 #include <net/if.h>
-#endif
 #endif
 
 namespace llarp::net

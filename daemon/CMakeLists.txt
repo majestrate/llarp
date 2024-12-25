@@ -1,11 +1,6 @@
 set(exetargets llarpd)
 
-if(APPLE)
-  add_executable(llarpd lokinet.swift)
-  target_compile_options(llarpd BEFORE PRIVATE -target x86_64-apple-macos${CMAKE_OSX_DEPLOYMENT_TARGET})
-else()
-  add_executable(llarpd main.cpp)
-endif()
+add_executable(llarpd main.cpp)
 
 
 set(should_install ON)
@@ -26,15 +21,9 @@ endif()
 
 # cmake interface library for bunch of cmake hacks to fix final link order
 add_library(hax_and_shims_for_cmake INTERFACE)
-if(WIN32)
-  target_link_libraries(hax_and_shims_for_cmake INTERFACE uvw oxenmq::oxenmq -lws2_32 -lshlwapi -ldbghelp -luser32 -liphlpapi -lpsapi -luserenv)
-endif()
 
 foreach(exe ${exetargets})
-  if(WIN32)
-    target_sources(${exe} PRIVATE ${CMAKE_BINARY_DIR}/${exe}.rc)
-    target_link_libraries(${exe} PRIVATE -static-libstdc++ -static-libgcc --static -Wl,--pic-executable,-e,mainCRTStartup,--subsystem,console:5.00)
-  elseif(CMAKE_SYSTEM_NAME MATCHES "FreeBSD")
+  if(CMAKE_SYSTEM_NAME MATCHES "FreeBSD")
     target_link_directories(${exe} PRIVATE /usr/local/lib)
   endif()
   target_link_libraries(${exe} PUBLIC lokinet-amalgum hax_and_shims_for_cmake)
@@ -46,14 +35,7 @@ foreach(exe ${exetargets})
   endif()
   target_include_directories(${exe} PUBLIC "${PROJECT_SOURCE_DIR}")
   if(should_install)
-    if(APPLE)
-      install(TARGETS ${exe}
-        BUNDLE DESTINATION "${PROJECT_BINARY_DIR}"
-        RUNTIME DESTINATION "."
-        COMPONENT llarpd)
-    else()
-      install(TARGETS ${exe} RUNTIME DESTINATION bin COMPONENT llarpd)
-    endif()
+    install(TARGETS ${exe} RUNTIME DESTINATION bin COMPONENT llarpd)
   endif()
 endforeach()
 

@@ -55,26 +55,7 @@ if(CMAKE_SYSTEM_NAME MATCHES "Linux")
   endif()
 endif()
 
-if (WIN32)
-  target_sources(lokinet-platform PRIVATE
-    net/win32.cpp
-    vpn/win32.cpp
-    win32/service_manager.cpp
-    win32/exec.cpp
-    win32/dll.cpp
-    win32/exception.cpp
-    win32/wintun.cpp
-    win32/windivert.cpp)
-  target_include_directories(lokinet-platform PRIVATE ${CMAKE_BINARY_DIR}/wintun/include/ ${CMAKE_BINARY_DIR}/WinDivert-${WINDIVERT_VERSION}/include/)
-else()
-  target_sources(lokinet-platform PRIVATE
-    net/posix.cpp)
-endif()
-
-if(APPLE)
-  add_subdirectory(apple)
-  target_sources(lokinet-platform PRIVATE util/nop_service_manager.cpp)
-endif()
+target_sources(lokinet-platform PRIVATE net/posix.cpp)
 
 # lokinet-dns is the dns parsing and hooking library that we use to
 # parse modify and reconstitute dns wire proto, dns queries and RR
@@ -422,7 +403,7 @@ function(link_lokinet_layers)
     lokinet_link_lib(${ARGV1} ${lib})
     list(REMOVE_AT ARGV 1)
     target_link_libraries(${lib} PRIVATE ${ARGV1})
-    # recursion :D 
+    # recursion :D
     link_lokinet_layers(${ARGV})
   else()
     lokinet_link_lib(${lib})
@@ -500,16 +481,8 @@ if(WITH_EMBEDDED_LOKINET)
   include(GNUInstallDirs)
   add_library(lokinet-shared SHARED lokinet_shared.cpp)
   target_link_libraries(lokinet-shared PUBLIC lokinet-amalgum)
-  if(WIN32)
-    set(CMAKE_SHARED_LIBRARY_PREFIX_CXX "")
-  endif()
   set_target_properties(lokinet-shared PROPERTIES OUTPUT_NAME lokinet)
-  if(WIN32)
-    target_link_libraries(lokinet-shared PUBLIC ws2_32 iphlpapi -fstack-protector)
-    install(TARGETS lokinet-shared DESTINATION bin COMPONENT liblokinet)
-  elseif(NOT APPLE)
-    install(TARGETS lokinet-shared LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT liblokinet)
-  endif()
+  install(TARGETS lokinet-shared LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT liblokinet)
 endif()
 
 file(GLOB_RECURSE docs_SRC */*.hpp *.hpp)

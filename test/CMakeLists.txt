@@ -55,9 +55,4 @@ endif()
 target_link_libraries(testAll PUBLIC lokinet-amalgum Catch2::Catch2)
 target_include_directories(testAll PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
-if(WIN32)
-    target_sources(testAll PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/win32/test.rc")
-    target_link_libraries(testAll PUBLIC ws2_32 iphlpapi shlwapi)
-endif()
-
 add_custom_target(check COMMAND testAll)

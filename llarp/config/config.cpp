@@ -829,9 +829,7 @@ namespace llarp
     conf.defineOption<bool>(
         "dns",
         "l3-intercept",
-        Default{
-            platform::is_windows or platform::is_android
-            or (platform::is_macos and not platform::is_apple_sysex)},
+        Default{platform::is_android},
         Comment{"Intercept all dns traffic (udp/53) going into our lokinet network interface "
                 "instead of binding a local udp socket"},
         AssignmentAcceptor(m_raw_dns));
@@ -839,11 +837,7 @@ namespace llarp
     conf.defineOption<std::string>(
         "dns",
         "query-bind",
-#if defined(_WIN32)
-        Default{"0.0.0.0:0"},
-#else
         Hidden,
-#endif
         Comment{
             "Address to bind to for sending upstream DNS requests.",
         },
@@ -1116,9 +1110,7 @@ namespace llarp
   {
     constexpr std::array DefaultRPCBind{
         Default{"tcp://127.0.0.1:1190"},
-#ifndef _WIN32
         Default{"ipc://rpc.sock"},
-#endif
     };
 
     conf.defineOption<bool>(
@@ -1197,8 +1189,7 @@ namespace llarp
   {
     (void)params;
 
-    constexpr Default DefaultLogType{
-        platform::is_android or platform::is_apple ? "system" : "print"};
+    constexpr Default DefaultLogType{platform::is_android ? "system" : "print"};
     constexpr Default DefaultLogFile{""};
 
     const Default DefaultLogLevel{params.isRelay ? "warn" : "info"};

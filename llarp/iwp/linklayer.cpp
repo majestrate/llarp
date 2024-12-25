@@ -21,7 +21,7 @@ namespace llarp::iwp
       WorkerFunc_t worker,
       bool allowInbound)
       : ILinkLayer(
-          keyManager, getrc, h, sign, before, est, reneg, timeout, closed, pumpDone, worker)
+            keyManager, getrc, h, sign, before, est, reneg, timeout, closed, pumpDone, worker)
       , m_Wakeup{ev->make_waker([this]() { HandleWakeupPlaintext(); })}
       , m_Inbound{allowInbound}
   {}
