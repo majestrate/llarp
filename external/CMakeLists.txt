@@ -63,7 +63,7 @@ system_or_submodule(SPDLOG spdlog libspdlog=1.14.1 spdlog)
 system_or_submodule(OXENC oxenc liboxenc>=1.0.4 oxen-encoding)
 
 set(OXEN_LOGGING_SOURCE_ROOT "${PROJECT_SOURCE_DIR}" CACHE INTERNAL "")
-add_subdirectory(oxen-logging)
+add_subdirectory(oxen-logging EXCLUDE_FROM_ALL)
 
 if(WITH_HIVE)
   add_subdirectory(pybind11 EXCLUDE_FROM_ALL)
