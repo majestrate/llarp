@@ -4,8 +4,6 @@
 #include <llarp/router_id.hpp>
 #include <llarp/util/aligned.hpp>
 #include <llarp/util/types.hpp>
-#include <llarp/util/fs.hpp>
-
 #include <algorithm>
 #include <iostream>
 
@@ -108,11 +106,13 @@ namespace llarp
     bool
     toPrivate(PrivateKey& key) const;
 
+    template <typename fspath_t>
     bool
-    LoadFromFile(const fs::path& fname);
+    LoadFromFile(const fspath_t& fname);
 
+    template <typename fspath_t>
     bool
-    SaveToFile(const fs::path& fname) const;
+    SaveToFile(const fspath_t& fname) const;
   };
 
   /// PrivateKey is similar to SecretKey except that it only stores the private
@@ -169,8 +169,9 @@ namespace llarp
     explicit IdentitySecret(const byte_t*) = delete;
 
     /// load service node seed from file
+    template <typename fspath_t>
     bool
-    LoadFromFile(const fs::path& fname);
+    LoadFromFile(const fspath_t& fname);
 
     std::string_view
     ToString() const

@@ -8,7 +8,6 @@
 #include "protocol_type.hpp"
 #include <llarp/util/bencode.hpp>
 #include <llarp/util/time.hpp>
-#include <llarp/util/status.hpp>
 #include <llarp/dns/srv_data.hpp>
 
 #include <llarp/net/ip_range.hpp>
@@ -93,9 +92,6 @@ namespace llarp
 
       bool
       Verify(llarp_time_t now) const;
-
-      util::StatusObject
-      ExtractStatus() const;
     };
 
     inline bool
@@ -170,9 +166,6 @@ namespace llarp
 
       std::string
       ToString() const;
-
-      util::StatusObject
-      ExtractStatus() const;
 
       std::optional<IntroSet>
       MaybeDecrypt(const PubKey& rootKey) const;

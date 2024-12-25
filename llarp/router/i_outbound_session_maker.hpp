@@ -1,6 +1,5 @@
 #pragma once
 
-#include <llarp/util/status.hpp>
 #include <llarp/util/types.hpp>
 #include <llarp/util/formattable.hpp>
 
@@ -61,9 +60,6 @@ namespace llarp
 
     virtual void
     ConnectToRandomRouters(int numDesired) = 0;
-
-    virtual util::StatusObject
-    ExtractStatus() const = 0;
 
     virtual bool
     ShouldConnectTo(const RouterID& router) const = 0;

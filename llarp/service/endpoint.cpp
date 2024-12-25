@@ -366,28 +366,10 @@ namespace llarp
       return introSet().HasExpiredIntros(Now());
     }
 
-    util::StatusObject
-    Endpoint::ExtractStatus() const
-    {
-      auto obj = path::Builder::ExtractStatus();
-      obj["exitMap"] = m_ExitMap.ExtractStatus();
-      obj["identity"] = m_Identity.pub.Addr().ToString();
-      obj["networkReady"] = ReadyForNetwork();
-
-      util::StatusObject authCodes;
-      for (const auto& [service, info] : m_RemoteAuthInfos)
-      {
-        authCodes[service.ToString()] = info.token;
-      }
-      obj["authCodes"] = authCodes;
-
-      return m_state->ExtractStatus(obj);
-    }
-
     void
     Endpoint::Tick(llarp_time_t)
     {
-      const auto now = llarp::time_now_ms();
+      const auto now = m_router->loop()->time_now();
       path::Builder::Tick(now);
       // publish descriptors
       if (ShouldPublishDescriptors(now))

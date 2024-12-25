@@ -13,7 +13,6 @@ add_library(lokinet-util
   util/bencode.cpp
   util/buffer.cpp
   util/file.cpp
-  util/json.cpp
   util/logging/buffer.cpp
   util/easter_eggs.cpp
   util/mem.cpp
@@ -219,13 +218,6 @@ add_library(lokinet-context
   router/route_poker.cpp
 )
 
-# optional peer stats library
-add_library(lokinet-peerstats
-  STATIC
-  peerstats/peer_db.cpp
-  peerstats/types.cpp
-)
-
 # lokinet-layer-routing holds logic related to the routing layer
 # routing layer is anonymized over the onion layer
 add_library(lokinet-layer-routing
@@ -300,11 +292,6 @@ target_include_directories(lokinet-base
 )
 target_link_libraries(lokinet-base INTERFACE oxen::logging lokinet-cryptography)
 
-if(WITH_PEERSTATS)
-  target_compile_definitions(lokinet-base INTERFACE -DLOKINET_PEERSTATS_BACKEND)
-  target_link_libraries(lokinet-base INTERFACE sqlite_orm)
-endif()
-
 # interface libraries for internal linkage
 add_library(lokinet-layers INTERFACE)
 add_library(lokinet-amalgum INTERFACE)
@@ -321,9 +308,8 @@ endfunction()
 # internal public linkages of components
 lokinet_link_lib(lokinet-util)
 lokinet_link_lib(lokinet-cryptography lokinet-libcrypt lokinet-util)
-lokinet_link_lib(lokinet-peerstats lokinet-context)
 lokinet_link_lib(lokinet-consensus lokinet-context)
-lokinet_link_lib(lokinet-layer-link lokinet-peerstats)
+lokinet_link_lib(lokinet-layer-routing lokinet-dht)
 
 if(TARGET lokinet-hive-tooling)
   lokinet_link_lib(lokinet-hive-tooling lokinet-context)
@@ -348,7 +334,6 @@ lokinet_link_lib(lokinet-config
 lokinet_link_lib(lokinet-context
   lokinet-config
   lokinet-platform
-  lokinet-peerstats
   lokinet-layers
   lokinet-consensus
 )
@@ -446,7 +431,6 @@ target_link_libraries(lokinet-cryptography PUBLIC
 
 target_link_libraries(lokinet-context PUBLIC
   CLI11
-  uvw
 )
 
 target_link_libraries(lokinet-platform PUBLIC
@@ -455,7 +439,6 @@ target_link_libraries(lokinet-platform PUBLIC
 )
 
 target_link_libraries(lokinet-util PUBLIC
-  nlohmann_json::nlohmann_json
   filesystem
   oxenc::oxenc
 )

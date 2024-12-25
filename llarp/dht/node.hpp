@@ -22,12 +22,6 @@ namespace llarp
       RCNode(const RouterContact& other) : rc(other), ID(other.pubkey)
       {}
 
-      util::StatusObject
-      ExtractStatus() const
-      {
-        return rc.ExtractStatus();
-      }
-
       bool
       operator<(const RCNode& other) const
       {
@@ -49,12 +43,6 @@ namespace llarp
       ISNode(service::EncryptedIntroSet other) : introset(std::move(other))
       {
         ID = Key_t(introset.derivedSigningKey.as_array());
-      }
-
-      util::StatusObject
-      ExtractStatus() const
-      {
-        return introset.ExtractStatus();
       }
 
       bool

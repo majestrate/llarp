@@ -5,10 +5,7 @@
 #include <set>
 #include <string>
 #include <string_view>
-
-#ifndef _MSC_VER
 #include <dirent.h>
-#endif
 
 namespace llarp::util
 {
@@ -45,13 +42,16 @@ namespace llarp::util
         filename, std::string_view{reinterpret_cast<const char*>(buffer), buffer_size});
   }
 
+  std::string
+  filepath(const fs::path& f);
+
   struct FileHash
   {
     size_t
     operator()(const fs::path& f) const
     {
       std::hash<std::string> h;
-      return h(f.string());
+      return h(filepath(f));
     }
   };
 
@@ -60,13 +60,13 @@ namespace llarp::util
   /// Ensure that a file exists and has correct permissions
   /// return any error code or success
   error_code_t
-  EnsurePrivateFile(fs::path pathname);
+  EnsurePrivateFile(const fs::path& pathname);
 
   /// open a stream to a file and ensure it exists before open
   /// sets any permissions on creation
   template <typename T>
   std::optional<T>
-  OpenFileStream(fs::path pathname, std::ios::openmode mode)
+  OpenFileStream(const fs::path& pathname, std::ios::openmode mode)
   {
     if (EnsurePrivateFile(pathname))
       return {};
@@ -75,13 +75,15 @@ namespace llarp::util
 
   template <typename PathVisitor>
   static void
-  IterDir(const fs::path& path, PathVisitor visit)
+  IterDir(const fs::path& _path, PathVisitor visit)
   {
-    DIR* d = opendir(path.string().c_str());
+    auto fpath = filepath(_path);
+    DIR* d = opendir(fpath.c_str());
     if (d == nullptr)
       return;
     struct dirent* ent = nullptr;
     std::set<fs::path> entries;
+    fs::path path{_path};
     do
     {
       ent = readdir(d);

@@ -6,8 +6,6 @@
 #include <tuple>
 #include <string_view>
 
-#include "llarp/util/status.hpp"
-
 namespace llarp::dns
 {
   using SRVTuple = std::tuple<std::string, uint16_t, uint16_t, uint16_t, std::string>;
@@ -62,9 +60,6 @@ namespace llarp::dns
 
     bool
     BDecode(llarp_buffer_t*);
-
-    util::StatusObject
-    ExtractStatus() const;
 
     static SRVData
     fromTuple(SRVTuple tuple);

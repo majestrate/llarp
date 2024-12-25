@@ -82,9 +82,6 @@ namespace llarp
       virtual std::unordered_map<std::string, std::string>
       NotifyParams() const;
 
-      virtual util::StatusObject
-      ExtractStatus() const;
-
       void
       SetHandler(IDataHandler* h);
 

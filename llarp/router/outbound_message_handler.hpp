@@ -67,9 +67,6 @@ namespace llarp
     void
     RemovePath(const PathID_t& pathid) override;
 
-    util::StatusObject
-    ExtractStatus() const override;
-
     void
     Init(AbstractRouter* router);
 

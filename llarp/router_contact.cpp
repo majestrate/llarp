@@ -233,32 +233,6 @@ namespace llarp
     version = llarp::constants::proto_version;
   }
 
-  util::StatusObject
-  RouterContact::ExtractStatus() const
-  {
-    util::StatusObject obj{
-        {"lastUpdated", last_updated.count()},
-        {"publicRouter", IsPublicRouter()},
-        {"identity", pubkey.ToString()},
-        {"addresses", addrs}};
-
-    if (HasNick())
-    {
-      obj["nickname"] = Nick();
-    }
-    if (routerVersion)
-    {
-      obj["routerVersion"] = routerVersion->ToString();
-    }
-    std::vector<util::StatusObject> srv;
-    for (const auto& record : srvRecords)
-    {
-      srv.emplace_back(record.ExtractStatus());
-    }
-    obj["srvRecords"] = srv;
-    return obj;
-  }
-
   bool
   RouterContact::BDecode(llarp_buffer_t* buf)
   {

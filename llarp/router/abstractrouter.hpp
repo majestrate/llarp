@@ -4,14 +4,12 @@
 #include <llarp/config/key_manager.hpp>
 #include <memory>
 #include <llarp/util/types.hpp>
-#include <llarp/util/status.hpp>
 #include "i_outbound_message_handler.hpp"
 #include <vector>
 #include <llarp/ev/ev.hpp>
 #include <functional>
 #include <llarp/router_contact.hpp>
 #include <llarp/tooling/router_event.hpp>
-#include <llarp/peerstats/peer_db.hpp>
 #include <llarp/consensus/reachability_testing.hpp>
 
 #include <optional>
@@ -174,9 +172,6 @@ namespace llarp
     virtual I_RCLookupHandler&
     rcLookupHandler() = 0;
 
-    virtual std::shared_ptr<PeerDb>
-    peerDb() = 0;
-
     virtual bool
     Sign(Signature& sig, const llarp_buffer_t& buf) const = 0;
 
@@ -334,12 +329,6 @@ namespace llarp
 
     virtual std::string
     ShortName() const = 0;
-
-    virtual util::StatusObject
-    ExtractStatus() const = 0;
-
-    virtual util::StatusObject
-    ExtractSummaryStatus() const = 0;
 
     /// gossip an rc if required
     virtual void

@@ -1,8 +1,8 @@
 #include "bootstrap.hpp"
-#include "util/bencode.hpp"
-#include "util/logging.hpp"
-#include "util/logging/buffer.hpp"
-#include "util/fs.hpp"
+#include <llarp/util/fs.hpp>
+#include <llarp/util/bencode.hpp>
+#include <llarp/util/logging.hpp>
+#include <llarp/util/logging/buffer.hpp>
 
 namespace llarp
 {
@@ -38,8 +38,9 @@ namespace llarp
     return BEncodeWriteList(begin(), end(), buf);
   }
 
+  template <>
   void
-  BootstrapList::AddFromFile(fs::path fpath)
+  BootstrapList::AddFromFile(const fs::path& fpath)
   {
     bool isListFile = false;
     {

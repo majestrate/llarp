@@ -1,7 +1,5 @@
 #pragma once
 
-#include <llarp/util/status.hpp>
-
 #include <cstdint>
 #include <functional>
 
@@ -39,9 +37,6 @@ namespace llarp
 
     virtual void
     RemovePath(const PathID_t& pathid) = 0;
-
-    virtual util::StatusObject
-    ExtractStatus() const = 0;
   };
 
 }  // namespace llarp

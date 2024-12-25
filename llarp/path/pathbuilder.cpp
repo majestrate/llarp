@@ -218,21 +218,6 @@ namespace llarp
       }
     }
 
-    util::StatusObject
-    Builder::ExtractStatus() const
-    {
-      util::StatusObject obj{
-          {"buildStats", m_BuildStats.ExtractStatus()},
-          {"numHops", uint64_t{numHops}},
-          {"numPaths", uint64_t{numDesiredPaths}}};
-      std::transform(
-          m_Paths.begin(),
-          m_Paths.end(),
-          std::back_inserter(obj["paths"]),
-          [](const auto& item) -> util::StatusObject { return item.second->ExtractStatus(); });
-      return obj;
-    }
-
     std::optional<RouterContact>
     Builder::SelectFirstHop(const std::set<RouterID>& exclude) const
     {

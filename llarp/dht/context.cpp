@@ -35,9 +35,6 @@ namespace llarp
 
       ~Context() override = default;
 
-      util::StatusObject
-      ExtractStatus() const override;
-
       void
       StoreRC(const RouterContact rc) const override
       {
@@ -446,19 +443,6 @@ namespace llarp
       pendingRouterLookups().Expire(now);
       _pendingIntrosetLookups.Expire(now);
       pendingExploreLookups().Expire(now);
-    }
-
-    util::StatusObject
-    Context::ExtractStatus() const
-    {
-      util::StatusObject obj{
-          {"pendingRouterLookups", pendingRouterLookups().ExtractStatus()},
-          {"pendingIntrosetLookups", _pendingIntrosetLookups.ExtractStatus()},
-          {"pendingExploreLookups", pendingExploreLookups().ExtractStatus()},
-          {"nodes", _nodes->ExtractStatus()},
-          {"services", _services->ExtractStatus()},
-          {"ourKey", ourKey.ToHex()}};
-      return obj;
     }
 
     void

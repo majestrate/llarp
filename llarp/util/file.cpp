@@ -66,7 +66,7 @@ namespace llarp::util
   }
 
   error_code_t
-  EnsurePrivateFile(fs::path pathname)
+  EnsurePrivateFile(const fs::path& pathname)
   {
     errno = 0;
     error_code_t ec = errno_error();
@@ -106,6 +106,12 @@ namespace llarp::util
     if (ec)
       llarp::LogError("failed to ensure ", str, ", ", ec.message());
     return ec;
+  }
+
+  std::string
+  filepath(const fs::path& f)
+  {
+    return f.string();
   }
 
 }  // namespace llarp::util

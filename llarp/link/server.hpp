@@ -5,7 +5,6 @@
 #include "session.hpp"
 #include <llarp/net/sock_addr.hpp>
 #include <llarp/router_contact.hpp>
-#include <llarp/util/status.hpp>
 #include <llarp/util/thread/threading.hpp>
 #include <llarp/config/key_manager.hpp>
 
@@ -137,9 +136,6 @@ namespace llarp
 
     virtual std::string_view
     Name() const = 0;
-
-    util::StatusObject
-    ExtractStatus() const EXCLUDES(m_AuthedLinksMutex);
 
     void
     CloseSessionTo(const RouterID& remote);

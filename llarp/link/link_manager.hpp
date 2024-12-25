@@ -87,12 +87,6 @@ namespace llarp
     CheckPersistingSessions(llarp_time_t now) override;
 
     void
-    updatePeerDb(std::shared_ptr<PeerDb> peerDb) override;
-
-    util::StatusObject
-    ExtractStatus() const override;
-
-    void
     Init(IOutboundSessionMaker* sessionMaker);
 
    private:

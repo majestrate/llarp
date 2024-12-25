@@ -171,48 +171,6 @@ namespace llarp
       }
     }
 
-    util::StatusObject
-    TunEndpoint::ExtractStatus() const
-    {
-      auto obj = service::Endpoint::ExtractStatus();
-      obj["ifaddr"] = m_OurRange.ToString();
-      obj["ifname"] = m_IfName;
-
-      std::vector<std::string> upstreamRes;
-      for (const auto& ent : m_DnsConfig.m_upstreamDNS)
-        upstreamRes.emplace_back(ent.ToString());
-      obj["ustreamResolvers"] = upstreamRes;
-
-      std::vector<std::string> localRes;
-      for (const auto& ent : m_DnsConfig.m_bind)
-        localRes.emplace_back(ent.ToString());
-      obj["localResolvers"] = localRes;
-
-      // for backwards compat
-      if (not m_DnsConfig.m_bind.empty())
-        obj["localResolver"] = localRes[0];
-
-      util::StatusObject ips{};
-      for (const auto& item : m_IPActivity)
-      {
-        util::StatusObject ipObj{{"lastActive", to_json(item.second)}};
-        std::string remoteStr;
-        AlignedBuffer<32> addr = m_IPToAddr.at(item.first);
-        if (m_SNodes.at(addr))
-          remoteStr = RouterID(addr.as_array()).ToString();
-        else
-          remoteStr = service::Address(addr.as_array()).ToString();
-        ipObj["remote"] = remoteStr;
-        std::string ipaddr = item.first.ToString();
-        ips[ipaddr] = ipObj;
-      }
-      obj["addrs"] = ips;
-      obj["ourIP"] = m_OurIP.ToString();
-      obj["nextIP"] = m_NextIP.ToString();
-      obj["maxIP"] = m_MaxIP.ToString();
-      return obj;
-    }
-
     void
     TunEndpoint::Thaw()
     {

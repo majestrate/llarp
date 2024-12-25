@@ -6,13 +6,6 @@
 
 namespace llarp::service
 {
-  util::StatusObject
-  EncryptedIntroSet::ExtractStatus() const
-  {
-    const auto sz = introsetPayload.size();
-    return {
-        {"location", derivedSigningKey.ToString()}, {"signedAt", to_json(signedAt)}, {"size", sz}};
-  }
 
   bool
   EncryptedIntroSet::BEncode(llarp_buffer_t* buf) const
@@ -134,41 +127,6 @@ namespace llarp::service
     buf.sz = buf.cur - buf.base;
     buf.cur = buf.base;
     return CryptoManager::instance()->verify(derivedSigningKey, buf, sig);
-  }
-
-  util::StatusObject
-  IntroSet::ExtractStatus() const
-  {
-    util::StatusObject obj{{"published", to_json(timestampSignedAt)}};
-    std::vector<util::StatusObject> introsObjs;
-    std::transform(
-        intros.begin(),
-        intros.end(),
-        std::back_inserter(introsObjs),
-        [](const auto& intro) -> util::StatusObject { return intro.ExtractStatus(); });
-    obj["intros"] = introsObjs;
-    if (!topic.IsZero())
-      obj["topic"] = topic.ToString();
-
-    std::vector<util::StatusObject> protocols;
-    std::transform(
-        supportedProtocols.begin(),
-        supportedProtocols.end(),
-        std::back_inserter(protocols),
-        [](const auto& proto) -> util::StatusObject { return service::ToString(proto); });
-    obj["protos"] = protocols;
-    std::vector<util::StatusObject> ranges;
-    std::transform(
-        ownedRanges.begin(),
-        ownedRanges.end(),
-        std::back_inserter(ranges),
-        [](const auto& range) -> util::StatusObject { return range.ToString(); });
-
-    obj["advertisedRanges"] = ranges;
-    if (exitTrafficPolicy)
-      obj["exitPolicy"] = exitTrafficPolicy->ExtractStatus();
-
-    return obj;
   }
 
   bool
