@@ -69,12 +69,6 @@ namespace llarp
     return t + time_since_epoch<Duration_t, Clock_t>(started_at_system);
   }
 
-  nlohmann::json
-  to_json(const Duration_t& t)
-  {
-    return ToMS(t);
-  }
-
   static auto
   extract_h_m_s_ms(const Duration_t& dur)
   {
