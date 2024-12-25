@@ -205,19 +205,6 @@ add_library(lokinet-layer-link
   messages/link_message_parser.cpp
 )
 
-# lokinet-plainquic is for holding the tunneled plainquic code, not quic wire protocol code
-add_library(lokinet-plainquic
-  STATIC
-  quic/address.cpp
-  quic/client.cpp
-  quic/connection.cpp
-  quic/endpoint.cpp
-  quic/null_crypto.cpp
-  quic/server.cpp
-  quic/stream.cpp
-  quic/tunnel.cpp
-)
-
 # lokinet-context holds the contextualized god objects for a lokinet instance
 # it is what any main function would link to in practice but it is hidden behind an interface library (lokinet-amalgum)
 add_library(lokinet-context
@@ -371,11 +358,6 @@ lokinet_link_lib(lokinet-dht
   lokinet-nodedb
 )
 
-lokinet_link_lib(lokinet-plainquic
-  lokinet-platform
-  lokinet-config
-)
-
 lokinet_link_lib(lokinet-dns
   lokinet-platform
   lokinet-dns-platform
@@ -435,7 +417,6 @@ if(use_old_impl)
     lokinet-dns
     lokinet-nodedb
     lokinet-context
-    lokinet-plainquic
     lokinet-layer-routing
     lokinet-layer-onion
     lokinet-dht
@@ -479,10 +460,6 @@ target_link_libraries(lokinet-util PUBLIC
   oxenc::oxenc
 )
 
-target_link_libraries(lokinet-plainquic PUBLIC
-  ngtcp2_static
-  uvw
-)
 
 if(WITH_EMBEDDED_LOKINET)
   include(GNUInstallDirs)

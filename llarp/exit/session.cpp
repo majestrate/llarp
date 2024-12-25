@@ -4,7 +4,6 @@
 #include <llarp/nodedb.hpp>
 #include <llarp/path/path_context.hpp>
 #include <llarp/path/path.hpp>
-#include <llarp/quic/tunnel.hpp>
 #include <llarp/router/abstractrouter.hpp>
 #include <llarp/util/meta/memfn.hpp>
 #include <utility>
@@ -204,11 +203,7 @@ namespace llarp
 
       if (t == service::ProtocolType::QUIC)
       {
-        auto quic = m_Parent->GetQUICTunnel();
-        if (not quic)
-          return false;
-        quic->receive_packet(tag, buf);
-        return true;
+        return false;
       }
 
       if (m_WritePacket)

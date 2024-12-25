@@ -103,30 +103,25 @@ namespace llarp
     }
 
     // bool: true if any bit set
-    explicit constexpr
-    operator bool() const
+    explicit constexpr operator bool() const
     {
       return static_cast<bool>(lower) || static_cast<bool>(upper);
     }
 
     // Casting to basic unsigned int types: casts away upper bits
-    explicit constexpr
-    operator uint8_t() const
+    explicit constexpr operator uint8_t() const
     {
       return static_cast<uint8_t>(lower);
     }
-    explicit constexpr
-    operator uint16_t() const
+    explicit constexpr operator uint16_t() const
     {
       return static_cast<uint16_t>(lower);
     }
-    explicit constexpr
-    operator uint32_t() const
+    explicit constexpr operator uint32_t() const
     {
       return static_cast<uint32_t>(lower);
     }
-    explicit constexpr
-    operator uint64_t() const
+    explicit constexpr operator uint64_t() const
     {
       return lower;
     }
@@ -221,8 +216,7 @@ namespace llarp
     operator<<=(uint64_t shift)
     {
       if (shift == 0)
-      {
-      }
+      {}
       else if (shift < 64)
       {
         upper = upper << shift | (lower >> (64 - shift));
@@ -256,8 +250,7 @@ namespace llarp
     operator>>=(uint64_t shift)
     {
       if (shift == 0)
-      {
-      }
+      {}
       else if (shift < 64)
       {
         lower = lower >> shift | upper << (64 - shift);

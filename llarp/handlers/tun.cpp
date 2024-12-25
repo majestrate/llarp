@@ -19,7 +19,6 @@
 #include <llarp/service/protocol_type.hpp>
 #include <llarp/util/meta/memfn.hpp>
 #include <llarp/nodedb.hpp>
-#include <llarp/quic/tunnel.hpp>
 #include <llarp/util/str.hpp>
 #include <llarp/util/logging/buffer.hpp>
 #include <llarp/dns/srv_data.hpp>
@@ -79,7 +78,7 @@ namespace llarp
       }
 
       void
-      Stop() override {};
+      Stop() override{};
 
       std::optional<SockAddr>
       BoundOn() const override
@@ -399,12 +398,6 @@ namespace llarp
         }
       }
 
-      if (auto* quic = GetQUICTunnel())
-      {
-        quic->listen([this](std::string_view, uint16_t port) {
-          return llarp::SockAddr{net::TruncateV6(GetIfAddr()), huint16_t{port}};
-        });
-      }
       return Endpoint::Configure(conf, dnsConf);
     }
 
@@ -1241,20 +1234,7 @@ namespace llarp
       LogTrace("Inbound ", t, " packet (", buf.sz, "B) on convo ", tag);
       if (t == service::ProtocolType::QUIC)
       {
-        auto* quic = GetQUICTunnel();
-        if (!quic)
-        {
-          LogWarn("incoming quic packet but this endpoint is not quic capable; dropping");
-          return false;
-        }
-        if (buf.sz < 4)
-        {
-          LogWarn("invalid incoming quic packet, dropping");
-          return false;
-        }
-        LogInfo("tag active T=", tag);
-        quic->receive_packet(tag, buf);
-        return true;
+        return false;
       }
 
       if (t != service::ProtocolType::TrafficV4 && t != service::ProtocolType::TrafficV6

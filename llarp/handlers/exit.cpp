@@ -7,7 +7,6 @@
 #include <llarp/util/str.hpp>
 #include <llarp/util/bits.hpp>
 
-#include <llarp/quic/tunnel.hpp>
 #include <llarp/router/i_rc_lookup_handler.hpp>
 
 #include <cassert>
@@ -18,10 +17,9 @@ namespace llarp
   namespace handlers
   {
     ExitEndpoint::ExitEndpoint(std::string name, AbstractRouter* r)
-        : m_Router(r), m_Name(std::move(name)), m_QUIC{std::make_shared<quic::TunnelManager>(*this)}
+        : m_Router(r), m_Name(std::move(name))
     {
       m_ShouldInitTun = true;
-      m_QUIC = std::make_shared<quic::TunnelManager>(*this);
     }
 
     ExitEndpoint::~ExitEndpoint() = default;
@@ -749,12 +747,6 @@ namespace llarp
         m_ifname = *maybe;
       }
       LogInfo(Name(), " set ifname to ", m_ifname);
-      if (auto* quic = GetQUICTunnel())
-      {
-        quic->listen([ifaddr = net::TruncateV6(m_IfAddr)](std::string_view, uint16_t port) {
-          return llarp::SockAddr{ifaddr, huint16_t{port}};
-        });
-      }
     }
 
     huint128_t
@@ -781,12 +773,6 @@ namespace llarp
         m_SNodeSessions[other] = session;
       }
       return ip;
-    }
-
-    quic::TunnelManager*
-    ExitEndpoint::GetQUICTunnel()
-    {
-      return m_QUIC.get();
     }
 
     bool
