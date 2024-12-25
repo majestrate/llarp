@@ -60,16 +60,16 @@ namespace llarp::vpn
     void DelRoute(net::ipaddr_t, net::ipaddr_t) override{};
 
     void
-    AddDefaultRouteViaInterface(NetworkInterface&) override{};
+    AddDefaultRouteViaInterface(NetworkInterface&) override {};
 
     void
-    DelDefaultRouteViaInterface(NetworkInterface&) override{};
+    DelDefaultRouteViaInterface(NetworkInterface&) override {};
 
     void
-    AddRouteViaInterface(NetworkInterface&, IPRange) override{};
+    AddRouteViaInterface(NetworkInterface&, IPRange) override {};
 
     void
-    DelRouteViaInterface(NetworkInterface&, IPRange) override{};
+    DelRouteViaInterface(NetworkInterface&, IPRange) override {};
 
     std::vector<net::ipaddr_t>
     GetGatewaysNotOnInterface(NetworkInterface&) override

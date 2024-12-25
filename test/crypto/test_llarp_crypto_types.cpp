@@ -10,11 +10,6 @@ extern "C" {
 #include <unistd.h>
 }
 
-// This used to be implied via the headers above *shrug*
-#ifdef _WIN32
-#include <windows.h>
-#endif
-
 struct ToStringData
 {
   llarp::PubKey::Data input;
@@ -251,72 +246,14 @@ TEST_CASE_METHOD(TestCryptoTypesSecret, "secret_key_from_file_happy_bencode")
 // - file not writeable
 // - happy path
 
-// Win32: check for root/admin/elevation privileges
-#ifdef _WIN32
-BOOL
-IsRunAsAdmin()
-{
-  BOOL fIsRunAsAdmin = FALSE;
-  DWORD dwError = ERROR_SUCCESS;
-  PSID pAdministratorsGroup = NULL;
-
-  // Allocate and initialize a SID of the administrators group.
-  SID_IDENTIFIER_AUTHORITY NtAuthority = SECURITY_NT_AUTHORITY;
-  if (!AllocateAndInitializeSid(
-          &NtAuthority,
-          2,
-          SECURITY_BUILTIN_DOMAIN_RID,
-          DOMAIN_ALIAS_RID_ADMINS,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          &pAdministratorsGroup))
-  {
-    dwError = GetLastError();
-    goto Cleanup;
-  }
-
-  // Determine whether the SID of administrators group is enabled in
-  // the primary access token of the process.
-  if (!CheckTokenMembership(NULL, pAdministratorsGroup, &fIsRunAsAdmin))
-  {
-    dwError = GetLastError();
-    goto Cleanup;
-  }
-
-Cleanup:
-  // Centralized cleanup for all allocated resources.
-  if (pAdministratorsGroup)
-  {
-    FreeSid(pAdministratorsGroup);
-    pAdministratorsGroup = NULL;
-  }
-
-  // Throw the error if something failed in the function.
-  if (ERROR_SUCCESS != dwError)
-  {
-    throw dwError;
-  }
-
-  return fIsRunAsAdmin;
-}
-#endif
 
 TEST_CASE_METHOD(TestCryptoTypesSecret, "secret_key_to_missing_file")
 {
   // Verify writing to an unwritable file fails.
   // Assume we're not running as root, so can't write to [C:]/
   // if we are root just skip this test
-#ifndef _WIN32
   if (getuid() == 0)
     return;
-#else
-  if (IsRunAsAdmin())
-    return;
-#endif
   filename = "/" + filename;
   p = filename;
   REQUIRE_FALSE(fs::exists(fs::status(p)));

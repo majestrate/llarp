@@ -30,7 +30,7 @@ namespace llarp
       ExtractStatus() const;
 
       void
-      BlacklistSNode(const RouterID) override{};
+      BlacklistSNode(const RouterID) override {};
 
       bool
       ShouldBundleRC() const override;

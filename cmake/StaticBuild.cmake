@@ -110,9 +110,6 @@ set(cross_host "")
 set(cross_rc "")
 if(CMAKE_CROSSCOMPILING)
   set(cross_host "--host=${ARCH_TRIPLET}")
-  if (ARCH_TRIPLET MATCHES mingw AND CMAKE_RC_COMPILER)
-    set(cross_rc "WINDRES=${CMAKE_RC_COMPILER}")
-  endif()
 endif()
 if(ANDROID)
   set(android_toolchain_suffix linux-android)
@@ -160,16 +157,6 @@ set(deps_CXXFLAGS "-O2")
 
 if(WITH_LTO)
   set(deps_CFLAGS "${deps_CFLAGS} -flto")
-endif()
-
-if(APPLE)
-  set(deps_CFLAGS "${deps_CFLAGS} -mmacosx-version-min=${CMAKE_OSX_DEPLOYMENT_TARGET}")
-  set(deps_CXXFLAGS "${deps_CXXFLAGS} -mmacosx-version-min=${CMAKE_OSX_DEPLOYMENT_TARGET}")
-endif()
-
-if(_winver)
-  set(deps_CFLAGS "${deps_CFLAGS} -D_WIN32_WINNT=${_winver}")
-  set(deps_CXXFLAGS "${deps_CXXFLAGS} -D_WIN32_WINNT=${_winver}")
 endif()
 
 
@@ -244,13 +231,7 @@ set(openssl_configure_command ./config)
 set(openssl_flags "CFLAGS=${deps_CFLAGS}")
 set(unbound_ldflags "")
 if(CMAKE_CROSSCOMPILING)
-  if(ARCH_TRIPLET STREQUAL x86_64-w64-mingw32)
-    set(openssl_arch mingw64)
-    set(openssl_system_env RC=${CMAKE_RC_COMPILER} AR=${ARCH_TRIPLET}-ar RANLIB=${ARCH_TRIPLET}-ranlib)
-  elseif(ARCH_TRIPLET STREQUAL i686-w64-mingw32)
-    set(openssl_arch mingw)
-    set(openssl_system_env RC=${CMAKE_RC_COMPILER} AR=${ARCH_TRIPLET}-ar RANLIB=${ARCH_TRIPLET}-ranlib)
-  elseif(ANDROID)
+  if(ANDROID)
     set(openssl_arch android-${android_machine})
     set(openssl_system_env LD=${deps_ld} RANLIB=${deps_ranlib} AR=${deps_ar} ANDROID_NDK_ROOT=${CMAKE_ANDROID_NDK} "PATH=${CMAKE_ANDROID_NDK}/toolchains/llvm/prebuilt/linux-x86_64/bin:$ENV{PATH}")
     list(APPEND openssl_flags "CPPFLAGS=-D__ANDROID_API__=${ANDROID_API}")
@@ -295,9 +276,6 @@ build_external(openssl
 )
 add_static_target(OpenSSL::SSL openssl_external libssl.a)
 add_static_target(OpenSSL::Crypto openssl_external libcrypto.a)
-if(WIN32)
-  target_link_libraries(OpenSSL::Crypto INTERFACE "ws2_32;crypt32;iphlpapi")
-endif()
 
 set(OPENSSL_INCLUDE_DIR ${DEPS_DESTDIR}/include)
 set(OPENSSL_CRYPTO_LIBRARY ${DEPS_DESTDIR}/lib/libcrypto.a ${DEPS_DESTDIR}/lib/libssl.a)
@@ -311,11 +289,6 @@ build_external(expat
 add_static_target(expat expat_external libexpat.a)
 
 
-if(WIN32)
-  set(unbound_patch
-    PATCH_COMMAND ${PROJECT_SOURCE_DIR}/contrib/apply-patches.sh
-        ${PROJECT_SOURCE_DIR}/contrib/patches/unbound-delete-crash-fix.patch)
-endif()
 build_external(unbound
   DEPENDS openssl_external expat_external
   ${unbound_patch}
@@ -326,11 +299,7 @@ build_external(unbound
   "CC=${deps_cc}" "CFLAGS=${deps_CFLAGS}" "LDFLAGS=${unbound_ldflags}"
 )
 add_static_target(libunbound unbound_external libunbound.a)
-if(NOT WIN32)
-  set_target_properties(libunbound PROPERTIES INTERFACE_LINK_LIBRARIES "OpenSSL::SSL;OpenSSL::Crypto")
-else()
-  set_target_properties(libunbound PROPERTIES INTERFACE_LINK_LIBRARIES "OpenSSL::SSL;OpenSSL::Crypto;ws2_32;crypt32;iphlpapi")
-endif()
+set_target_properties(libunbound PROPERTIES INTERFACE_LINK_LIBRARIES "OpenSSL::SSL;OpenSSL::Crypto")
 
 
 
@@ -345,20 +314,6 @@ if(WITH_PEERSTATS_BACKEND)
 endif()
 
 
-if(ARCH_TRIPLET MATCHES mingw)
-  option(WITH_WEPOLL "use wepoll zmq poller (crashy)" OFF)
-  if(WITH_WEPOLL)
-    set(zmq_extra --with-poller=wepoll)
-  endif()
-endif()
-
-if(CMAKE_CROSSCOMPILING AND ARCH_TRIPLET MATCHES mingw)
-  set(zmq_patch
-    PATCH_COMMAND ${PROJECT_SOURCE_DIR}/contrib/apply-patches.sh
-        ${PROJECT_SOURCE_DIR}/contrib/patches/libzmq-mingw-wepoll.patch
-        ${PROJECT_SOURCE_DIR}/contrib/patches/libzmq-mingw-unistd.patch)
-endif()
-
 build_external(zmq
   DEPENDS sodium_external
   ${zmq_patch}
@@ -371,9 +326,6 @@ build_external(zmq
 add_static_target(libzmq zmq_external libzmq.a)
 
 set(libzmq_link_libs "sodium")
-if(CMAKE_CROSSCOMPILING AND ARCH_TRIPLET MATCHES mingw)
-  list(APPEND libzmq_link_libs iphlpapi)
-endif()
 
 set_target_properties(libzmq PROPERTIES
   INTERFACE_LINK_LIBRARIES "${libzmq_link_libs}"
@@ -393,42 +345,18 @@ if(NOT WITH_BOOTSTRAP)
 endif()
 
 set(curl_extra)
-if(WIN32)
-  set(curl_ssl_opts --without-ssl --with-schannel)
-elseif(APPLE)
-  set(curl_ssl_opts --without-ssl --with-secure-transport)
-  if(IOS)
-    # This CPP crap shouldn't be necessary but is because Apple's toolchain is trash
-    set(curl_extra "LDFLAGS=-L${DEPS_DESTDIR}/lib -isysroot ${CMAKE_OSX_SYSROOT}" CPP=cpp)
-  endif()
-else()
-  set(curl_ssl_opts --with-ssl=${DEPS_DESTDIR})
-  set(curl_extra "LIBS=-pthread")
-endif()
+set(curl_ssl_opts --with-ssl=${DEPS_DESTDIR})
+set(curl_extra "LIBS=-pthread")
 
 set(curl_arches default)
 set(curl_lib_outputs)
-if(IOS)
-  # On iOS things get a little messy: curl won't build a multi-arch library (with `clang -arch arch1
-  # -arch arch2`) so we have to build them separately then glue them together if we're building
-  # multiple.
-  set(curl_arches ${CMAKE_OSX_ARCHITECTURES})
-  list(GET curl_arches 0 curl_arch0)
-  list(LENGTH CMAKE_OSX_ARCHITECTURES num_arches)
-endif()
 
 foreach(curl_arch ${curl_arches})
   set(curl_target_suffix "")
   set(curl_prefix "${DEPS_DESTDIR}")
   if(curl_arch STREQUAL "default")
     set(curl_cflags_extra "")
-  elseif(IOS)
-    set(cflags_extra " -arch ${curl_arch}")
-    if(num_arches GREATER 1)
-      set(curl_target_suffix "-${curl_arch}")
-      set(curl_prefix "${DEPS_DESTDIR}/tmp/${curl_arch}")
-    endif()
-  else()
+  else
     message(FATAL_ERROR "unexpected curl_arch=${curl_arch}")
   endif()
 
@@ -459,24 +387,8 @@ endforeach()
 
 
 
-if(IOS AND num_arches GREATER 1)
-  # We are building multiple architectures for different iOS devices, so we need to glue the
-  # separate libraries into one. (Normally multiple -arch values passed to clang does this for us,
-  # but curl refuses to build that way).
-  add_custom_target(curl_external
-    COMMAND lipo ${curl_lib_outputs} -create -output ${DEPS_DESTDIR}/libcurl.a
-    COMMAND ${CMAKE_COMMAND} -E copy_directory ${DEPS_DESTDIR}/tmp/${curl_arch0}/include/curl ${DEPS_DESTDIR}/include/curl
-    BYPRODUCTS ${DEPS_DESTDIR}/lib/libcurl.a ${DEPS_DESTDIR}/include/curl/curl.h
-    DEPENDS ${curl_lib_targets})
-endif()
-
 add_static_target(CURL::libcurl curl_external libcurl.a)
 set(libcurl_link_libs zlib)
-if(CMAKE_CROSSCOMPILING AND ARCH_TRIPLET MATCHES mingw)
-  list(APPEND libcurl_link_libs crypt32)
-elseif(APPLE)
-  list(APPEND libcurl_link_libs "-framework Security -framework CoreFoundation")
-endif()
 set_target_properties(CURL::libcurl PROPERTIES
   INTERFACE_LINK_LIBRARIES "${libcurl_link_libs}"
   INTERFACE_COMPILE_DEFINITIONS "CURL_STATICLIB")

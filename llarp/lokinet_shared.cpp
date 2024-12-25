@@ -19,10 +19,6 @@
 #include <chrono>
 #include <stdexcept>
 
-#ifdef _WIN32
-#define EHOSTDOWN ENETDOWN
-#endif
-
 namespace
 {
   struct Context : public llarp::Context
@@ -695,8 +691,7 @@ extern "C"
         }
         try
         {
-          auto [addr, id] = quic->open(
-              remotehost, remoteport, [](auto) {}, localAddr);
+          auto [addr, id] = quic->open(remotehost, remoteport, [](auto) {}, localAddr);
           auto [host, port] = split_host_port(addr.ToString());
           ctx->outbound_stream(id);
           stream_okay(result, host, port, id);

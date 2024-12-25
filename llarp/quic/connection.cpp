@@ -1045,7 +1045,7 @@ namespace llarp::quic
       enc[len - i] = val & 0xff;
       val >>= 8;
     }
-    enc[0] = (enc[0] & 0b00'111111) | (size << 6);
+    enc[0] = (enc[0] & 0b0011'1111) | (size << 6);
     enc[0] |= size << 6;
     return result;
   }

@@ -1,6 +1,5 @@
 #include "server.hpp"
 #include <llarp/constants/platform.hpp>
-#include <llarp/constants/apple.hpp>
 #include "dns.hpp"
 #include <iterator>
 #include <llarp/crypto/crypto.hpp>
@@ -117,13 +116,7 @@ namespace llarp::dns
     {
       ub_ctx* m_ctx = nullptr;
       std::weak_ptr<EventLoop> m_Loop;
-#ifdef _WIN32
-      // windows is dumb so we do ub mainloop in a thread
-      std::thread runner;
-      std::atomic<bool> running;
-#else
       std::shared_ptr<uvw::PollHandle> m_Poller;
-#endif
 
       std::optional<SockAddr> m_LocalAddr;
       std::unordered_set<std::shared_ptr<Query>> m_Pending;
@@ -186,61 +179,16 @@ namespace llarp::dns
         }
       }
 
-      bool
-      ConfigureAppleTrampoline(const SockAddr& dns)
-      {
-        // On Apple, when we turn on exit mode, we tear down and then reestablish the unbound
-        // resolver: in exit mode, we set use upstream to a localhost trampoline that redirects
-        // packets through the tunnel.  In non-exit mode, we directly use the upstream, so we look
-        // here for a reconfiguration to use the trampoline port to check which state we're in.
-        //
-        // We have to do all this crap because we can't directly connect to upstream from here:
-        // within the network extension, macOS ignores the tunnel we are managing and so, if we
-        // didn't do this, all our DNS queries would leak out around the tunnel.  Instead we have to
-        // bounce things through the objective C trampoline code (which is what actually handles the
-        // upstream querying) so that it can call into Apple's special snowflake API to set up a
-        // socket that has the magic Apple snowflake sauce added on top so that it actually routes
-        // through the tunnel instead of around it.
-        //
-        // But the trampoline *always* tries to send the packet through the tunnel, and that will
-        // only work in exit mode.
-        //
-        // All of this macos behaviour is all carefully and explicitly documented by Apple with
-        // plenty of examples and other exposition, of course, just like all of their wonderful new
-        // APIs to reinvent standard unix interfaces with half-baked replacements.
-
-        if constexpr (platform::is_apple)
-        {
-          if (dns.hostString() == "127.0.0.1" and dns.getPort() == apple::dns_trampoline_port)
-          {
-            // macOS is stupid: the default (0.0.0.0) fails with "send failed: Can't assign
-            // requested address" when unbound tries to connect to the localhost address using a
-            // source address of 0.0.0.0.  Yay apple.
-            SetOpt("outgoing-interface:", "127.0.0.1");
-
-            // The trampoline expects just a single source port (and sends everything back to it).
-            SetOpt("outgoing-range:", "1");
-            SetOpt("outgoing-port-avoid:", "0-65535");
-            SetOpt("outgoing-port-permit:", "{}", apple::dns_trampoline_source_port);
-            return true;
-          }
-        }
-        return false;
-      }
-
       void
       ConfigureUpstream(const llarp::DnsConfig& conf)
       {
-        bool is_apple_tramp = false;
-
         // set up forward dns
         for (const auto& dns : conf.m_upstreamDNS)
         {
           AddUpstreamResolver(dns);
-          is_apple_tramp = is_apple_tramp or ConfigureAppleTrampoline(dns);
         }
 
-        if (auto maybe_addr = conf.m_QueryBind; maybe_addr and not is_apple_tramp)
+        if (auto maybe_addr = conf.m_QueryBind; maybe_addr)
         {
           SockAddr addr{*maybe_addr};
           std::string host{addr.hostString()};
@@ -252,21 +200,13 @@ namespace llarp::dns
             // explicitly bind to JUST that port.
 
             auto fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-#ifdef _WIN32
-            if (fd == INVALID_SOCKET)
-#else
             if (fd == -1)
-#endif
             {
               throw std::invalid_argument{
                   fmt::format("Failed to create UDP socket for unbound: {}", strerror(errno))};
             }
 
-#ifdef _WIN32
-#define CLOSE closesocket
-#else
 #define CLOSE close
-#endif
             if (0 != bind(fd, static_cast<const sockaddr*>(addr), addr.sockaddr_len()))
             {
               CLOSE(fd);
@@ -376,21 +316,6 @@ namespace llarp::dns
         // set async
         ub_ctx_async(m_ctx, 1);
         // setup mainloop
-#ifdef _WIN32
-        running = true;
-        runner = std::thread{[this]() {
-          while (running)
-          {
-            // poll and process callbacks it this thread
-            if (ub_poll(m_ctx))
-            {
-              ub_process(m_ctx);
-            }
-            else  // nothing to do, sleep.
-              std::this_thread::sleep_for(10ms);
-          }
-        }};
-#else
         if (auto loop = m_Loop.lock())
         {
           if (auto loop_ptr = loop->MaybeGetUVWLoop())
@@ -402,22 +327,13 @@ namespace llarp::dns
           }
         }
         throw std::runtime_error{"no uvw loop"};
-#endif
       }
 
       void
       Down() override
       {
-#ifdef _WIN32
-        if (running.exchange(false))
-        {
-          log::debug(logcat, "shutting down win32 dns thread");
-          runner.join();
-        }
-#else
         if (m_Poller)
           m_Poller->close();
-#endif
         if (m_ctx)
         {
           ::ub_ctx_delete(m_ctx);
@@ -510,20 +426,6 @@ namespace llarp::dns
           return true;
         }
 
-#ifdef _WIN32
-        if (not running)
-        {
-          // we are stopping the win32 thread
-          log::debug(
-              logcat,
-              "dns from {} to {} got to the unbound resolver, but the resolver isn't running, "
-              "sending failure reply",
-              from,
-              to);
-          tmp->Cancel();
-          return true;
-        }
-#endif
         const auto& q = query.questions[0];
         if (auto err = ub_resolve_async(
                 m_ctx,

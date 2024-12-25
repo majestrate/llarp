@@ -5,10 +5,8 @@
 
 #include <stdlib.h>
 
-#ifndef _WIN32
 #include <unistd.h>
 #include <pwd.h>
-#endif
 
 namespace llarp
 {
@@ -22,22 +20,15 @@ namespace llarp
   inline fs::path
   GetDefaultDataDir()
   {
-    if constexpr (not platform::is_windows)
+    fs::path datadir{"/var/lib/lokinet"};
+    if (auto uid = geteuid())
     {
-      fs::path datadir{"/var/lib/lokinet"};
-#ifndef _WIN32
-      if (auto uid = geteuid())
+      if (auto* pw = getpwuid(uid))
       {
-        if (auto* pw = getpwuid(uid))
-        {
-          datadir = fs::path{pw->pw_dir} / ".lokinet";
-        }
+        datadir = fs::path{pw->pw_dir} / ".lokinet";
       }
-#endif
-      return datadir;
     }
-    else
-      return "C:\\ProgramData\\Lokinet";
+    return datadir;
   }
 
   inline fs::path

@@ -1,9 +1,7 @@
 #include "address_info.hpp"
 #include <stdexcept>
 
-#ifndef _WIN32
 #include <arpa/inet.h>
-#endif
 #include "net.hpp"
 #include <llarp/util/bencode.h>
 #include <llarp/util/mem.h>

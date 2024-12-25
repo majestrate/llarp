@@ -4,9 +4,7 @@
 #include <llarp/util/buffer.hpp>
 #include <llarp/util/mem.hpp>
 #include <llarp/util/str.hpp>
-#ifndef _WIN32
 #include <netinet/in.h>
-#endif
 
 #include <oxenc/endian.h>
 

@@ -35,16 +35,12 @@ namespace llarp
     {
       if (buff.base + idx == buff.cur)
       {
-#ifndef _WIN32
         printf("%c[1;31m", 27);
-#endif
       }
       printf("%.2x", buff.base[idx]);
       if (buff.base + idx == buff.cur)
       {
-#ifndef _WIN32
         printf("%c[0;0m", 27);
-#endif
       }
       ++idx;
       if (idx % align == 0)
@@ -64,9 +60,7 @@ namespace llarp
     {
       if (buff.base + idx == buff.cur)
       {
-#ifndef _WIN32
         printf("%c[1;31m", 27);
-#endif
       }
       if (std::isprint(buff.base[idx]))
       {
@@ -78,9 +72,7 @@ namespace llarp
       }
       if (buff.base + idx == buff.cur)
       {
-#ifndef _WIN32
         printf("%c[0;0m", 27);
-#endif
       }
       ++idx;
       if (idx % align == 0)

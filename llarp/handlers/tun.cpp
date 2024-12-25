@@ -3,10 +3,8 @@
 #include <variant>
 #include "tun.hpp"
 #include <sys/types.h>
-#ifndef _WIN32
 #include <sys/socket.h>
 #include <netdb.h>
-#endif
 
 #include <llarp/dns/dns.hpp>
 #include <llarp/ev/ev.hpp>
@@ -81,7 +79,7 @@ namespace llarp
       }
 
       void
-      Stop() override{};
+      Stop() override {};
 
       std::optional<SockAddr>
       BoundOn() const override
@@ -92,17 +90,7 @@ namespace llarp
       bool
       WouldLoop(const SockAddr& to, const SockAddr& from) const override
       {
-        if constexpr (platform::is_apple)
-        {
-          // DNS on Apple is a bit weird because in order for the NetworkExtension itself to send
-          // data through the tunnel we have to proxy DNS requests through Apple APIs (and so our
-          // actual upstream DNS won't be set in our resolvers, which is why the vanilla WouldLoop
-          // won't work for us).  However when active the mac also only queries the main tunnel IP
-          // for DNS, so we consider anything else to be upstream-bound DNS to let it through the
-          // tunnel.
-          return to.getIP() != m_OurIP;
-        }
-        else if (auto maybe_addr = m_Config.m_QueryBind)
+        if (auto maybe_addr = m_Config.m_QueryBind)
         {
           const auto& addr = *maybe_addr;
           // omit traffic to and from our dns socket
@@ -179,34 +167,6 @@ namespace llarp
 
       if (m_DnsConfig.m_raw_dns)
       {
-        if (auto vpn = Router()->GetVPNPlatform())
-        {
-          // get the first local address we know of
-          std::optional<SockAddr> localaddr;
-          for (auto res : m_DNS->GetAllResolvers())
-          {
-            if (auto ptr = res.lock())
-            {
-              localaddr = ptr->GetLocalAddr();
-              if (localaddr)
-                break;
-            }
-          }
-          if (platform::is_windows)
-          {
-            auto dns_io = vpn->create_packet_io(0, localaddr);
-            Router()->loop()->add_ticker([r = Router(), dns_io, handler = m_PacketRouter]() {
-              net::IPPacket pkt = dns_io->ReadNextPacket();
-              while (not pkt.empty())
-              {
-                handler->HandleIPPacket(std::move(pkt));
-                pkt = dns_io->ReadNextPacket();
-              }
-            });
-            m_RawDNS = dns_io;
-          }
-        }
-
         if (m_RawDNS)
           m_RawDNS->Start();
       }
@@ -951,11 +911,7 @@ namespace llarp
     std::string
     TunEndpoint::GetIfName() const
     {
-#ifdef _WIN32
-      return net::TruncateV6(GetIfAddr()).ToString();
-#else
       return m_IfName;
-#endif
     }
 
     bool
@@ -1030,13 +986,10 @@ namespace llarp
       m_OurIPv6 = llarp::huint128_t{
           llarp::uint128_t{0xfd2e'6c6f'6b69'0000, llarp::net::TruncateV6(m_OurRange.addr).h}};
 
-      if constexpr (not llarp::platform::is_apple)
+      if (auto maybe = m_router->Net().GetInterfaceIPv6Address(m_IfName))
       {
-        if (auto maybe = m_router->Net().GetInterfaceIPv6Address(m_IfName))
-        {
-          m_OurIPv6 = *maybe;
-          LogInfo(Name(), " has ipv6 address ", m_OurIPv6);
-        }
+        m_OurIPv6 = *maybe;
+        LogInfo(Name(), " has ipv6 address ", m_OurIPv6);
       }
 
       LogInfo(Name(), " setting up dns...");
@@ -1157,15 +1110,6 @@ namespace llarp
       {
         dst = pkt.dstv6();
         src = pkt.srcv6();
-      }
-
-      if constexpr (llarp::platform::is_apple)
-      {
-        if (dst == m_OurIP)
-        {
-          HandleWriteIPPacket(pkt.ConstBuffer(), src, dst, 0);
-          return;
-        }
       }
 
       if (m_state->m_ExitEnabled)

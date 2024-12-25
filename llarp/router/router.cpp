@@ -29,7 +29,7 @@
 #include <iterator>
 #include <unordered_map>
 #include <utility>
-#if defined(ANDROID) || defined(IOS)
+#if defined(ANDROID)
 #include <unistd.h>
 #endif
 

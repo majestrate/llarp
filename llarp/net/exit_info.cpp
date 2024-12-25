@@ -1,6 +1,4 @@
-#ifndef _WIN32
 #include <arpa/inet.h>
-#endif
 
 #include "exit_info.hpp"
 #include "net.hpp"

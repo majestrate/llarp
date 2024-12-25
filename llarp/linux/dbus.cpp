@@ -9,7 +9,7 @@ namespace llarp::linux
 
   dbus_call_exception::dbus_call_exception(std::string meth, int err)
       : std::runtime_error{
-          "failed to call dbus function '" + meth + "': " + std::string{strerror(-err)}}
+            "failed to call dbus function '" + meth + "': " + std::string{strerror(-err)}}
   {}
 
   DBUS::DBUS(std::string _interface, std::string _instance, std::string _call)

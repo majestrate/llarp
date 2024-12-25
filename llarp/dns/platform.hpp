@@ -5,9 +5,7 @@
 #include <llarp/util/logging.hpp>
 #include <stdexcept>
 
-#ifndef _WIN32
 #include <net/if.h>
-#endif
 
 namespace llarp::dns
 {
