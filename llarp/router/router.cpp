@@ -412,9 +412,8 @@ namespace llarp
     if (rotateKeys)
     {
       CryptoManager::instance()->encryption_keygen(nextOnionKey);
-      std::string f = encryption_keyfile.string();
       // TODO: use disk worker
-      if (nextOnionKey.SaveToFile(f.c_str()))
+      if (nextOnionKey.SaveToFile(encryption_keyfile))
       {
         nextRC.enckey = seckey_topublic(nextOnionKey);
         _encryption = nextOnionKey;

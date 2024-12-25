@@ -41,7 +41,7 @@ namespace llarp
     bool
     BaseSession::LoadIdentityFromFile(const char* fname)
     {
-      return m_ExitIdentity.LoadFromFile(fname);
+      return m_ExitIdentity.LoadFromFile(fs::path{fname});
     }
 
     bool
