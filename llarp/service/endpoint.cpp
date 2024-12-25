@@ -1190,7 +1190,6 @@ namespace llarp
         auto& ev = *maybe;
         ProtocolMessage::ProcessAsync(ev.fromPath, ev.pathid, ev.msg);
       }
-      Router()->TriggerPump();
     }
 
     void
