@@ -211,7 +211,7 @@ endif()
 
 if(NOT APPLE)
   if(NATIVE_BUILD)
-    if(CMAKE_SYSTEM_PROCESSOR STREQUAL ppc64le)
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "ppc*|power*")
       add_compile_options(-mcpu=native -mtune=native)
     else()
       add_compile_options(-march=native -mtune=native)
