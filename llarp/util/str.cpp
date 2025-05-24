@@ -151,12 +151,13 @@ namespace llarp
   friendly_duration(std::chrono::nanoseconds dur)
   {
     const double dsecs = std::chrono::duration<double>(dur).count();
+    const long secs = std::chrono::duration_cast<std::chrono::seconds>(dur).count();
     if (dur >= 24h)
-      return fmt::format("{0}d{1}h{2}m{3}s", dur / 24h, dur / 1h, dur / 1min, dur / 1s);
+      return fmt::format("{0}d{1}h{2}m{3}s", dur / 24h, dur / 1h, dur / 1min, secs % 60);
     if (dur >= 1h)
-      return fmt::format("{0}h{1}m{2}s", dur / 1h, dur / 1min, dur / 1s);
+      return fmt::format("{0}h{1}m{2}s", dur / 1h, dur / 1min, secs % 60);
     if (dur >= 1min)
-      return fmt::format("{0}m{1}s", dur / 1min, dur / 1s);
+      return fmt::format("{0}m{1}s", dur / 1min, secs % 60);
     if (dur >= 1s)
       return fmt::format("{0:.3f}s", dsecs);
     if (dur >= 1ms)

@@ -4,6 +4,7 @@
 #include <stdexcept>
 #include <string_view>
 #include <mutex>
+#include "time.hpp"
 namespace llarp::log
 {
 
@@ -11,7 +12,7 @@ namespace llarp::log
 
   std::mutex g_loggers_access;
   std::unordered_map<std::string, CategoryLogger_ptr> g_loggers;
-
+  
   CategoryLogger_ptr
   Cat(std::string_view _name)
   {
@@ -21,7 +22,11 @@ namespace llarp::log
     if (itr != g_loggers.end())
       return itr->second;
 
-    CategoryLogger_ptr logger = g_loggers[name] = std::make_shared<CategoryLogger>(_name);
+    if(g_loggers.empty())
+      g_loggers.rehash(10);
+    
+    CategoryLogger_ptr logger = std::make_shared<CategoryLogger>(_name);
+    g_loggers.emplace(std::make_pair(name, logger));
     return logger;
   }
 
@@ -68,26 +73,47 @@ namespace llarp::log
     m_MinLevel = lvl;
   }
 
+  namespace
+  {
+    std::string_view
+    format_sl(const llarp::util::source_location& loc)
+    {
+      static constexpr std::string_view source_prefix = LOGGING_SOURCE_ROOT;
+      std::string_view filename{loc.file_name()};
+      if (filename.substr(0, source_prefix.size()) == source_prefix)
+      {
+        filename.remove_prefix(source_prefix.size());
+        if (!filename.empty() && filename[0] == '/')
+          filename.remove_prefix(1);
+      }
+
+      while (filename.substr(0, 3) == "../")
+        filename.remove_prefix(3);
+
+      return filename;
+    }
+  }
   void
   CategoryLogger::on_log_event(
       Level lvl, const llarp::util::source_location& loc, const std::string& msg) const
   {
+    auto uptime = friendly_duration(llarp::uptime());
     switch (lvl)
     {
       case Level::lvl_trace:
-        spdlog::trace("[{}] [{}|{}:{}] {}", uptime(), m_Name, loc.file_name(), loc.line(), msg);
+        spdlog::trace("[{}] [{}|{}:{}] {}", uptime, m_Name, format_sl(loc), loc.line(), msg);
         return;
       case Level::lvl_debug:
-        spdlog::debug("[{}] [{}|{}:{}] {}", uptime(), m_Name, loc.file_name(), loc.line(), msg);
+        spdlog::debug("[{}] [{}|{}:{}] {}", uptime, m_Name, format_sl(loc), loc.line(), msg);
         return;
       case Level::lvl_info:
-        spdlog::info("[{}] [{}|{}:{}] {}", uptime(), m_Name, loc.file_name(), loc.line(), msg);
+        spdlog::info("[{}] [{}|{}:{}] {}", uptime, m_Name, format_sl(loc), loc.line(), msg);
         return;
       case Level::lvl_warning:
-        spdlog::warn("[{}] [{}|{}:{}] {}", uptime(), m_Name, loc.file_name(), loc.line(), msg);
+        spdlog::warn("[{}] [{}|{}:{}] {}", uptime, m_Name, format_sl(loc), loc.line(), msg);
         return;
       case Level::lvl_error:
-        spdlog::error("[{}] [{}|{}:{}] {}", uptime(), m_Name, loc.file_name(), loc.line(), msg);
+        spdlog::error("[{}] [{}|{}:{}] {}", uptime, m_Name, format_sl(loc), loc.line(), msg);
         return;
     }
   }

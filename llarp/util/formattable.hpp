@@ -64,28 +64,6 @@ namespace fmt
 
 #endif
 
-namespace
-{
-
-  inline auto
-  format_sl(const std::source_location& loc)
-  {
-    static constexpr std::string_view source_prefix = LOGGING_SOURCE_ROOT;
-    std::string_view filename{loc.file_name()};
-    if (filename.substr(0, source_prefix.size()) == source_prefix)
-    {
-      filename.remove_prefix(source_prefix.size());
-      if (!filename.empty() && filename[0] == '/')
-        filename.remove_prefix(1);
-    }
-
-    while (filename.substr(0, 3) == "../")
-      filename.remove_prefix(3);
-
-    return spdlog::source_loc{filename.data(), static_cast<int>(loc.line()), loc.function_name()};
-  }
-}  // namespace
-
 namespace fmt
 {
 
