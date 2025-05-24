@@ -2,6 +2,7 @@
 #include <stdexcept>
 
 #include <arpa/inet.h>
+#include "llarp/net/sock_addr.hpp"
 #include "net.hpp"
 #include <llarp/util/bencode.h>
 #include <llarp/util/mem.h>
@@ -150,14 +151,6 @@ namespace llarp
       return false;
     /** end */
     return bencode_end(buff);
-  }
-
-  IpAddress
-  AddressInfo::toIpAddress() const
-  {
-    SockAddr addr(ip);
-    addr.setPort(port);
-    return IpAddress(addr);
   }
 
   void

@@ -1,4 +1,5 @@
 #include "relay_commit.hpp"
+#include "llarp/net/sock_addr.hpp"
 #include "relay_status.hpp"
 
 #include <llarp/crypto/crypto.hpp>
@@ -186,7 +187,7 @@ namespace llarp
     // the actual hop
     std::shared_ptr<Hop> hop;
 
-    const std::optional<IpAddress> fromAddr;
+    const std::optional<SockAddr> fromAddr;
 
     LRCMFrameDecrypt(Context* ctx, Decrypter_ptr dec, const LR_CommitMessage* commit)
         : decrypter(std::move(dec))
@@ -195,7 +196,7 @@ namespace llarp
         , hop(std::make_shared<Hop>())
         , fromAddr(
               commit->session->GetRemoteRC().IsPublicRouter()
-                  ? std::optional<IpAddress>{}
+                  ? std::optional<SockAddr>{}
                   : commit->session->GetRemoteEndpoint())
     {
       hop->info.downstream = commit->session->GetPubKey();
@@ -266,7 +267,7 @@ namespace llarp
       {
         // only do ip limiting from non service nodes
 #ifndef LOKINET_HIVE
-        if (self->context->CheckPathLimitHitByIP(*self->fromAddr))
+        if (self->context->CheckPathLimitHitByAddr(*self->fromAddr))
         {
           // we hit a limit so tell it to slow tf down
           llarp::LogError("client path build hit limit ", *self->fromAddr);

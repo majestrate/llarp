@@ -297,7 +297,7 @@ namespace llarp
       /// our ip range we are using
       llarp::IPRange m_OurRange;
       /// list of strict connect addresses for hooks
-      std::vector<IpAddress> m_StrictConnectAddrs;
+      std::vector<SockAddr> m_StrictConnectAddrs;
       /// use v6?
       bool m_UseV6;
       std::string m_IfName;

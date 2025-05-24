@@ -1,7 +1,10 @@
 #pragma once
 
 #include <fmt/format.h>
+#include <spdlog/common.h>
 #include <type_traits>
+#include <source_location>
+#include <string_view>
 
 // Formattable types can specialize this to true and will get automatic fmt formattering support via
 // their .ToString() method.
@@ -61,8 +64,31 @@ namespace fmt
 
 #endif
 
+namespace
+{
+
+  inline auto
+  format_sl(const std::source_location& loc)
+  {
+    static constexpr std::string_view source_prefix = LOGGING_SOURCE_ROOT;
+    std::string_view filename{loc.file_name()};
+    if (filename.substr(0, source_prefix.size()) == source_prefix)
+    {
+      filename.remove_prefix(source_prefix.size());
+      if (!filename.empty() && filename[0] == '/')
+        filename.remove_prefix(1);
+    }
+
+    while (filename.substr(0, 3) == "../")
+      filename.remove_prefix(3);
+
+    return spdlog::source_loc{filename.data(), static_cast<int>(loc.line()), loc.function_name()};
+  }
+}  // namespace
+
 namespace fmt
 {
+
   template <typename T>
   struct formatter<T, char, std::enable_if_t<llarp::IsToStringFormattable<T>>>
       : formatter<std::string_view>

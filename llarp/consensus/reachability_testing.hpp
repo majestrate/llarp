@@ -9,6 +9,7 @@
 
 #include <llarp/util/time.hpp>
 #include <llarp/router_id.hpp>
+#include <optional>
 
 namespace llarp
 {

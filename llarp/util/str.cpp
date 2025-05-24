@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <chrono>
 #include <cstring>
 #include <cassert>
 #include <string>
@@ -150,22 +151,19 @@ namespace llarp
   friendly_duration(std::chrono::nanoseconds dur)
   {
     const double dsecs = std::chrono::duration<double>(dur).count();
-    return fmt::format(
-        dur >= 24h        ? "{0}d{1}h{2}m{3}s"
-            : dur >= 1h   ? "{1}h{2}m{3}s"
-            : dur >= 1min ? "{2}m{3}s"
-            : dur >= 1s   ? "{4:.3f}s"
-            : dur >= 1ms  ? "{5:.3f}s"
-            : dur >= 1us  ? u8"{6:.3f}µs"
-                          : "{7}ns",
-        dur / 24h,
-        dur / 1h,
-        dur / 1min,
-        dur / 1s,
-        dsecs,
-        dsecs * 1'000,
-        dsecs * 1'000'000,
-        dur.count());
+    if (dur >= 24h)
+      return fmt::format("{0}d{1}h{2}m{3}s", dur / 24h, dur / 1h, dur / 1min, dur / 1s);
+    if (dur >= 1h)
+      return fmt::format("{0}h{1}m{2}s", dur / 1h, dur / 1min, dur / 1s);
+    if (dur >= 1min)
+      return fmt::format("{0}m{1}s", dur / 1min, dur / 1s);
+    if (dur >= 1s)
+      return fmt::format("{0:.3f}s", dsecs);
+    if (dur >= 1ms)
+      return fmt::format("{0:.3f}s", dsecs * 1'000);
+    if (dur >= 1us)
+      return fmt::format("{0:.3f}us", dsecs * 1'000'000);
+    return fmt::format("{0}ns", dur.count());
   }
 
   std::wstring

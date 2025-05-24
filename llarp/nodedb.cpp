@@ -12,6 +12,7 @@
 #include "dht/kademlia.hpp"
 
 #include <algorithm>
+#include <cstddef>
 #include <unordered_map>
 #include <utility>
 

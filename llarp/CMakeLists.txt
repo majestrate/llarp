@@ -13,6 +13,7 @@ add_library(lokinet-util
   util/bencode.cpp
   util/buffer.cpp
   util/file.cpp
+  util/logging.cpp
   util/logging/buffer.cpp
   util/easter_eggs.cpp
   util/mem.cpp
@@ -21,6 +22,12 @@ add_library(lokinet-util
   util/thread/threading.cpp
   util/time.cpp)
 
+
+string(REGEX REPLACE "([\\\"])" "\\\\\\1" path_escaped "${PROJECT_SOURCE_DIR}")
+message(STATUS "Stripping source root ${PROJECT_SOURCE_DIR} (${path_escaped}) from log paths")
+target_compile_definitions(lokinet-util PUBLIC
+  LOGGING_SOURCE_ROOT="${path_escaped}"
+)
 add_dependencies(lokinet-util genversion)
 
 # lokinet-platform holds all platform specific code
@@ -30,7 +37,6 @@ add_library(lokinet-platform
   ev/ev.cpp
   net/interface_info.cpp
   net/ip.cpp
-  net/ip_address.cpp
   net/ip_packet.cpp
   net/ip_range.cpp
   net/net_int.cpp
@@ -290,7 +296,7 @@ add_library(lokinet-base INTERFACE)
 target_include_directories(lokinet-base
   INTERFACE ${PROJECT_SOURCE_DIR} ${PROJECT_SOURCE_DIR}/include
 )
-target_link_libraries(lokinet-base INTERFACE oxen::logging lokinet-cryptography)
+target_link_libraries(lokinet-base INTERFACE spdlog::spdlog fmt::fmt lokinet-cryptography)
 
 # interface libraries for internal linkage
 add_library(lokinet-layers INTERFACE)

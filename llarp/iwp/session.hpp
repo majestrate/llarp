@@ -3,7 +3,6 @@
 #include <llarp/link/session.hpp>
 #include "linklayer.hpp"
 #include "message_buffer.hpp"
-#include <llarp/net/ip_address.hpp>
 
 #include <map>
 #include <unordered_set>
