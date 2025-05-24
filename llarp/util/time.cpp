@@ -90,11 +90,28 @@ namespace llarp
     auto [hours, mins, secs, ms] = extract_h_m_s_ms(delta);
 
     using namespace fmt::literals;
+    if (delta < now_threshold)
+      return "now";
+    if (delta < 10s)
+      return fmt::format(
+          "{in}{secs:d}.{ms:03d}s{ago}",
+          "in"_a = future ? "in " : "",
+          "ago"_a = future ? "" : " ago",
+          "hours"_a = hours,
+          "mins"_a = mins,
+          "secs"_a = secs,
+          "ms"_a = ms);
+    if (delta < 1h)
+      return fmt::format(
+          "{in}{mins:d}m{secs:02d}s{ago}",
+          "in"_a = future ? "in " : "",
+          "ago"_a = future ? "" : " ago",
+          "hours"_a = hours,
+          "mins"_a = mins,
+          "secs"_a = secs,
+          "ms"_a = ms);
     return fmt::format(
-        delta < now_threshold ? "now"
-            : delta < 10s     ? "{in}{secs:d}.{ms:03d}s{ago}"
-            : delta < 1h      ? "{in}{mins:d}m{secs:02d}s{ago}"
-                              : "{in}{hours:d}h{mins:02d}m{ago}",
+        "{in}{hours:d}h{mins:02d}m{ago}",
         "in"_a = future ? "in " : "",
         "ago"_a = future ? "" : " ago",
         "hours"_a = hours,
@@ -113,10 +130,24 @@ namespace llarp
     auto [hours, mins, secs, ms] = extract_h_m_s_ms(delta);
 
     using namespace fmt::literals;
+    if (delta < 1min)
+      return fmt::format(
+          "{neg}{secs:d}.{ms:03d}s",
+          "neg"_a = neg ? "-" : "",
+          "hours"_a = hours,
+          "mins"_a = mins,
+          "secs"_a = secs,
+          "ms"_a = ms);
+    if (delta < 1h)
+      return fmt::format(
+          "{neg}{mins:d}m{secs:02d}.{ms:03d}s",
+          "neg"_a = neg ? "-" : "",
+          "hours"_a = hours,
+          "mins"_a = mins,
+          "secs"_a = secs,
+          "ms"_a = ms);
     return fmt::format(
-        delta < 1min     ? "{neg}{secs:d}.{ms:03d}s"
-            : delta < 1h ? "{neg}{mins:d}m{secs:02d}.{ms:03d}s"
-                         : "{neg}{hours:d}h{mins:02d}m{secs:02d}.{ms:03d}s",
+        "{neg}{hours:d}h{mins:02d}m{secs:02d}.{ms:03d}s",
         "neg"_a = neg ? "-" : "",
         "hours"_a = hours,
         "mins"_a = mins,

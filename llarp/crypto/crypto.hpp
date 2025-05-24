@@ -6,7 +6,7 @@
 #include <llarp/util/buffer.hpp>
 
 #include <functional>
-
+#include <optional>
 #include <cstdint>
 
 /**

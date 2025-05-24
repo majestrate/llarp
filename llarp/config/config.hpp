@@ -11,7 +11,6 @@
 #include <llarp/util/str.hpp>
 #include <llarp/util/logging.hpp>
 #include <llarp/constants/files.hpp>
-#include <llarp/net/ip_address.hpp>
 #include <llarp/net/net_int.hpp>
 #include <llarp/net/ip_range_map.hpp>
 #include <llarp/service/address.hpp>
@@ -204,7 +203,6 @@ namespace llarp
 
   struct LoggingConfig
   {
-    log::Type m_logType = log::Type::Print;
     log::Level m_logLevel = log::Level::off;
     std::string m_logFile;
 

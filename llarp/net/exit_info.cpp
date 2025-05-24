@@ -14,22 +14,16 @@ namespace llarp
   bool
   ExitInfo::BEncode(llarp_buffer_t* buf) const
   {
-    SockAddr exitaddr = ipAddress.createSockAddr();
-    const auto* exitaddr6 = static_cast<const sockaddr_in6*>(exitaddr);
-
-    SockAddr netmaskaddr = netmask.createSockAddr();
-    const auto* netmaskaddr6 = static_cast<const sockaddr_in6*>(netmaskaddr);
-
     char tmp[128] = {0};
     if (!bencode_start_dict(buf))
       return false;
 
-    if (!inet_ntop(AF_INET6, &exitaddr6->sin6_addr, tmp, sizeof(tmp)))
+    if (!inet_ntop(AF_INET6, &ipAddress.s6_addr[0], tmp, sizeof(tmp)))
       return false;
     if (!BEncodeWriteDictString("a", std::string(tmp), buf))
       return false;
 
-    if (!inet_ntop(AF_INET6, &netmaskaddr6->sin6_addr, tmp, sizeof(tmp)))
+    if (!inet_ntop(AF_INET6, &netmask.s6_addr[0], tmp, sizeof(tmp)))
       return false;
     if (!BEncodeWriteDictString("b", std::string(tmp), buf))
       return false;
@@ -69,22 +63,11 @@ namespace llarp
       return false;
     if (k.startswith("a"))
     {
-      in6_addr tmp;
-      if (not bdecode_ip_string(buf, tmp))
-        return false;
-
-      SockAddr addr(tmp);
-      ipAddress = IpAddress(addr);
-      return true;
+      return bdecode_ip_string(buf, ipAddress);
     }
     if (k.startswith("b"))
     {
-      in6_addr tmp;
-      if (not bdecode_ip_string(buf, tmp))
-        return false;
-      SockAddr addr(tmp);
-      netmask = IpAddress(addr);
-      return true;
+      return bdecode_ip_string(buf, netmask);
     }
     return read;
   }
@@ -116,7 +99,9 @@ namespace llarp
 #endif
     printer.printValue(ss.str());
     */
-    return fmt::format("[Exit {}]", ipAddress.ToString());
+    char tmp[128] = {0};
+    inet_ntop(AF_INET6, &ipAddress.s6_addr[0], tmp, sizeof(tmp));
+    return fmt::format("[Exit {}]", tmp);
   }
 
 }  // namespace llarp

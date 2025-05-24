@@ -25,6 +25,10 @@ extern "C"
 }
 namespace llarp
 {
+  namespace aligned_detail
+  {
+    inline static auto logcat = log::Cat("aligned-buffer");
+  }
   /// aligned buffer that is sz bytes long and aligns to the nearest Alignment
   template <size_t sz>
   // Microsoft C malloc(3C) cannot return pointers aligned wider than 8 ffs
@@ -232,7 +236,7 @@ namespace llarp
     {
       if (buf->sz != sz)
       {
-        llarp::LogError("bdecode buffer size mismatch ", buf->sz, "!=", sz);
+        log::error(aligned_detail::logcat, "bdecode buffer size mismatch {} != {} ", buf->sz, sz);
         return false;
       }
       memcpy(data(), buf->base, sz);

@@ -242,35 +242,17 @@ namespace llarp
     m_Config = std::move(c);
     auto& conf = *m_Config;
 
-    // Do logging config as early as possible to get the configured log level applied
-
-    // Backwards compat: before 0.9.10 we used `type=file` with `file=|-|stdout` for print mode
-    auto log_type = conf.logging.m_logType;
-    if (log_type == log::Type::File
-        && (conf.logging.m_logFile == "stdout" || conf.logging.m_logFile == "-"
-            || conf.logging.m_logFile.empty()))
-      log_type = log::Type::Print;
-
-    if (log::get_level_default() != log::Level::off)
-      log::reset_level(conf.logging.m_logLevel);
-    log::clear_sinks();
-    log::add_sink(log_type, log_type == log::Type::System ? "lokinet" : conf.logging.m_logFile);
-
-    // re-add rpc log sink if rpc enabled, else free it
-    if (m_Config->api.m_enableRPCServer and llarp::logRingBuffer)
-      log::add_sink(llarp::logRingBuffer, llarp::log::DEFAULT_PATTERN_MONO);
-    else
-      llarp::logRingBuffer = nullptr;
+    // set log level for runtime.
+    log::set_log_level(conf.logging.m_logLevel);
 
     log::debug(logcat, "Configuring router");
-
     whitelistRouters = false;
 
     _nodedb = std::move(nodedb);
 
     m_isServiceNode = conf.router.m_isRelay;
-    log::debug(
-        logcat, m_isServiceNode ? "Running as a relay (service node)" : "Running as a client");
+    if (m_isServiceNode)
+      log::info(logcat, "Running as a relay");
 
     log::debug(logcat, "Initializing key manager");
     if (not m_keyManager->initialize(conf, true, isSNode))
@@ -1030,10 +1012,12 @@ namespace llarp
 
           if ((not Net().IsBogonIP(ai_ip)) and (not Net().IsBogonIP(override_ip))
               and ai_ip != override_ip)
-            throw std::runtime_error{
+            throw std::runtime_error{fmt::format(
                 "Lokinet is bound to public IP '{}', but public-ip is set to '{}'. Either fix the "
                 "[router]:public-ip setting or set a bind address in the [bind] section of the "
-                "config."_format(ai_ip_str, override_ip_str)};
+                "config.",
+                ai_ip_str,
+                override_ip_str)};
           ai.fromSockAddr(*_ourAddress);
         }
         if (RouterContact::BlockBogons && Net().IsBogon(ai.ip))
@@ -1253,8 +1237,7 @@ namespace llarp
       return;
 
     _stopping.store(true);
-    if (log::get_level_default() != log::Level::off)
-      log::reset_level(log::Level::info);
+
     LogWarn("stopping router hard");
     llarp::sys::service_manager->stopping();
     hiddenServiceContext().StopAll();
@@ -1278,9 +1261,6 @@ namespace llarp
     }
 
     _stopping.store(true);
-    if (auto level = log::get_level_default();
-        level > log::Level::info and level != log::Level::off)
-      log::reset_level(log::Level::info);
     log::info(logcat, "stopping");
     llarp::sys::service_manager->stopping();
     log::debug(logcat, "stopping hidden service context");

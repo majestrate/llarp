@@ -1,6 +1,7 @@
 #include "path_context.hpp"
 
 #include <llarp/messages/relay_commit.hpp>
+#include "llarp/net/sock_addr.hpp"
 #include "path.hpp"
 #include <llarp/router/abstractrouter.hpp>
 #include <llarp/router/i_outbound_message_handler.hpp>
@@ -28,17 +29,14 @@ namespace llarp
     }
 
     bool
-    PathContext::CheckPathLimitHitByIP(const IpAddress& ip)
+    PathContext::CheckPathLimitHitByAddr(const SockAddr& addr)
     {
 #ifdef TESTNET
       return false;
 #else
-      IpAddress remote = ip;
-      // null out the port -- we don't care about it for path limiting purposes
-      remote.setPort(0);
       // try inserting remote address by ip into decaying hash set
       // if it cannot insert it has hit a limit
-      return not m_PathLimits.Insert(remote);
+      return not m_PathLimits.Insert(addr.getIP());
 #endif
     }
 

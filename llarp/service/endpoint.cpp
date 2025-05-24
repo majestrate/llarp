@@ -37,7 +37,6 @@
 #include <optional>
 #include <type_traits>
 #include <utility>
-#include <uvw.hpp>
 #include <variant>
 
 namespace llarp
@@ -231,7 +230,7 @@ namespace llarp
            poker = m_router->routePoker()](auto maybe_addr) {
             if (not maybe_addr)
             {
-              result_handler(false, "exit not found: {}"_format(name));
+              result_handler(false, fmt::format("exit not found: {}", name));
               return;
             }
             if (auto* addr_ptr = std::get_if<Address>(&*maybe_addr))
@@ -245,7 +244,7 @@ namespace llarp
                   [ptr, name, ranges, result_handler, poker](auto addr, auto* ctx) {
                     if (ctx == nullptr)
                     {
-                      result_handler(false, "could not establish flow to {}"_format(name));
+                      result_handler(false, fmt::format("could not establish flow to {}", name));
                       return;
                     }
 
@@ -270,7 +269,7 @@ namespace llarp
                   ptr->PathAlignmentTimeout());
 
               if (not result)
-                result_handler(false, "did not build path to {}"_format(name));
+                result_handler(false, fmt::format("did not build path to {}", name));
             }
             else
               result_handler(false, "exit via snode not supported");
