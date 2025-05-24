@@ -10,6 +10,7 @@
 #include <string_view>
 #include <variant>
 #include <set>
+#include <optional>
 
 namespace llarp
 {

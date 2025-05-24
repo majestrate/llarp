@@ -48,6 +48,7 @@ namespace
 
   // variable declarations
   static auto logcat = llarp::log::Cat("main");
+  static auto deadlock_cat = llarp::log::Cat("deadlock");
   std::shared_ptr<llarp::Context> ctx;
   std::promise<int> exit_code;
 
@@ -141,7 +142,7 @@ namespace
         }
         catch (std::exception& ex)
         {
-          llarp::LogError("cannot generate config at ", *configFile, ": ", ex.what());
+          llarp::log::error(logcat, "cannot generate config at {}: {}", *configFile, ex.what());
           return 1;
         }
       }
@@ -151,13 +152,13 @@ namespace
         {
           if (!fs::exists(*configFile))
           {
-            llarp::LogError("Config file not found ", *configFile);
+            llarp::log::error(logcat, "Config file not found: {}", *configFile);
             return 1;
           }
         }
         catch (std::exception& ex)
         {
-          llarp::LogError("cannot check if ", *configFile, " exists: ", ex.what());
+          llarp::log::error(logcat, "cannot check if {} exists: {}", *configFile, ex.what());
           return 1;
         }
       }
@@ -174,7 +175,7 @@ namespace
       }
       catch (std::exception& ex)
       {
-        llarp::LogError("cannot ensure config: ", ex.what());
+        llarp::log::error(logcat, "cannot ensure config: {}", ex.what());
         return 1;
       }
       configFile = llarp::GetDefaultConfigPath();
@@ -213,8 +214,7 @@ namespace
               "file a bug report now or be cursed with this "
               "annoying image in your syslog for all time."})
         {
-          llarp::log::critical(deadlock_cat, wtf);
-          llarp::log::flush();
+          llarp::log::error(deadlock_cat, "{}", std::string_view{wtf});
         }
         llarp::sys::service_manager->failed();
         std::abort();
@@ -239,8 +239,6 @@ namespace
       std::cerr << "main thread threw non-standard exception" << std::endl;
       code = 2;
     }
-
-    llarp::log::flush();
     llarp::sys::service_manager->stopped();
     if (ctx)
     {
@@ -253,13 +251,13 @@ namespace
   static void
   run_main_context(std::optional<fs::path> confFile, const llarp::RuntimeOptions opts)
   {
-    llarp::LogInfo(fmt::format("starting up {} {}", llarp::VERSION_FULL, llarp::RELEASE_MOTTO));
+    llarp::log::info(logcat, "starting up {} {}", llarp::VERSION_FULL, llarp::RELEASE_MOTTO);
     try
     {
       std::shared_ptr<llarp::Config> conf;
       if (confFile)
       {
-        llarp::LogInfo("Using config file: ", *confFile);
+        llarp::log::info(logcat, "Using config file: {}", *confFile);
         conf = std::make_shared<llarp::Config>(confFile->parent_path());
       }
       else
@@ -268,7 +266,7 @@ namespace
       }
       if (not conf->Load(confFile, opts.isSNode))
       {
-        llarp::LogError("failed to parse configuration");
+        llarp::log::error(logcat, "failed to parse configuration");
         exit_code.set_value(1);
         return;
       }
@@ -291,13 +289,13 @@ namespace
       }
       catch (llarp::util::bind_socket_error& ex)
       {
-        llarp::LogError(fmt::format("{}, is llarpd already running? 🤔", ex.what()));
+        llarp::log::error(logcat, "{}, is llarpd already running? 🤔", ex.what());
         exit_code.set_value(1);
         return;
       }
       catch (std::exception& ex)
       {
-        llarp::LogError(fmt::format("failed to start up llarpd: {}", ex.what()));
+        llarp::log::error(logcat, "failed to start up llarpd: {}", ex.what());
         exit_code.set_value(1);
         return;
       }
@@ -308,12 +306,12 @@ namespace
     }
     catch (std::exception& e)
     {
-      llarp::LogError("Fatal: caught exception while running: ", e.what());
+      llarp::log::error(logcat, "Fatal: caught exception while running: {}", e.what());
       exit_code.set_exception(std::current_exception());
     }
     catch (...)
     {
-      llarp::LogError("Fatal: caught non-standard exception while running");
+      llarp::log::error(logcat, "Fatal: caught non-standard exception while running");
       exit_code.set_exception(std::current_exception());
     }
   }
@@ -323,13 +321,6 @@ namespace
 int
 main(int argc, char* argv[])
 {
-  // Set up a default, stderr logging for very early logging; we'll replace this later once we read
-  // the desired log info from config.
-  llarp::log::add_sink(llarp::log::Type::Print, "stderr");
-  llarp::log::reset_level(llarp::log::Level::info);
-
-  llarp::logRingBuffer = std::make_shared<llarp::log::RingBufferSink>(100);
-  llarp::log::add_sink(llarp::logRingBuffer, llarp::log::DEFAULT_PATTERN_MONO);
-
+  llarp::log::set_log_level(llarp::log::Level::lvl_info);
   return llarp_main(argc, argv);
 }

@@ -1,10 +1,10 @@
 #pragma once
 
 #include <llarp/crypto/types.hpp>
-#include "ip_address.hpp"
 #include <llarp/util/bencode.hpp>
 
 #include <iosfwd>
+#include <llarp/net/net_int.hpp>
 
 /**
  * exit_info.h
@@ -18,15 +18,12 @@ namespace llarp
   /// deprecated don't use me , this is only for backwards compat
   struct ExitInfo
   {
-    IpAddress ipAddress;
-    IpAddress netmask;
+    in6_addr ipAddress;
+    in6_addr netmask;
     PubKey pubkey;
     uint64_t version = llarp::constants::proto_version;
 
     ExitInfo() = default;
-
-    ExitInfo(const PubKey& pk, const IpAddress& address) : ipAddress(address), pubkey(pk)
-    {}
 
     bool
     BEncode(llarp_buffer_t* buf) const;

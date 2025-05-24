@@ -12,6 +12,8 @@ namespace llarp
     clear();
   }
 
+  static auto logcat = log::Cat("bootstrap-list");
+
   bool
   BootstrapList::BDecode(llarp_buffer_t* buf)
   {
@@ -22,7 +24,7 @@ namespace llarp
             RouterContact rc{};
             if (not rc.BDecode(b))
             {
-              LogError("invalid rc in bootstrap list: ", llarp::buffer_printer{*b});
+              log::error(logcat, "invalid rc in bootstrap list: {}", llarp::buffer_printer{*b});
               return false;
             }
             emplace(std::move(rc));

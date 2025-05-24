@@ -65,6 +65,11 @@ namespace llarp
     return true;
   }
 
+  namespace bencode_detail
+  {
+    inline static auto logcat = log::Cat("bencode");
+  }
+
   template <typename Item_t>
   bool
   BEncodeMaybeReadDictEntry(
@@ -74,7 +79,8 @@ namespace llarp
     {
       if (!item.BDecode(buf))
       {
-        llarp::LogWarn("failed to decode key ", k, " for entry in dict");
+        log::warning(
+            bencode_detail::logcat, "failed to decode key {} for entry in dict", std::string{k});
 
         return false;
       }
@@ -93,7 +99,8 @@ namespace llarp
       uint64_t read_i;
       if (!bencode_read_integer(buf, &read_i))
       {
-        llarp::LogWarn("failed to decode key ", k, " for integer in dict");
+        log::warning(
+            bencode_detail::logcat, "failed to decode key {} for integer in dict", std::string{k});
         return false;
       }
 
@@ -191,7 +198,7 @@ namespace llarp
 
     if (*buffer->cur != 'e')
     {
-      llarp::LogWarn("reading dict not ending on 'e'");
+      log::warning(bencode_detail::logcat, "reading dict not ending in 'e'");
       // make sure we're at dictionary end
       return false;
     }
@@ -209,8 +216,8 @@ namespace llarp
             return true;
           if (sink.DecodeKey(*key, buffer))
             return true;
-          llarp::LogWarn("undefined key '", *key->cur, "' for entry in dict");
-
+          log::warning(
+              bencode_detail::logcat, "undefined key '{}' for entry in dict", char{*key->cur});
           return false;
         },
         buff);
@@ -224,7 +231,10 @@ namespace llarp
       return false;
     if (*buffer->cur != 'l')  // ensure is a list
     {
-      llarp::LogWarn("bencode::bencode_read_list - expecting list got ", *buffer->cur);
+      log::warning(
+          bencode_detail::logcat,
+          "bencode::bencode_read_list - expecting list got '{}'",
+          char{*buffer->cur});
       return false;
     }
 

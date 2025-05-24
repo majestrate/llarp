@@ -1,8 +1,7 @@
 #pragma once
 
 #include <llarp/crypto/types.hpp>
-#include "ip_address.hpp"
-#include "net.h"
+#include <llarp/net/net_int.hpp>
 #include <llarp/util/bencode.hpp>
 #include <llarp/util/mem.h>
 
@@ -20,6 +19,8 @@
 /// address information model
 namespace llarp
 {
+  struct SockAddr;
+
   struct AddressInfo
   {
     uint16_t rank;
@@ -40,10 +41,6 @@ namespace llarp
 
     bool
     DecodeKey(const llarp_buffer_t& k, llarp_buffer_t* buf);
-
-    /// Return an IpAddress representing the address portion of this AddressInfo
-    IpAddress
-    toIpAddress() const;
 
     /// Updates our ip and port to reflect that of the given SockAddr
     void

@@ -288,8 +288,7 @@ namespace llarp::io_uring
       bool
       completed(int st) override
       {
-        log::debug(
-            cat, "udp send completion: fd={} result={} completed={} msgs={}", m_Sock.m_FD, st);
+        log::debug(cat, "udp send completion: fd={} result={}", m_Sock.m_FD, st);
         return true;
       };
 

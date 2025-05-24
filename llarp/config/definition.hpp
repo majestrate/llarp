@@ -75,6 +75,27 @@ namespace llarp
       {}
     };
 
+    /// Fetches config from environmental variable
+    struct Env
+    {
+      std::function<std::optional<std::string_view>(std::string_view)> get_env;
+      std::string varname;
+      template <typename GetEnv>
+      constexpr Env(std::string_view _varname, const GetEnv& _get_env) : varname{_varname}
+      {
+        get_env = [&_get_env](auto val) -> auto
+        {
+          return _get_env(val);
+        };
+      }
+
+      std::optional<std::string_view>
+      operator()() const
+      {
+        return get_env(varname);
+      }
+    };
+
     /// A convenience function that returns an acceptor which assigns to a reference.
     ///
     /// Note that this holds on to the reference; it must only be used when this is safe to do. In
@@ -103,11 +124,14 @@ namespace llarp
     constexpr bool is_default_array<std::array<Default<T>, N>> = true;
     template <typename U>
     constexpr bool is_default_array<U&> = is_default_array<remove_cvref_t<U>>;
+    template <typename T>
+    constexpr bool is_env_v = std::is_same_v<Env, remove_cvref_t<T>>;
 
     template <typename T, typename Option>
     constexpr bool is_option = std::is_base_of_v<option_flag, remove_cvref_t<Option>>
         or std::is_same_v<Comment, Option> or is_default<Option> or is_default_array<Option>
-        or std::is_invocable_v<remove_cvref_t<Option>, T>;
+        or std::is_invocable_v<remove_cvref_t<Option>, T> or is_env_v<Option>;
+
   }  // namespace config
 
   /// A base class for specifying config options and their constraints. The basic to/from string
@@ -213,8 +237,25 @@ namespace llarp
       (extractDefault(std::forward<Options>(opts)), ...);
       (extractAcceptor(std::forward<Options>(opts)), ...);
       (extractComments(std::forward<Options>(opts)), ...);
+      (extractEnv(std::forward<Options>(opts)), ...);
     }
 
+    template <typename U>
+    void
+    extractEnv(U&& envValue_)
+    {
+      if constexpr (config::is_env_v<U>)
+      {
+        if (auto maybe = envValue_())
+        {
+          // override existing parsed values
+          if (not parsedValues.empty())
+            parsedValues.clear();
+
+          parseValue(std::string{*maybe});
+        }
+      }
+    }
     /// Extracts a default value from an config::Default<U> or an array of defaults (for
     /// multi-valued options with multi-value default); ignores anything else.
     template <typename U>
@@ -290,7 +331,7 @@ namespace llarp
       if (defaultValues.empty())
         return {};
       if constexpr (std::is_same_v<fs::path, T>)
-        return {{defaultValues.front().u8string()}};
+        return {{defaultValues.front().string()}};
       else
       {
         std::vector<std::string> def_strs;

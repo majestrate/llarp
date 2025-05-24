@@ -4,11 +4,12 @@
 
 namespace llarp
 {
+  using namespace std::literals;
   std::string
   buffer_printer::ToString() const
   {
     auto& b = buf;
-    std::string out;
+    std::basic_string<char8_t> out;
     auto ins = std::back_inserter(out);
     fmt::format_to(ins, "Buffer[{}/{:#x} bytes]:", b.size(), b.size());
 
@@ -23,7 +24,9 @@ namespace llarp
         if (j % 4 == 0)
           out.push_back(' ');
         if (k >= stop)
-          out.append("  ");
+        {
+          out.append(u8"  ");
+        }
         else
           fmt::format_to(ins, "{:02x}", std::to_integer<uint_fast16_t>(b[k]));
       }
@@ -40,6 +43,7 @@ namespace llarp
       }
       out.append(u8"┃");
     }
-    return out;
+    std::string ret{reinterpret_cast<const char*>(out.c_str())};
+    return ret;
   }
 }  // namespace llarp

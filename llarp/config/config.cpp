@@ -21,6 +21,7 @@
 #include <cstdlib>
 #include <ios>
 #include <iostream>
+#include <map>
 
 namespace llarp
 {
@@ -44,6 +45,35 @@ namespace llarp
         return llarp::net::Platform::Default_ptr();
       }
     };
+
+    struct EnvVarFetcher
+    {
+      std::map<std::string, std::string> m_env;
+
+      EnvVarFetcher()
+      {
+        // clone enviorn global.
+        for (char** var{environ}; *var; ++var)
+        {
+          std::string_view pair{*var};
+          auto pos = pair.find_first_of('=');
+          std::string key{pair.substr(0, pos)};
+          m_env[key] = std::string{pair.substr(1 + pos)};
+        }
+      }
+
+      std::optional<std::string_view>
+      operator()(std::string_view varname) const
+      {
+        auto itr = m_env.find(std::string{varname});
+        if (itr == m_env.end())
+          return std::nullopt;
+        return itr->second;
+      }
+    };
+
+    const EnvVarFetcher get_env{};
+
   }  // namespace
 
   void
@@ -65,6 +95,7 @@ namespace llarp
         "router",
         "netid",
         Default{llarp::DEFAULT_NETID},
+        Env{"LLARP_NETID", get_env},
         Comment{
             "Network ID; this is '"s + llarp::DEFAULT_NETID + "' for mainnet, 'gamma' for testnet.",
         },
@@ -116,6 +147,7 @@ namespace llarp
         "router",
         "data-dir",
         Default{params.defaultDataDir},
+        Env{"LLARP_DATA_DIR", get_env},
         Comment{
             "Optional directory for containing lokinet runtime data. This includes generated",
             "private keys.",
@@ -134,6 +166,7 @@ namespace llarp
         "router",
         "public-ip",
         RelayOnly,
+        Env{"LLARP_PUBLIC_IP", get_env},
         Comment{
             "For complex network configurations where the detected IP is incorrect or non-public",
             "this setting specifies the public IP at which this router is reachable. When",
@@ -164,6 +197,7 @@ namespace llarp
         "public-port",
         RelayOnly,
         Default{DefaultPublicPort},
+        Env{"LLARP_PUBLIC_PORT", get_env},
         Comment{
             "When specifying public-ip=, this specifies the public UDP port at which this lokinet",
             "router is reachable. Required when public-ip is used.",
@@ -259,17 +293,16 @@ namespace llarp
   void
   NetworkConfig::defineConfigOptions(ConfigDefinition& conf, const ConfigGenParameters& params)
   {
-    (void)params;
-
     static constexpr Default ProfilingValueDefault{true};
     static constexpr Default SaveProfilesDefault{true};
     static constexpr Default ReachableDefault{true};
     static constexpr Default HopsDefault{4};
     static constexpr Default PathsDefault{6};
     static constexpr Default IP6RangeDefault{"fd00::"};
+    const Default DefaultEndpointType{params.isRelay ? "null" : "tun"};
 
     conf.defineOption<std::string>(
-        "network", "type", Default{"tun"}, Hidden, AssignmentAcceptor(m_endpointType));
+        "network", "type", DefaultEndpointType, Hidden, AssignmentAcceptor(m_endpointType));
 
     conf.defineOption<bool>(
         "network",
@@ -329,27 +362,10 @@ namespace llarp
           m_AuthType = service::ParseAuthType(arg);
         });
 
-    conf.defineOption<std::string>(
-        "network",
-        "auth-lmq",
-        ClientOnly,
-        AssignmentAcceptor(m_AuthUrl),
-        Comment{
-            "lmq endpoint to talk to for authenticating new sessions",
-            "ipc:///var/lib/lokinet/auth.socket",
-            "tcp://127.0.0.1:5555",
-        });
+    conf.defineOption<std::string>("network", "auth-lmq", ClientOnly, Deprecated);
 
     conf.defineOption<std::string>(
-        "network",
-        "auth-lmq-method",
-        ClientOnly,
-        Default{"llarp.auth"},
-        Comment{
-            "lmq function to call for authenticating new sessions",
-            "llarp.auth",
-        },
-        [this](std::string arg) {
+        "network", "auth-lmq-method", ClientOnly, Deprecated, [this](std::string arg) {
           if (arg.empty())
             return;
           m_AuthMethod = std::move(arg);
@@ -1189,22 +1205,11 @@ namespace llarp
   {
     (void)params;
 
-    constexpr Default DefaultLogType{platform::is_android ? "system" : "print"};
     constexpr Default DefaultLogFile{""};
 
     const Default DefaultLogLevel{params.isRelay ? "warn" : "info"};
 
-    conf.defineOption<std::string>(
-        "logging",
-        "type",
-        DefaultLogType,
-        [this](std::string arg) { m_logType = log::type_from_string(arg); },
-        Comment{
-            "Log type (format). Valid options are:",
-            "  print - print logs to standard output",
-            "  system - logs directed to the system logger (syslog/eventlog/etc.)",
-            "  file - plaintext formatting to a file",
-        });
+    conf.defineOption<std::string>("logging", "type", Deprecated);
 
     conf.defineOption<std::string>(
         "logging",
@@ -1339,7 +1344,7 @@ namespace llarp
         {
           ConfigParser parser;
           if (not parser.LoadFile(overrideFile))
-            throw std::runtime_error{"cannot load '" + overrideFile.u8string() + "'"};
+            throw std::runtime_error{"cannot load '" + overrideFile.string() + "'"};
 
           parser.IterAll([&](std::string_view section, const SectionValues_t& values) {
             for (const auto& pair : values)
