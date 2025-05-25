@@ -12,7 +12,7 @@ namespace llarp::log
 
   std::mutex g_loggers_access;
   std::unordered_map<std::string, CategoryLogger_ptr> g_loggers;
-  
+
   CategoryLogger_ptr
   Cat(std::string_view _name)
   {
@@ -22,9 +22,9 @@ namespace llarp::log
     if (itr != g_loggers.end())
       return itr->second;
 
-    if(g_loggers.empty())
+    if (g_loggers.empty())
       g_loggers.rehash(10);
-    
+
     CategoryLogger_ptr logger = std::make_shared<CategoryLogger>(_name);
     g_loggers.emplace(std::make_pair(name, logger));
     return logger;
@@ -92,7 +92,7 @@ namespace llarp::log
 
       return filename;
     }
-  }
+  }  // namespace
   void
   CategoryLogger::on_log_event(
       Level lvl, const llarp::util::source_location& loc, const std::string& msg) const
