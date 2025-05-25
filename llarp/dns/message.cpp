@@ -8,6 +8,7 @@
 #include <llarp/net/ip.hpp>
 
 #include <array>
+#include <fmt/ranges.h>
 
 namespace llarp
 {

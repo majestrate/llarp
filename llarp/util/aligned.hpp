@@ -1,6 +1,7 @@
 #pragma once
 
 #include "bencode.h"
+#include <fmt/ranges.h>
 #include <llarp/util/logging.hpp>
 #include <llarp/util/formattable.hpp>
 
@@ -309,6 +310,14 @@ namespace llarp
 
 namespace fmt
 {
+
+  /// disable range formatting for aligned buffer.
+  template <typename T>
+  struct range_format_kind<T, char, std::enable_if_t<llarp::is_aligned_buffer<T>>>
+  {
+    static constexpr auto value = range_format::disabled;
+  };
+
   // Any AlignedBuffer<N> (or subclass) gets hex formatted when output:
   template <typename T>
   struct formatter<
@@ -319,7 +328,7 @@ namespace fmt
   {
     template <typename FormatContext>
     auto
-    format(const T& val, FormatContext& ctx)
+    format(const T& val, FormatContext& ctx) const
     {
       auto it = oxenc::hex_encoder{val.begin(), val.end()};
       return std::copy(it, it.end(), ctx.out());
