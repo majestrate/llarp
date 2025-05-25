@@ -1623,7 +1623,7 @@ namespace llarp
 
         auto session = std::make_shared<exit::SNodeSession>(
             snode,
-            [=](const llarp_buffer_t& buf) -> bool {
+            [this, snode, src, dst](const llarp_buffer_t& buf) -> bool {
               net::IPPacket pkt;
               if (not pkt.Load(buf))
                 return false;
