@@ -6,11 +6,11 @@
 #include <fmt/chrono.h>
 
 #ifdef __linux__
-  #include <linux/time_types.h>
-  using llarp_timespec = __kernel_timespec;
+#include <linux/time_types.h>
+using llarp_timespec = __kernel_timespec;
 #else
-  #include <ctime>
-  using llarp_timespec = timespec;
+#include <ctime>
+using llarp_timespec = timespec;
 #endif
 
 using namespace std::chrono_literals;

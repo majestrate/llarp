@@ -13,6 +13,8 @@
 
 #include "util/file.hpp"
 
+#include <fmt/ranges.h>
+
 namespace llarp
 {
   static auto logcat = log::Cat("RC");
@@ -563,7 +565,7 @@ namespace llarp
   RouterContact::ToString() const
   {
     return fmt::format(
-        "[RC k={} updated={} netid={} v={} ai={{{}}} e={} z={}]",
+        "[RC k={} updated={} netid={} v={} ai={} e={} z={}]",
         pubkey,
         last_updated.count(),
         netID,

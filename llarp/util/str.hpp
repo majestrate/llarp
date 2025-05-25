@@ -6,6 +6,7 @@
 #include <iterator>
 #include <charconv>
 #include <fmt/format.h>
+#include <fmt/ranges.h>
 
 namespace llarp
 {
