@@ -8,6 +8,7 @@
 #include <fmt/format.h>
 #include "source_location.hpp"
 #include "time.hpp"
+#include <memory>
 
 namespace llarp::log
 {
