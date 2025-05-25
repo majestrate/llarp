@@ -48,7 +48,7 @@ add_library(lokinet-platform
 )
 
 if (ANDROID)
-  target_sources(lokinet-platform PRIVATE android/ifaddrs.c util/nop_service_manager.cpp)
+  target_sources(lokinet-platform PRIVATE android/ifaddrs.c)
 endif()
 
 if(WITH_IOURING)
@@ -67,6 +67,8 @@ if(CMAKE_SYSTEM_NAME MATCHES "Linux")
   else()
     target_sources(lokinet-platform PRIVATE util/nop_service_manager.cpp)
   endif()
+else()
+  target_sources(lokinet-platform PRIVATE util/nop_service_manager.cpp)
 endif()
 
 target_sources(lokinet-platform PRIVATE net/posix.cpp)
