@@ -1,7 +1,6 @@
 #pragma once
 
 #include <llarp/crypto/types.hpp>
-#include <llarp/pow.hpp>
 #include "info.hpp"
 #include "intro.hpp"
 #include "tag.hpp"
