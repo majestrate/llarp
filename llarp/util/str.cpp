@@ -166,7 +166,7 @@ namespace llarp
       return fmt::format("{0:.3f}ms", dsecs * 1'000);
     if (dur >= 1us)
       return fmt::format("{0:.3f}us", dsecs * 1'000'000);
-    if(dur.count())
+    if (dur.count())
       return fmt::format("{0}ns", dur.count());
     return "0";
   }
