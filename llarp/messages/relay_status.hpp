@@ -4,7 +4,6 @@
 #include <llarp/crypto/types.hpp>
 #include "link_message.hpp"
 #include <llarp/path/path_types.hpp>
-#include <llarp/pow.hpp>
 
 #include <array>
 #include <memory>
