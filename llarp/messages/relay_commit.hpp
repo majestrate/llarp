@@ -4,7 +4,6 @@
 #include <llarp/crypto/types.hpp>
 #include <llarp/messages/link_message.hpp>
 #include <llarp/path/path_types.hpp>
-#include <llarp/pow.hpp>
 
 #include <array>
 #include <memory>
@@ -27,7 +26,6 @@ namespace llarp
     PathID_t txid, rxid;
 
     std::unique_ptr<RouterContact> nextRC;
-    std::unique_ptr<PoW> work;
     uint64_t version = 0;
     llarp_time_t lifetime = 0s;
 

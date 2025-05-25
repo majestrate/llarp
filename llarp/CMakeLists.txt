@@ -101,7 +101,6 @@ add_library(lokinet-nodedb
   net/exit_info.cpp
   net/traffic_policy.cpp
   nodedb.cpp
-  pow.cpp
   profiling.cpp
   router_contact.cpp
   router_id.cpp
