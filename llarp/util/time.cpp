@@ -1,8 +1,6 @@
 #include "time.hpp"
-#include <linux/time_types.h>
 #include <chrono>
 #include <iomanip>
-#include "types.hpp"
 
 namespace llarp
 {
@@ -39,10 +37,11 @@ namespace llarp
     t.tv_nsec = ms * 1000000;
     return t;
   }
-  __kernel_timespec
+
+  llarp_timespec
   as_timespec(Duration_t d)
   {
-    return make_timespec<__kernel_timespec>(d);
+    return make_timespec<llarp_timespec>(d);
   }
 
   timespec

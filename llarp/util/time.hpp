@@ -4,7 +4,14 @@
 #include <iostream>
 #include <fmt/format.h>
 #include <fmt/chrono.h>
-#include <linux/time_types.h>
+
+#ifdef __linux__
+  #include <linux/time_types.h>
+  using llarp_timespec = __kernel_timespec;
+#else
+  #include <ctime>
+  using llarp_timespec = timespec;
+#endif
 
 using namespace std::chrono_literals;
 
@@ -18,7 +25,7 @@ namespace llarp
   Duration_t
   uptime();
 
-  __kernel_timespec as_timespec(Duration_t);
+  llarp_timespec as_timespec(Duration_t);
 
   timespec to_timespec(Duration_t);
 
