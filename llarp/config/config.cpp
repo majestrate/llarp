@@ -116,7 +116,7 @@ namespace llarp
         Comment{
             "Minimum number of routers lokinet will attempt to maintain connections to.",
         },
-        [=](int arg) {
+        [this, minConnections](int arg) {
           if (arg < minConnections)
             throw std::invalid_argument{
                 fmt::format("min-connections must be >= {}", minConnections)};
@@ -133,7 +133,7 @@ namespace llarp
         Comment{
             "Maximum number (hard limit) of routers lokinet will be connected to at any time.",
         },
-        [=](int arg) {
+        [this, maxConnections](int arg) {
           if (arg < maxConnections)
             throw std::invalid_argument{
                 fmt::format("max-connections must be >= {}", maxConnections)};
@@ -828,7 +828,7 @@ namespace llarp
             "Upstream resolver(s) to use as fallback for non-loki addresses.",
             "Multiple values accepted.",
         },
-        [=, first = true](std::string arg) mutable {
+        [this, first = true](std::string arg) mutable {
           if (first)
           {
             m_upstreamDNS.clear();
@@ -867,7 +867,7 @@ namespace llarp
         Comment{
             "Address to bind to for handling DNS requests.",
         },
-        [=](std::string arg) {
+        [this](std::string arg) {
           SockAddr addr{arg};
           // set dns port if no explicit port specified
           // explicit :0 allowed
@@ -881,7 +881,7 @@ namespace llarp
         "add-hosts",
         ClientOnly,
         Comment{"Add a hosts file to the dns resolver", "For use with client side dns filtering"},
-        [=](fs::path path) {
+        [this](fs::path path) {
           if (path.empty())
             return;
           if (not fs::exists(path))
@@ -1250,7 +1250,7 @@ namespace llarp
         "unique-range-size",
         DefaultUniqueCIDR,
         ClientOnly,
-        [=](int arg) {
+        [this](int arg) {
           if (arg == 0)
           {
             m_UniqueHopsNetmaskSize = arg;

@@ -211,13 +211,15 @@ namespace llarp
   bencode_decode_dict(Sink&& sink, llarp_buffer_t* buff)
   {
     return bencode_read_dict(
-        [&](llarp_buffer_t* buffer, llarp_buffer_t* key) {
+        [&sink](llarp_buffer_t* buffer, llarp_buffer_t* key) {
           if (key == nullptr)
             return true;
           if (sink.DecodeKey(*key, buffer))
             return true;
           log::warning(
-              bencode_detail::logcat, "undefined key '{}' for entry in dict", char{*key->cur});
+              bencode_detail::logcat,
+              "undefined key '{}' for entry in dict",
+              static_cast<char>(*key->cur));
           return false;
         },
         buff);
@@ -234,7 +236,7 @@ namespace llarp
       log::warning(
           bencode_detail::logcat,
           "bencode::bencode_read_list - expecting list got '{}'",
-          char{*buffer->cur});
+          static_cast<char>(*buffer->cur));
       return false;
     }
 
