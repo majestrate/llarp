@@ -106,8 +106,6 @@ namespace llarp
 
     if (not bencode_write_uint64_entry(buf, "v", 1, llarp::constants::proto_version))
       return false;
-    if (work and not BEncodeWriteDictEntry("w", *work, buf))
-      return false;
 
     return bencode_end(buf);
   }
@@ -140,18 +138,6 @@ namespace llarp
     if (!BEncodeMaybeVerifyVersion(
             "v", version, llarp::constants::proto_version, read, *key, buffer))
       return false;
-    if (key->startswith("w"))
-    {
-      // check for duplicate
-      if (work)
-      {
-        llarp::LogWarn("duplicate POW in LRCR");
-        return false;
-      }
-
-      work = std::make_unique<PoW>();
-      return bencode_decode_dict(*work, buffer);
-    }
     return read;
   }
 
@@ -164,11 +150,6 @@ namespace llarp
   bool
   LR_CommitRecord::operator==(const LR_CommitRecord& other) const
   {
-    if (work && other.work)
-    {
-      if (*work != *other.work)
-        return false;
-    }
     return nextHop == other.nextHop && commkey == other.commkey && txid == other.txid
         && rxid == other.rxid;
   }
@@ -409,16 +390,7 @@ namespace llarp
       }
       // generate hash of hop key for nonce mutation
       crypto->shorthash(self->hop->nonceXOR, llarp_buffer_t(self->hop->pathKey));
-      if (self->record.work && self->record.work->IsValid(now))
-      {
-        llarp::LogDebug(
-            "LRCM extended lifetime by ",
-            ToString(self->record.work->extendedLifetime),
-            " for ",
-            info);
-        self->hop->lifetime += self->record.work->extendedLifetime;
-      }
-      else if (self->record.lifetime < path::default_lifetime && self->record.lifetime > 10s)
+      if (self->record.lifetime < path::default_lifetime && self->record.lifetime > 10s)
       {
         self->hop->lifetime = self->record.lifetime;
         llarp::LogDebug(
