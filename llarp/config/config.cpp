@@ -23,6 +23,14 @@
 #include <iostream>
 #include <map>
 
+#ifdef __APPLE__
+  #include <crt_externs.h>
+  #define llarp_environ (*_NSGetEnviron())
+#else
+  extern char **environ;
+  #define llarp_environ environ
+#endif
+
 namespace llarp
 {
   // constants for config file default values
@@ -53,7 +61,7 @@ namespace llarp
       EnvVarFetcher()
       {
         // clone enviorn global.
-        for (char** var{environ}; *var; ++var)
+        for (char** var = llarp_environ; *var; ++var)
         {
           std::string_view pair{*var};
           auto pos = pair.find_first_of('=');
