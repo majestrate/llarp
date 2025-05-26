@@ -179,7 +179,7 @@ namespace llarp
 
   namespace log_detail
   {
-    inline log::CategoryLogger_ptr legacy_logger = log::Cat("llarp");
+    static inline log::CategoryLogger_ptr legacy_logger = log::Cat("llarp");
 
     template <typename>
     struct concat_args_fmt_impl;

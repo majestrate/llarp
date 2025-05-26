@@ -10,23 +10,23 @@ namespace llarp::log
 
   Level g_currentLevel = Level::lvl_info;
 
-  std::mutex g_loggers_access;
-  std::unordered_map<std::string, CategoryLogger_ptr> g_loggers;
+  static std::mutex g_loggers_access;
+  static std::unique_ptr<std::unordered_map<std::string, CategoryLogger_ptr>> g_loggers = nullptr;
 
   CategoryLogger_ptr
   Cat(std::string_view _name)
   {
     std::string name{_name};
     auto lock = std::unique_lock(g_loggers_access);
-    auto itr = g_loggers.find(name);
-    if (itr != g_loggers.end())
+    if (g_loggers == nullptr)
+      g_loggers = std::make_unique<std::unordered_map<std::string, CategoryLogger_ptr>>();
+
+    auto itr = g_loggers->find(name);
+    if (itr != g_loggers->end())
       return itr->second;
 
-    if (g_loggers.empty())
-      g_loggers.rehash(10);
-
     CategoryLogger_ptr logger = std::make_shared<CategoryLogger>(_name);
-    g_loggers.emplace(std::make_pair(name, logger));
+    g_loggers->emplace(std::make_pair(name, logger));
     return logger;
   }
 
@@ -48,14 +48,35 @@ namespace llarp::log
     throw std::invalid_argument{fmt::format("invalid log level: {}", str)};
   }
 
+  auto
+  to_spdlog_level(Level lvl)
+  {
+    switch (lvl)
+    {
+      case Level::lvl_trace:
+        return spdlog::level::trace;
+      case Level::lvl_debug:
+        return spdlog::level::debug;
+      case Level::lvl_info:
+        return spdlog::level::info;
+      case Level::lvl_warning:
+        return spdlog::level::warn;
+      case Level::lvl_error:
+        return spdlog::level::err;
+      default:
+        return spdlog::level::critical;
+    }
+  }
+
   void
   set_log_level(Level lvl)
   {
     auto lock = std::unique_lock(g_loggers_access);
-    for (const auto& [key, val] : g_loggers)
+    for (const auto& [key, val] : *g_loggers)
     {
       val->min_level(lvl);
     }
+    spdlog::set_level(to_spdlog_level(lvl));
   }
 
   CategoryLogger::CategoryLogger(std::string_view name) : m_MinLevel{g_currentLevel}, m_Name{name}
