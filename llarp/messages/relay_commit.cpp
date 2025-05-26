@@ -138,6 +138,8 @@ namespace llarp
     if (!BEncodeMaybeVerifyVersion(
             "v", version, llarp::constants::proto_version, read, *key, buffer))
       return false;
+    if(static_cast<char>(*key->cur) == 'w')
+      return bencode_discard(buffer);
     return read;
   }
 
