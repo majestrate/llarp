@@ -8,6 +8,9 @@
 #include "linux.hpp"
 #endif
 #endif
+#ifdef __APPLE__
+#include "apple.hpp"
+#endif
 
 #include <exception>
 
@@ -31,6 +34,9 @@ namespace llarp::vpn
     plat = std::make_shared<vpn::LinuxPlatform>();
 #endif
 #endif
+#ifdef __APPLE__
+    plat = std::make_shared<vpn::ApplePlatform>();
+ #endif
     return plat;
   }
 
