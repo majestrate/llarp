@@ -34,7 +34,7 @@ namespace llarp::vpn
 {
   class AppleInterface : public NetworkInterface
   {
-    const int m_FD;
+    const int m_fd;
     const InterfaceInfo m_Info;
     std::string m_IfName;
 
@@ -47,17 +47,17 @@ namespace llarp::vpn
 
    public:
     AppleInterface(InterfaceInfo info)
-        : m_FD{::socket(PF_SYSTEM, SOCK_DGRAM, SYSPROTO_CONTROL)}, m_Info{std::move(info)}
+        : m_fd{::socket(PF_SYSTEM, SOCK_DGRAM, SYSPROTO_CONTROL)}, m_Info{std::move(info)}
     {
-      if (m_FD == -1)
+      if (m_fd == -1)
         throw std::invalid_argument{"cannot open control socket: " + std::string{strerror(errno)}};
 
       ctl_info cinfo{};
       const std::string apple_utun = "com.apple.net.utun_control";
       std::copy_n(apple_utun.c_str(), apple_utun.size(), cinfo.ctl_name);
-      if (::ioctl(m_FD, CTLIOCGINFO, &cinfo) < 0)
+      if (::ioctl(m_fd, CTLIOCGINFO, &cinfo) < 0)
       {
-        ::close(m_FD);
+        ::close(m_fd);
         throw std::runtime_error{"ioctl CTLIOCGINFO call failed: " + std::string{strerror(errno)}};
       }
       sockaddr_ctl addr{};
@@ -68,17 +68,17 @@ namespace llarp::vpn
       addr.ss_sysaddr = AF_SYS_CONTROL;
       addr.sc_unit = 0;
 
-      if (connect(m_FD, (sockaddr*)&addr, sizeof(addr)) < 0)
+      if (connect(m_fd, (sockaddr*)&addr, sizeof(addr)) < 0)
       {
-        ::close(m_FD);
+        ::close(m_fd);
         throw std::runtime_error{
             "cannot connect to control socket address: " + std::string{strerror(errno)}};
       }
       uint32_t namesz = IFNAMSIZ;
       char name[IFNAMSIZ + 1]{};
-      if (getsockopt(m_FD, SYSPROTO_CONTROL, 2, name, &namesz) < 0)
+      if (getsockopt(m_fd, SYSPROTO_CONTROL, 2, name, &namesz) < 0)
       {
-        ::close(m_FD);
+        ::close(m_fd);
         throw std::runtime_error{
             "cannot query for interface name: " + std::string{strerror(errno)}};
       }
@@ -107,7 +107,7 @@ namespace llarp::vpn
 
     ~AppleInterface()
     {
-      ::close(m_FD);
+      ::close(m_fd);
     }
 
     std::string
@@ -119,7 +119,7 @@ namespace llarp::vpn
     int
     PollFD() const override
     {
-      return m_FD;
+      return m_fd;
     }
 
     net::IPPacket
@@ -131,7 +131,7 @@ namespace llarp::vpn
       const struct iovec vecs[2] = {
           {.iov_base = &pktinfo, .iov_len = uintsize},
           {.iov_base = pkt.buf, .iov_len = sizeof(pkt.buf)}};
-      int sz = readv(m_FD, vecs, 2);
+      int sz = readv(m_fd, vecs, 2);
       if (sz >= uintsize)
         pkt.sz = sz - uintsize;
       else if (sz >= 0 || errno == EAGAIN || errno == EWOULDBLOCK)
@@ -151,7 +151,7 @@ namespace llarp::vpn
           {.iov_base = pkt.IsV6() ? &af6 : &af4, .iov_len = sizeof(unsigned int)},
           {.iov_base = pkt.buf, .iov_len = pkt.sz}};
 
-      ssize_t n = writev(m_FD, vecs, 2);
+      ssize_t n = writev(m_fd, vecs, 2);
       if (n >= (int)sizeof(unsigned int))
       {
         n -= sizeof(unsigned int);
