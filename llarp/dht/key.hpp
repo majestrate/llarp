@@ -71,6 +71,4 @@ namespace llarp
       }
     };
   }  // namespace dht
-  template <>
-  constexpr bool IsToStringFormattable<dht::Key_t> = true;
 }  // namespace llarp
