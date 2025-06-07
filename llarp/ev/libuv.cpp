@@ -249,17 +249,9 @@ namespace llarp::uv
       std::shared_ptr<llarp::vpn::NetworkInterface> netif,
       std::function<void(llarp::net::IPPacket)> handler)
   {
-#ifdef __linux__
+
     using event_t = uvw::PollEvent;
     auto handle = m_Impl->resource<uvw::PollHandle>(netif->PollFD());
-#else
-    // we use a uv_prepare_t because it fires before blocking for new io events unconditionally
-    // we want to match what linux does, using a uv_check_t does not suffice as the order of
-    // operations is not what we need.
-    using event_t = uvw::PrepareEvent;
-    auto handle = m_Impl->resource<uvw::PrepareHandle>();
-#endif
-
     if (!handle)
       return false;
 
@@ -278,11 +270,7 @@ namespace llarp::uv
       }
     });
 
-#ifdef __linux__
     handle->start(uvw::PollHandle::Event::READABLE);
-#else
-    handle->start();
-#endif
 
     return true;
   }
