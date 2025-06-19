@@ -2,7 +2,7 @@
 
 #include "platform.hpp"
 #include "common.hpp"
-#include <llarp/util/ioctl.hpp>
+#include <llarp/vpn/ioctl.hpp>
 #include <llarp/util/fd.hpp>
 #include <llarp/util/non_blocking.hpp>
 
@@ -57,10 +57,15 @@ namespace llarp::vpn
       ctl_info cinfo{};
       const std::string apple_utun = "com.apple.net.utun_control";
       std::copy_n(apple_utun.c_str(), apple_utun.size(), cinfo.ctl_name);
-      if (::ioctl(m_FD->fd(), CTLIOCGINFO, &cinfo) < 0)
+
       {
-        m_FD.reset();
-        throw std::runtime_error{"ioctl CTLIOCGINFO call failed: " + std::string{strerror(errno)}};
+        vpn::IOCTL ioc{*m_FD};
+        if (ioc.ioctl(CTLIOCGINFO, &cinfo) < 0)
+        {
+          m_FD.reset();
+          throw std::runtime_error{
+              "ioctl CTLIOCGINFO call failed: " + std::string{strerror(errno)}};
+        }
       }
       sockaddr_ctl addr{};
       addr.sc_id = cinfo.ctl_id;
@@ -70,7 +75,7 @@ namespace llarp::vpn
       addr.ss_sysaddr = AF_SYS_CONTROL;
       addr.sc_unit = 0;
 
-      if (connect(m_FD->fd(), (sockaddr*)&addr, sizeof(addr)) < 0)
+      if (::connect(m_FD->fd(), (sockaddr*)&addr, sizeof(addr)) < 0)
       {
         m_FD.reset();
         throw std::runtime_error{
@@ -78,7 +83,7 @@ namespace llarp::vpn
       }
       uint32_t namesz = IFNAMSIZ;
       std::array<char, IFNAMSIZ + 1> name{};
-      if (getsockopt(m_FD->fd(), SYSPROTO_CONTROL, 2, name.data(), &namesz) < 0)
+      if (::getsockopt(m_FD->fd(), SYSPROTO_CONTROL, 2, name.data(), &namesz) < 0)
       {
         m_FD.reset();
         throw std::runtime_error{

@@ -20,5 +20,6 @@ namespace llarp::vpn
   struct IOCTL : util::IOCTL
   {
     explicit IOCTL(int af) : util::IOCTL{::socket(af, SOCK_DGRAM, IPPROTO_IP)} {};
+    explicit IOCTL(const util::FD& fd) : util::IOCTL{fd} {};
   };
 }  // namespace llarp::vpn
