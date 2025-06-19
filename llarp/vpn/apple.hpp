@@ -80,7 +80,8 @@ namespace llarp::vpn
       std::array<char, IFNAMSIZ + 1> name{};
       if (getsockopt(m_FD->fd(), SYSPROTO_CONTROL, 2, name.data(), &namesz) < 0)
       {
-        m_FD.reset() throw std::runtime_error{
+        m_FD.reset();
+        throw std::runtime_error{
             "cannot query for interface name: " + std::string{strerror(errno)}};
       }
 
@@ -111,8 +112,7 @@ namespace llarp::vpn
       }
     }
 
-    ~AppleInterface() override
-    {}
+    ~AppleInterface() override = default;
 
     int
     PollFD() const override

@@ -21,7 +21,7 @@
 #include <llarp.hpp>
 
 #include <llarp/util/fs.hpp>
-#include <llarp/util/ioctl.hpp
+#include <llarp/util/ioctl.hpp>
 #include <llarp/util/non_blocking.hpp>
 
 namespace llarp::vpn
@@ -446,7 +446,8 @@ namespace llarp::vpn
     std::shared_ptr<NetworkInterface>
     ObtainInterface(InterfaceInfo info, AbstractRouter*) override
     {
-      return std::make_shared<LinuxInterface>(std::move(info));
+      return std::static_pointer_cast<NetworkInterface>(
+          std::make_shared<LinuxInterface>(std::move(info)));
     };
 
     IRouteManager&
