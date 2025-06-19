@@ -136,9 +136,10 @@ namespace llarp::vpn
       {
         pkt._buf.resize(sz - uintsize);  // shrink to actual size
       }
-      else if (sz >= 0 || errno == EAGAIN || errno == EWOULDBLOCK)
+      else if (errno == EAGAIN || errno == EWOULDBLOCK)
       {
         pkt._buf.resize(0);
+        errno = 0;
       }
       else
       {
