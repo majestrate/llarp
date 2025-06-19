@@ -58,6 +58,7 @@ namespace llarp::vpn
     {}
     NetworkInterface(const NetworkInterface&) = delete;
     NetworkInterface(NetworkInterface&&) = delete;
+    ~NetworkInterface() override = default;
 
     const InterfaceInfo&
     Info() const

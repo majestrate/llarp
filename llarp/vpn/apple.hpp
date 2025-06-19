@@ -2,7 +2,9 @@
 
 #include "platform.hpp"
 #include "common.hpp"
-#include "llarp/net/ip_range.hpp"
+#include <llarp/util/ioctl.hpp>
+#include <llarp/util/fd.hpp>
+#include <llarp/util/non_blocking.hpp>
 
 #include <sys/kern_control.h>
 #include <sys/sys_domain.h>
@@ -36,28 +38,28 @@ namespace llarp::vpn
 {
   class AppleInterface : public NetworkInterface
   {
-    const int m_fd;
-    std::string m_IfName;
+    std::unique_ptr<util::FD> m_FD;
 
-    static void
-    Exec(std::string cmd)
+    static int
+    Exec(const std::string& cmd)
     {
-      system(cmd.c_str());
+      return system(cmd.c_str());
     }
 
    public:
     AppleInterface(InterfaceInfo info)
-        : NetworkInterface{std::move(info)}, m_fd{::socket(PF_SYSTEM, SOCK_DGRAM, SYSPROTO_CONTROL)}
+        : NetworkInterface{std::move(info)}
+        , m_FD{std::make_unique<util::FD>(::socket(PF_SYSTEM, SOCK_DGRAM, SYSPROTO_CONTROL))}
     {
-      if (m_fd == -1)
+      if (m_FD->fd() == -1)
         throw std::invalid_argument{"cannot open control socket: " + std::string{strerror(errno)}};
 
       ctl_info cinfo{};
       const std::string apple_utun = "com.apple.net.utun_control";
       std::copy_n(apple_utun.c_str(), apple_utun.size(), cinfo.ctl_name);
-      if (::ioctl(m_fd, CTLIOCGINFO, &cinfo) < 0)
+      if (::ioctl(m_FD->fd(), CTLIOCGINFO, &cinfo) < 0)
       {
-        ::close(m_fd);
+        m_FD.reset();
         throw std::runtime_error{"ioctl CTLIOCGINFO call failed: " + std::string{strerror(errno)}};
       }
       sockaddr_ctl addr{};
@@ -68,20 +70,24 @@ namespace llarp::vpn
       addr.ss_sysaddr = AF_SYS_CONTROL;
       addr.sc_unit = 0;
 
-      if (connect(m_fd, (sockaddr*)&addr, sizeof(addr)) < 0)
+      if (connect(m_FD->fd(), (sockaddr*)&addr, sizeof(addr)) < 0)
       {
-        ::close(m_fd);
+        m_FD.reset();
         throw std::runtime_error{
             "cannot connect to control socket address: " + std::string{strerror(errno)}};
       }
       uint32_t namesz = IFNAMSIZ;
-      char name[IFNAMSIZ + 1]{};
-      if (getsockopt(m_fd, SYSPROTO_CONTROL, 2, name, &namesz) < 0)
+      std::array<char, IFNAMSIZ + 1> name{};
+      if (getsockopt(m_FD->fd(), SYSPROTO_CONTROL, 2, name.data(), &namesz) < 0)
       {
-        ::close(m_fd);
-        throw std::runtime_error{
+        m_FD.reset() throw std::runtime_error{
             "cannot query for interface name: " + std::string{strerror(errno)}};
       }
+
+      // make underlying file descriptor non blocking
+      llarp::util::NonBlocking{*m_FD};
+
+      auto& m_IfName = m_Info.ifname;
       m_IfName = name;
       for (const auto& ifaddr : m_Info.addrs)
       {
@@ -105,65 +111,64 @@ namespace llarp::vpn
       }
     }
 
-    ~AppleInterface()
-    {
-      ::close(m_fd);
-    }
+    ~AppleInterface() override
+    {}
 
     int
     PollFD() const override
     {
-      return m_fd;
+      return m_FD->fd();
     }
 
-  net::IPPacket ReadNextPacket() override
-  {
-    constexpr int uintsize = sizeof(unsigned int);
-    net::IPPacket pkt;
+    net::IPPacket
+    ReadNextPacket() override
+    {
+      constexpr int uintsize = sizeof(unsigned int);
+      net::IPPacket pkt;
 
-    // Prepare storage for header + max-size packet.
-    pkt._buf.resize(net::IPPacket::MaxSize); // _buf is a std::vector<byte_t>
-    unsigned int pktinfo = 0;
-    struct iovec vecs[2] = {
-        { .iov_base = &pktinfo, .iov_len = uintsize },
-        { .iov_base = pkt._buf.data(), .iov_len = pkt._buf.size() }
-    };
-    int sz = readv(m_fd, vecs, 2);
-    if (sz >= uintsize)
-    {
-        pkt._buf.resize(sz - uintsize); // shrink to actual size
-    }
-    else if (sz >= 0 || errno == EAGAIN || errno == EWOULDBLOCK)
-    {
+      // Prepare storage for header + max-size packet.
+      pkt._buf.resize(net::IPPacket::MaxSize);  // _buf is a std::vector<byte_t>
+      unsigned int pktinfo = 0;
+      std::array<iovec, 2> vecs = {
+          {.iov_base = &pktinfo, .iov_len = uintsize},
+          {.iov_base = pkt._buf.data(), .iov_len = pkt._buf.size()}};
+      int sz = ::readv(m_FD->fd(), vecs.data(), vecs.size());
+      if (sz >= uintsize)
+      {
+        pkt._buf.resize(sz - uintsize);  // shrink to actual size
+      }
+      else if (sz >= 0 || errno == EAGAIN || errno == EWOULDBLOCK)
+      {
         pkt._buf.resize(0);
-    }
-    else
-    {
+      }
+      else
+      {
         throw std::error_code{errno, std::system_category()};
+      }
+      return pkt;
     }
-    return pkt;
-  }
 
-  bool WritePacket(net::IPPacket pkt) override
-  {
-    static unsigned int af4 = htonl(AF_INET);
-    static unsigned int af6 = htonl(AF_INET6);
-    const void* af_ptr = pkt.IsV6() ? static_cast<const void*>(&af6) : static_cast<const void*>(&af4);
-    size_t af_len = sizeof(unsigned int);
-
-    struct iovec vecs[2] = {
-        { .iov_base = const_cast<void*>(af_ptr), .iov_len = af_len },
-        { .iov_base = const_cast<byte_t*>(pkt.data()), .iov_len = pkt.size() }
-    };
-    ssize_t n = writev(m_fd, vecs, 2);
-    if (n >= static_cast<ssize_t>(af_len))
+    bool
+    WritePacket(net::IPPacket pkt) override
     {
+      static unsigned int af4 = htonl(AF_INET);
+      static unsigned int af6 = htonl(AF_INET6);
+      const void* af_ptr =
+          pkt.IsV6() ? static_cast<const void*>(&af6) : static_cast<const void*>(&af4);
+      size_t af_len = sizeof(unsigned int);
+
+      std::array<iovec, 2> vecs = {
+          {.iov_base = const_cast<void*>(af_ptr), .iov_len = af_len},
+          {.iov_base = const_cast<byte_t*>(pkt.data()), .iov_len = pkt.size()}};
+      ssize_t n = ::writev(m_FD->fd(), vecs.data(), vecs.size());
+      if (n >= static_cast<ssize_t>(af_len))
+      {
         n -= af_len;
         return static_cast<size_t>(n) == pkt.size();
+      }
+      return false;
     }
-    return false;
-  }
-};
+  };
 
   class AppleRouteManager : public IRouteManager
   {
@@ -172,24 +177,29 @@ namespace llarp::vpn
     ~AppleRouteManager() override = default;
 
     // Add a route to a specific IP via a gateway
-    void AddRoute(net::ipaddr_t ip, net::ipaddr_t gateway) override
+    void
+    AddRoute(net::ipaddr_t ip, net::ipaddr_t gateway) override
     {
-      std::string cmd = "/sbin/route add -host " + llarp::net::ToString(ip) + " " + llarp::net::ToString(gateway);
+      std::string cmd =
+          "/sbin/route add -host " + llarp::net::ToString(ip) + " " + llarp::net::ToString(gateway);
       int ret = std::system(cmd.c_str());
       if (ret != 0)
         throw std::runtime_error("AddRoute failed: " + cmd);
     }
 
-    void DelRoute(net::ipaddr_t ip, net::ipaddr_t gateway) override
+    void
+    DelRoute(net::ipaddr_t ip, net::ipaddr_t gateway) override
     {
-      std::string cmd = "/sbin/route delete -host " + llarp::net::ToString(ip) + " " + llarp::net::ToString(gateway);
+      std::string cmd = "/sbin/route delete -host " + llarp::net::ToString(ip) + " "
+          + llarp::net::ToString(gateway);
       int ret = std::system(cmd.c_str());
       if (ret != 0)
         throw std::runtime_error("DelRoute failed: " + cmd);
     }
 
     // Add a default route via the VPN interface's first IPv4 address
-    void AddDefaultRouteViaInterface(NetworkInterface& vpn) override
+    void
+    AddDefaultRouteViaInterface(NetworkInterface& vpn) override
     {
       const auto& info = vpn.Info();
       if (info.addrs.empty())
@@ -202,7 +212,8 @@ namespace llarp::vpn
         throw std::runtime_error("AddDefaultRouteViaInterface failed: " + cmd);
     }
 
-    void DelDefaultRouteViaInterface(NetworkInterface& vpn) override
+    void
+    DelDefaultRouteViaInterface(NetworkInterface& vpn) override
     {
       const auto& info = vpn.Info();
       if (info.addrs.empty())
@@ -216,31 +227,29 @@ namespace llarp::vpn
     }
 
     // Add a route for a subnet via the VPN interface
-    void AddRouteViaInterface(NetworkInterface& vpn, IPRange range) override
+    void
+    AddRouteViaInterface(NetworkInterface& vpn, IPRange range) override
     {
-      std::string cmd = "/sbin/route add -net " + range.addr.ToString() +
-                        " -netmask " + range.NetmaskString() +
-                        " -interface " + vpn.Info().ifname;
+      std::string cmd = "/sbin/route add -net " + range.addr.ToString() + " -netmask "
+          + range.NetmaskString() + " -interface " + vpn.Info().ifname;
       int ret = std::system(cmd.c_str());
       if (ret != 0)
         throw std::runtime_error("AddRouteViaInterface failed: " + cmd);
     }
 
-    void DelRouteViaInterface(NetworkInterface& vpn, IPRange range) override
+    void
+    DelRouteViaInterface(NetworkInterface& vpn, IPRange range) override
     {
-      std::string cmd = "/sbin/route delete -net " + range.addr.ToString() +
-                        " -netmask " + range.NetmaskString() +
-                        " -interface " + vpn.Info().ifname;
+      std::string cmd = "/sbin/route delete -net " + range.addr.ToString() + " -netmask "
+          + range.NetmaskString() + " -interface " + vpn.Info().ifname;
       int ret = std::system(cmd.c_str());
       if (ret != 0)
         throw std::runtime_error("DelRouteViaInterface failed: " + cmd);
     }
 
-    std::vector<net::ipaddr_t> GetGatewaysNotOnInterface(NetworkInterface&) override
-    {
-      // Not implemented: could parse "netstat -rn" output if needed
-      return {};
-    }
+    std::vector<net::ipaddr_t>
+    GetGatewaysNotOnInterface(NetworkInterface& vpn) override
+    {}
   };
 
   class ApplePlatform : public Platform
@@ -251,7 +260,8 @@ namespace llarp::vpn
     std::shared_ptr<NetworkInterface>
     ObtainInterface(InterfaceInfo info, AbstractRouter*) override
     {
-      return std::make_shared<AppleInterface>(std::move(info));
+      return std::static_pointer_cast<NetworkInterface>(
+          std::make_shared<AppleInterface>(std::move(info)));
     };
 
     IRouteManager&
