@@ -54,18 +54,12 @@ namespace llarp::vpn
       if (m_FD->fd() == -1)
         throw std::invalid_argument{"cannot open control socket: " + std::string{strerror(errno)}};
 
-      ctl_info cinfo{};
-      const std::string apple_utun = "com.apple.net.utun_control";
-      std::copy_n(apple_utun.c_str(), apple_utun.size(), cinfo.ctl_name);
-
       {
+        ctl_info cinfo{};
+        const std::string apple_utun = "com.apple.net.utun_control";
+        std::copy_n(apple_utun.c_str(), apple_utun.size(), cinfo.ctl_name);
         vpn::IOCTL ioc{*m_FD};
-        if (ioc.ioctl(CTLIOCGINFO, &cinfo) < 0)
-        {
-          m_FD.reset();
-          throw std::runtime_error{
-              "ioctl CTLIOCGINFO call failed: " + std::string{strerror(errno)}};
-        }
+        ioc.ioctl(CTLIOCGINFO, &cinfo);
       }
       sockaddr_ctl addr{};
       addr.sc_id = cinfo.ctl_id;
