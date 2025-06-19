@@ -1,5 +1,6 @@
 
 #include "platform.hpp"
+#include <stdexcept>
 
 #ifdef __linux__
 #ifdef ANDROID
@@ -36,7 +37,9 @@ namespace llarp::vpn
 #endif
 #ifdef __APPLE__
     plat = std::make_shared<vpn::ApplePlatform>();
- #endif
+#endif
+    if (not plat)
+      throw std::runtime_error{"no vpn platform supported on your platform"};
     return plat;
   }
 

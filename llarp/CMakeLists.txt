@@ -12,11 +12,14 @@ add_library(lokinet-util
   ${CMAKE_CURRENT_BINARY_DIR}/constants/version.cpp
   util/bencode.cpp
   util/buffer.cpp
+  util/fd.cpp
   util/file.cpp
   util/logging.cpp
   util/logging/buffer.cpp
   util/easter_eggs.cpp
+  util/ioctl.cpp
   util/mem.cpp
+  util/non_blocking.cpp
   util/str.cpp
   util/thread/queue_manager.cpp
   util/thread/threading.cpp

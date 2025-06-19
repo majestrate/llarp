@@ -333,6 +333,7 @@ namespace llarp
         "strict-connect",
         ClientOnly,
         MultiValue,
+        Env{"LLARP_STRICT_CONNECT", get_env},
         [this](std::string value) {
           RouterID router;
           if (not router.FromString(value))
@@ -344,7 +345,8 @@ namespace llarp
             "Public keys of routers which will act as pinned first-hops. This may be used to",
             "provide a trusted router (consider that you are not fully anonymous with your",
             "first hop).  This REQUIRES two or more nodes to be specified.",
-        });
+            "",
+            "env-var: LLARP_STRICT_CONNECT"});
 
     conf.defineOption<std::string>(
         "network",
@@ -384,9 +386,11 @@ namespace llarp
         "auth-whitelist",
         ClientOnly,
         MultiValue,
+        Env{"LLARP_AUTH_WHITELIST_ADDRS", get_env},
         Comment{
             "manually add a remote endpoint by .loki address to the access whitelist",
-        },
+            "",
+            "env-var: LLARP_AUTH_WHITELIST_ADDRS"},
         [this](std::string arg) {
           service::Address addr;
           if (not addr.FromString(arg))
@@ -399,10 +403,12 @@ namespace llarp
         "auth-file",
         ClientOnly,
         MultiValue,
+        Env{"LLARP_AUTH_FILES", get_env},
         Comment{
             "Read auth tokens from file to accept endpoint auth",
             "Can be provided multiple times",
-        },
+            "",
+            "env-var: LLARP_AUTH_FILES"},
         [this](fs::path arg) {
           if (not fs::exists(arg))
             throw std::invalid_argument{
@@ -413,10 +419,12 @@ namespace llarp
         "network",
         "auth-file-type",
         ClientOnly,
+        Env{"LLARP_AUTH_TYPE", get_env},
         Comment{
             "How to interpret the contents of an auth file.",
             "Possible values: hashes, plaintext",
-        },
+            "",
+            "env-var: LLARP_AUTH_TYPE"},
         [this](std::string arg) { m_AuthFileType = service::ParseAuthFileType(std::move(arg)); });
 
     conf.defineOption<std::string>(
@@ -424,10 +432,12 @@ namespace llarp
         "auth-static",
         ClientOnly,
         MultiValue,
+        Env{"LLARP_AUTH_TOKENS", get_env},
         Comment{
             "Manually add a static auth code to accept for endpoint auth",
             "Can be provided multiple times",
-        },
+            "",
+            "env-var: LLARP_AUTH_TOKENS"},
         [this](std::string arg) { m_AuthStaticTokens.emplace(std::move(arg)); });
 
     conf.defineOption<bool>(
@@ -435,18 +445,19 @@ namespace llarp
         "reachable",
         ClientOnly,
         ReachableDefault,
+        Env{"LLARP_PUBLISH_INTROSET", get_env},
         AssignmentAcceptor(m_reachable),
         Comment{
-            "Determines whether we will pubish our snapp's introset to the DHT.",
-        });
+            "Determines whether we will pubish our introset to the DHT.",
+            "",
+            "env-var: LLARP_PUBLISH_INTROSET"});
 
     conf.defineOption<int>(
         "network",
         "hops",
         HopsDefault,
-        Comment{
-            "Number of hops in a path. Min 1, max 8.",
-        },
+        Env{"LLARP_PATH_LEN", get_env},
+        Comment{"Number of hops in a path. Min 1, max 8.", "", "env-var: LLARP_PATH_LEN"},
         [this](int arg) {
           if (arg < 1 or arg > 8)
             throw std::invalid_argument("[endpoint]:hops must be >= 1 and <= 8");
@@ -458,9 +469,8 @@ namespace llarp
         "paths",
         ClientOnly,
         PathsDefault,
-        Comment{
-            "Number of paths to maintain at any given time.",
-        },
+        Env{"LLARP_PATH_COUNT", get_env},
+        Comment{"Number of paths to maintain at any given time.", "", "env-var: LLARP_PATH_COUNT"},
         [this](int arg) {
           if (arg < 3 or arg > 8)
             throw std::invalid_argument("[endpoint]:paths must be >= 3 and <= 8");
@@ -472,19 +482,26 @@ namespace llarp
         "exit",
         ClientOnly,
         Default{false},
+        Env{"LLARP_BECOME_EXIT_NODE", get_env},
         AssignmentAcceptor(m_AllowExit),
         Comment{
             "Whether or not we should act as an exit node. Beware that this increases demand",
             "on the server and may pose liability concerns. Enable at your own risk.",
+            "",
+            "env-var: LLARP_BECOME_EXIT_NODE",
         });
 
     conf.defineOption<std::string>(
         "network",
         "owned-range",
         MultiValue,
+        ClientOnly,
+        Env{"LLARP_OWNED_RANGES", get_env},
         Comment{
             "When in exit mode announce we allow a private range in our introset.  For example:",
             "    owned-range=10.0.0.0/24",
+            "",
+            "env-var: LLARP_OWNED_RANGES",
         },
         [this](std::string arg) {
           IPRange range;
@@ -497,6 +514,7 @@ namespace llarp
         "network",
         "traffic-whitelist",
         MultiValue,
+        Env{"LLARP_TRAFFIC_WHITELIST", get_env},
         Comment{
             "Adds an IP traffic type whitelist; can be specified multiple times.  If any are",
             "specified then only matched traffic will be allowed and all other traffic will be",
@@ -509,7 +527,8 @@ namespace llarp
             "would allow UDP port 53; and",
             "    traffic-whitelist=tcp/smtp",
             "would allow TCP traffic on the standard smtp port (21).",
-        },
+            "",
+            "env-var: LLARP_TRAFFIC_WHITELIST"},
         [this](std::string arg) {
           if (not m_TrafficPolicy)
             m_TrafficPolicy = net::TrafficPolicy{};
@@ -523,6 +542,7 @@ namespace llarp
         "exit-node",
         ClientOnly,
         MultiValue,
+        Env{"LLARP_USE_EXITS", get_env},
         Comment{
             "Specify a `.loki` address and an optional ip range to use as an exit broker.",
             "Examples:",
@@ -531,7 +551,8 @@ namespace llarp
             "    exit-node=stuff.loki:100.0.0.0/24",
             "would map the IP range 100.0.0.0/24 through stuff.loki.",
             "This option can be specified multiple times (to map different IP ranges).",
-        },
+            "",
+            "env-var: LLARP_USE_EXITS"},
         [this](std::string arg) {
           if (arg.empty())
             return;
@@ -569,13 +590,15 @@ namespace llarp
         "exit-auth",
         ClientOnly,
         MultiValue,
+        Env{"LLARP_EXIT_AUTHS", get_env},
         Comment{
             "Specify an optional authentication code required to use a non-public exit node.",
             "For example:",
             "    exit-auth=myfavouriteexit.loki:abc",
             "uses the authentication code `abc` whenever myfavouriteexit.loki is accessed.",
             "Can be specified multiple times to store codes for different exit nodes.",
-        },
+            "",
+            "env-var: LLARP_EXIT_AUTHS"},
         [this](std::string arg) {
           if (arg.empty())
             return;
@@ -631,20 +654,24 @@ namespace llarp
     conf.defineOption<std::string>(
         "network",
         "ifname",
+        Env{"LLARP_IFNAME", get_env},
         Comment{
             "Interface name for lokinet traffic. If unset lokinet will look for a free name",
             "matching 'lokitunN', starting at N=0 (e.g. lokitun0, lokitun1, ...).",
-        },
+            "",
+            "env-var: LLARP_IFNAME"},
         AssignmentAcceptor(m_ifname));
 
     conf.defineOption<std::string>(
         "network",
         "ifaddr",
+        Env{"LLARP_IFADDR", get_env},
         Comment{
             "Local IP and range for lokinet traffic. For example, 172.16.0.1/16 to use",
             "172.16.0.1 for this machine and 172.16.x.y for remote peers. If omitted then",
             "lokinet will attempt to find an unused private range.",
-        },
+            "",
+            "env-var: LLARP_IFADDR"},
         [this](std::string arg) {
           if (not m_ifaddr.FromString(arg))
           {
@@ -685,12 +712,14 @@ namespace llarp
         "mapaddr",
         ClientOnly,
         MultiValue,
+        Env{"LLARP_MAP_ADDRS", get_env},
         Comment{
             "Map a remote `.loki` address to always use a fixed local IP. For example:",
             "    mapaddr=whatever.loki:172.16.0.10",
             "maps `whatever.loki` to `172.16.0.10` instead of using the next available IP.",
             "The given IP address must be inside the range configured by ifaddr=",
-        },
+            "",
+            "env-var: LLARP_MAP_ADDRS"},
         [this](std::string arg) {
           if (arg.empty())
             return;
@@ -730,10 +759,12 @@ namespace llarp
         "blacklist-snode",
         ClientOnly,
         MultiValue,
+        Env{"LLARP_SNODE_BLACKLIST", get_env},
         Comment{
             "Adds a lokinet relay `.snode` address to the list of relays to avoid when",
             "building paths. Can be specified multiple times.",
-        },
+            "",
+            "env-var: LLARP_SNODE_BLACKLIST"},
         [this](std::string arg) {
           RouterID id;
           if (not id.FromString(arg))
@@ -750,15 +781,14 @@ namespace llarp
         "srv",
         ClientOnly,
         MultiValue,
+        Env{"LLARP_DNS_SRV_RECORDS", get_env},
         Comment{
             "Specify SRV Records for services hosted on the SNApp for protocols that use SRV",
             "records for service discovery. Each line specifies a single SRV record as:",
             "    srv=_service._protocol priority weight port target.loki",
             "and can be specified multiple times as needed.",
-            "For more info see",
-            "https://docs.oxen.io/products-built-on-oxen/lokinet/snapps/hosting-snapps",
-            "and general description of DNS SRV record configuration.",
-        },
+            "",
+            "env-var: LLARP_DNS_SRV_RECORDS"},
         [this](std::string arg) {
           llarp::dns::SRVData newSRV;
           if (not newSRV.fromString(arg))
@@ -832,10 +862,12 @@ namespace llarp
         "dns",
         "upstream",
         MultiValue,
+        Env{"LLARP_DNS_UPSTREAMS", get_env},
         Comment{
             "Upstream resolver(s) to use as fallback for non-loki addresses.",
             "Multiple values accepted.",
-        },
+            "",
+            "env-var: LLARP_DNS_UPSTREAMS"},
         [this, first = true](std::string arg) mutable {
           if (first)
           {
@@ -854,8 +886,12 @@ namespace llarp
         "dns",
         "l3-intercept",
         Default{platform::is_android},
-        Comment{"Intercept all dns traffic (udp/53) going into our lokinet network interface "
-                "instead of binding a local udp socket"},
+        Env{"LLARP_DNS_L3_INTERCEPT", get_env},
+        Comment{
+            "Intercept all dns traffic (udp/53) going into our lokinet network interface "
+            "instead of binding a local udp socket",
+            "",
+            "env-var: LLARP_DNS_L3_INTERCEPT"},
         AssignmentAcceptor(m_raw_dns));
 
     conf.defineOption<std::string>(
@@ -872,9 +908,9 @@ namespace llarp
         "bind",
         DefaultDNSBind,
         MultiValue,
+        Env{"LLARP_DNS_BIND_ADDR", get_env},
         Comment{
-            "Address to bind to for handling DNS requests.",
-        },
+            "Address to bind to for handling DNS requests.", "", "env-var: LLARP_DNS_BIND_ADDR"},
         [this](std::string arg) {
           SockAddr addr{arg};
           // set dns port if no explicit port specified
@@ -888,7 +924,12 @@ namespace llarp
         "dns",
         "add-hosts",
         ClientOnly,
-        Comment{"Add a hosts file to the dns resolver", "For use with client side dns filtering"},
+        Env{"LLARP_DNS_HOSTS_FILE", get_env},
+        Comment{
+            "Add a hosts file to the dns resolver",
+            "For use with client side dns filtering",
+            "",
+            "env-var: LLARP_DNS_HOSTS_FILE"},
         [this](fs::path path) {
           if (path.empty())
             return;
@@ -936,12 +977,14 @@ namespace llarp
     conf.defineOption<std::string>(
         "bind",
         "public-ip",
+        Env{"LLARP_PUBLIC_IP", get_env},
         RelayOnly,
         Comment{
             "The IP address to advertise to the network instead of the incoming= or auto-detected",
             "IP.  This is typically required only when incoming= is used to listen on an internal",
             "private range IP address that received traffic forwarded from the public IP.",
-        },
+            "",
+            "env-var: LLARP_PUBLIC_IP"},
         [this](std::string_view arg) {
           SockAddr pubaddr{arg};
           PublicAddress = pubaddr.getIP();
@@ -949,12 +992,14 @@ namespace llarp
     conf.defineOption<uint16_t>(
         "bind",
         "public-port",
+        Env{"LLARP_PUBLIC_PORT", get_env},
         RelayOnly,
         Comment{
             "The port to advertise to the network instead of the incoming= (or default) port.",
             "This is typically required only when incoming= is used to listen on an internal",
             "private range IP address/port that received traffic forwarded from the public IP.",
-        },
+            "",
+            "env-var: LLARP_PUBLIC_PORT"},
         [this](uint16_t arg) { PublicPort = net::port_t::from_host(arg); });
 
     auto parse_addr_for_link = [net_ptr](
@@ -998,6 +1043,7 @@ namespace llarp
         "inbound",
         RelayOnly,
         MultiValue,
+        Env{"LLARP_BIND_UDP_INBOUND", get_env},
         Comment{
             "IP and/or port to listen on for incoming connections.",
             "",
@@ -1013,7 +1059,8 @@ namespace llarp
             "Using a private range IP address (like the second example entry) will require using",
             "the public-ip= and public-port= to specify the public IP address at which this",
             "router can be reached.",
-        },
+            "",
+            "env-var: LLARP_BIND_UDP_INBOUND"},
         [this, parse_addr_for_link](const std::string& arg) {
           auto default_port = net::port_t::from_host(DefaultInboundPort.val);
           if (auto addr = parse_addr_for_link(arg, default_port, /*inbound=*/true))
@@ -1024,6 +1071,7 @@ namespace llarp
         "bind",
         "outbound",
         MultiValue,
+        Env{"LLARP_BIND_UDP_OUTBOUND", get_env},
         params.isRelay ? Comment{
             "IP and/or port to use for outbound socket connections to other lokinet routers.",
             "",
@@ -1041,6 +1089,8 @@ namespace llarp
             "",
             "The second example binds on the default incoming IP using port 9000; the third",
             "example binds on the given IP address using a random high port.",
+              "",
+              "env-var: LLARP_BIND_UDP_OUTBOUND"
         } : Comment{
             "IP and/or port to use for outbound socket connections to lokinet routers.",
             "",
@@ -1055,6 +1105,8 @@ namespace llarp
             "",
             "The second example binds on the wildcard address using port 9000; the third example",
             "binds on the given IP address using a random high port.",
+              "",
+              "env-var: LLARP_BIND_UDP_OUTBOUND"
         },
         [this, net_ptr, parse_addr_for_link](const std::string& arg) {
           auto default_port = net::port_t::from_host(DefaultOutboundPort.val);
@@ -1142,9 +1194,7 @@ namespace llarp
         "enabled",
         Default{not params.isRelay},
         AssignmentAcceptor(m_enableRPCServer),
-        Comment{
-            "Determines whether or not the LMQ JSON API is enabled. Defaults ",
-        });
+        Deprecated);
 
     conf.defineOption<std::string>(
         "api",
@@ -1163,10 +1213,7 @@ namespace llarp
           }
           m_rpcBindAddresses.emplace_back(arg);
         },
-        Comment{
-            "IP addresses and ports to bind to.",
-            "Recommend localhost-only for security purposes.",
-        });
+        Deprecated);
 
     conf.defineOption<std::string>("api", "authkey", Deprecated);
 
@@ -1183,17 +1230,25 @@ namespace llarp
         "bootstrap",
         "seed-node",
         Default{false},
-        Comment{"Whether or not to run as a seed node. We will not have any bootstrap routers "
-                "configured."},
+        Env{"LLARP_SEED_NODE", get_env},
+        Comment{
+            "Whether or not to run as a seed node. We will not have any bootstrap routers "
+            "configured.",
+            "",
+            "env-var: LLARP_SEED_NODE",
+        },
         AssignmentAcceptor(seednode));
 
     conf.defineOption<std::string>(
         "bootstrap",
         "add-node",
         MultiValue,
+        Env{"LLARP_BOOTSTRAP_FILEPATHS", get_env},
         Comment{
             "Specify a bootstrap file containing a list of signed RouterContacts of service nodes",
             "which can act as a bootstrap. Can be specified multiple times.",
+            "",
+            "env-var: LLARP_BOOSTRAP_FILEPATHS",
         },
         [this](std::string arg) {
           if (arg.empty())
@@ -1223,6 +1278,7 @@ namespace llarp
         "logging",
         "level",
         DefaultLogLevel,
+        Env{"LLARP_LOG_LEVEL", get_env},
         [this](std::string arg) { m_logLevel = log::level_from_string(arg); },
         Comment{
             "Minimum log level to print. Logging below this level will be ignored.",
@@ -1234,6 +1290,8 @@ namespace llarp
             "  error",
             "  critical",
             "  none",
+            "",
+            "env-var: LLARP_LOG_LEVEL",
         });
 
     conf.defineOption<std::string>(
@@ -1354,7 +1412,7 @@ namespace llarp
           if (not parser.LoadFile(overrideFile))
             throw std::runtime_error{"cannot load '" + overrideFile.string() + "'"};
 
-          parser.IterAll([&](std::string_view section, const SectionValues_t& values) {
+          parser.IterAll([&conf](std::string_view section, const SectionValues_t& values) {
             for (const auto& pair : values)
             {
               conf.addConfigValue(section, pair.first, pair.second);
@@ -1397,7 +1455,7 @@ namespace llarp
     if (not m_Parser.LoadFromStr(ini))
       return false;
 
-    m_Parser.IterAll([&](std::string_view section, const SectionValues_t& values) {
+    m_Parser.IterAll([&conf](std::string_view section, const SectionValues_t& values) {
       for (const auto& pair : values)
       {
         conf.addConfigValue(section, pair.first, pair.second);
@@ -1463,9 +1521,7 @@ namespace llarp
     conf.defineOption<std::string>("system", "user", Deprecated);
     conf.defineOption<std::string>("system", "group", Deprecated);
     conf.defineOption<std::string>("system", "pidfile", Deprecated);
-
     conf.defineOption<std::string>("netdb", "dir", Deprecated);
-
     conf.defineOption<std::string>("metrics", "json-metrics-path", Deprecated);
   }
 
@@ -1529,13 +1585,6 @@ namespace llarp
         "logging",
         {
             "logging settings",
-        });
-
-    // api
-    def.addSectionComments(
-        "api",
-        {
-            "JSON API settings",
         });
 
     // dns
