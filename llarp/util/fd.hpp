@@ -8,6 +8,9 @@ namespace llarp::util
   {
     explicit FD(int fd);
 
+    FD(const FD&) = delete;
+    FD(FD&&) = delete;
+
     ~FD();
 
     inline explicit operator int() const

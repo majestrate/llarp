@@ -20,6 +20,9 @@ namespace llarp::util
   {
     explicit IOCTL(const FD& fd);
 
+    IOCTL(const IOCTL&) = delete;
+    IOCTL(IOCTL&&) = delete;
+
     template <typename Command, typename... Args>
     void
     ioctl(Command cmd, Args&&... args)
