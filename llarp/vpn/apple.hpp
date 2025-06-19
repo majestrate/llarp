@@ -88,7 +88,7 @@ namespace llarp::vpn
       llarp::util::NonBlocking{*m_FD};
 
       auto& m_IfName = m_Info.ifname;
-      m_IfName = name;
+      m_IfName = name.data();
       for (const auto& ifaddr : m_Info.addrs)
       {
         if (ifaddr.fam == AF_INET)
