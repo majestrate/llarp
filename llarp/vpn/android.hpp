@@ -91,7 +91,8 @@ namespace llarp::vpn
     std::shared_ptr<NetworkInterface>
     ObtainInterface(InterfaceInfo info, AbstractRouter*) override
     {
-      return std::make_shared<AndroidInterface>(std::move(info), fd);
+      return std::static_pointer_cast<NetworkInterface>(
+          std::make_shared<AndroidInterface>(std::move(info), fd));
     }
     IRouteManager&
     RouteManager() override
