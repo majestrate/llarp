@@ -1,11 +1,15 @@
 #include "linklayer.hpp"
+#include <llarp/net/sock_addr.hpp>
 #include "session.hpp"
+#include <cstdint>
 #include <llarp/config/key_manager.hpp>
 #include <memory>
 #include <unordered_set>
 
 namespace llarp::iwp
 {
+  static auto logcat = log::Cat("iwp");
+
   LinkLayer::LinkLayer(
       std::shared_ptr<KeyManager> keyManager,
       std::shared_ptr<EventLoop> ev,
@@ -23,8 +27,78 @@ namespace llarp::iwp
       : ILinkLayer(
           keyManager, getrc, h, sign, before, est, reneg, timeout, closed, pumpDone, worker)
       , m_Wakeup{ev->make_waker([this]() { HandleWakeupPlaintext(); })}
+      , m_HashingWakeup{ev->make_waker([this]() {
+        for (auto& session : m_CollectHash)
+          session->TriggerHashGen();
+        m_CollectHash.clear();
+      })}
       , m_Inbound{allowInbound}
-  {}
+  {
+    m_Hasher.start(4, ev->make_waker([this]() { HandleWorkerCompletion(); }));
+  }
+
+  void
+  LinkLayer::HandleWorkerCompletion()
+  {
+    std::unordered_map<SockAddr, std::vector<OutboundMessage>> hashed;
+    std::unordered_map<SockAddr, std::vector<uint64_t>> verified;
+    std::unordered_map<SockAddr, std::vector<uint64_t>> drop;
+    for (const auto& result : m_Hasher.poll_verified())
+    {
+      if (result.result)
+        verified[result.from].emplace_back(result.msgid);
+      else
+        drop[result.from].emplace_back(result.msgid);
+    }
+    for (auto& result : m_Hasher.poll_hashed())
+    {
+      hashed[result.to].emplace_back(std::move(result.msg));
+    }
+
+    for (auto& [addr, msgs] : hashed)
+    {
+      if (auto session = SessionForAddr(addr))
+      {
+        session->RecvHashed(std::move(msgs));
+      }
+    }
+
+    for (const auto& [addr, msgids] : verified)
+    {
+      if (auto session = SessionForAddr(addr))
+      {
+        for (auto msgid : msgids)
+          session->VerifiedMessage(msgid);
+      }
+    }
+
+    for (const auto& [addr, msgids] : drop)
+    {
+      if (auto session = SessionForAddr(addr))
+      {
+        for (auto msgid : msgids)
+          session->DropMessage(msgid);
+      }
+    }
+  }
+
+  std::shared_ptr<Session>
+  LinkLayer::SessionForAddr(const SockAddr& addr) const
+  {
+    if (auto itr = m_AuthedAddrs.find(addr); itr != m_AuthedAddrs.end())
+    {
+      if (auto s_itr = m_AuthedLinks.find(itr->second); s_itr != m_AuthedLinks.end())
+      {
+        return std::dynamic_pointer_cast<Session>(s_itr->second);
+      }
+    }
+    if (auto itr = m_Pending.find(addr); itr != m_Pending.end())
+    {
+      return std::dynamic_pointer_cast<Session>(itr->second);
+    }
+    log::error(logcat, "No session for addr: {}", addr);
+    return nullptr;
+  }
 
   std::string_view
   LinkLayer::Name() const
@@ -45,6 +119,11 @@ namespace llarp::iwp
   LinkLayer::Rank() const
   {
     return 2;
+  }
+
+  LinkLayer::~LinkLayer()
+  {
+    m_Hasher.stop();
   }
 
   void
@@ -97,11 +176,25 @@ namespace llarp::iwp
     m_Wakeup->Trigger();
   }
 
+  size_t
+  LinkLayer::SessionAddrHash::hash(const std::shared_ptr<Session>& s) const
+  {
+    std::hash<SockAddr> h{};
+    return h(s->GetRemoteEndpoint());
+  }
+
+  void
+  LinkLayer::TriggerHashing(std::shared_ptr<Session> s)
+  {
+    m_CollectHash.emplace(s);
+    m_HashingWakeup->Trigger();
+  }
+
   void
   LinkLayer::HandleWakeupPlaintext()
   {
-    // Copy bare pointers out first because HandlePlaintext can end up removing themselves from the
-    // structures.
+    // Copy bare pointers out first because HandlePlaintext can end up removing themselves from
+    // the structures.
     m_WakingUp.clear();  // Reused to minimize allocations.
     for (const auto& [router_id, session] : m_AuthedLinks)
       m_WakingUp.push_back(session.get());

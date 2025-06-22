@@ -242,17 +242,17 @@ namespace llarp
 
     template <typename U>
     void
-    extractEnv(U&& envValue_)
+    extractEnv(U&& envValue)
     {
       if constexpr (config::is_env_v<U>)
       {
-        if (auto maybe = envValue_())
+        if (auto maybe = envValue())
         {
-          // override existing parsed values
-          if (not parsedValues.empty())
-            parsedValues.clear();
-
-          parseValue(std::string{*maybe});
+          for (auto part : split(*maybe, ","))
+          {
+            trim(part);
+            envValues.emplace_back(fromString(std::string{part}));
+          }
         }
       }
     }
@@ -307,6 +307,10 @@ namespace llarp
     std::optional<T>
     getValue() const
     {
+      // prefer env vars.
+      if (not envValues.empty())
+        return envValues.front();
+
       if (parsedValues.empty())
       {
         if (required || defaultValues.empty())
@@ -322,7 +326,9 @@ namespace llarp
     size_t
     getNumberFound() const override
     {
-      return parsedValues.size();
+      if (envValues.empty())
+        return parsedValues.size();
+      return envValues.size();
     }
 
     std::vector<std::string>
@@ -401,7 +407,7 @@ namespace llarp
     void
     tryAccept() const override
     {
-      if (required and parsedValues.empty())
+      if (required and parsedValues.empty() and envValues.empty())
       {
         throw std::runtime_error{fmt::format(
             "cannot call tryAccept() on [{}]:{} when required but no value available",
@@ -413,14 +419,24 @@ namespace llarp
       {
         if (multiValued)
         {
-          // add default value in multi value mode
-          if (parsedValues.empty() and not defaultValues.empty())
-            for (const auto& v : defaultValues)
-              acceptor(v);
-
-          for (auto value : parsedValues)
+          if (envValues.empty())
           {
-            acceptor(value);
+            // add default value in multi value mode
+            if (parsedValues.empty() and not defaultValues.empty())
+              for (const auto& v : defaultValues)
+                acceptor(v);
+
+            for (auto value : parsedValues)
+            {
+              acceptor(value);
+            }
+          }
+          else
+          {
+            for (auto value : envValues)
+            {
+              acceptor(value);
+            }
           }
         }
         else
@@ -434,6 +450,7 @@ namespace llarp
 
     std::vector<T> defaultValues;
     std::vector<T> parsedValues;
+    std::vector<T> envValues;
     std::function<void(T)> acceptor;
   };
 

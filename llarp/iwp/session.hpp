@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <llarp/link/session.hpp>
 #include "linklayer.hpp"
 #include "message_buffer.hpp"
@@ -133,6 +134,18 @@ namespace llarp
       void
       HandlePlaintext() override;
 
+      void
+      VerifiedMessage(uint64_t msgid);
+
+      void
+      DropMessage(uint64_t msgid);
+
+      void
+      TriggerHashGen();
+
+      void
+      RecvHashed(std::vector<OutboundMessage> msgs);
+
      private:
       enum class State
       {
@@ -202,7 +215,24 @@ namespace llarp
 
       std::atomic_flag m_PlaintextEmpty;
       llarp::thread::Queue<CryptoQueue_t> m_PlaintextRecv;
+      std::unordered_set<uint64_t> m_ToHash;
+      std::unordered_set<uint64_t> m_PendingHash;
       std::atomic_flag m_SentClosed;
+      std::thread m_VerifyThread;
+
+      template <typename Iter_t>
+      void
+      maybe_queue_verify(Iter_t itr)
+      {
+        if (itr->second.IsCompleted())
+        {
+          m_PendingHash.emplace(itr->first);
+          m_Parent->hasher()->async_verify_hash(itr->second, m_RemoteAddr);
+        }
+      }
+
+      void
+      HandleGeneratedHash(const OutboundMessage&);
 
       void
       EncryptWorker(CryptoQueue_t msgs);
