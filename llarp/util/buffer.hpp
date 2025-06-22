@@ -233,7 +233,13 @@ namespace llarp
   // convertible to a llarp_buffer_t.
   struct OwnedBuffer
   {
+#ifdef __APPLE__
+    // apple does not implement std::pmr even though they have it in the headers because of course
+    // they don't, why would they?
+    using alloc_t = std::allocator<byte_t>;
+#else
     using alloc_t = std::pmr::polymorphic_allocator<byte_t>;
+#endif
     struct destroyer
     {
       alloc_t& alloc;
@@ -249,11 +255,25 @@ namespace llarp
     bufptr_t buf;
     size_t sz;
 
+#ifdef __APPLE__
+    // Create a new, uninitialized owned buffer of the given size.
+    explicit OwnedBuffer(size_t sz)
+        : _alloc{}, buf{bufptr_t{_alloc.allocate(sz), destroyer{_alloc, sz}}}, sz{sz}
+    {}
+#else
     // Create a new, uninitialized owned buffer of the given size.
     explicit OwnedBuffer(std::pmr::memory_resource* res, size_t sz)
         : _alloc{res}, buf{bufptr_t{_alloc.allocate(sz), destroyer{_alloc, sz}}}, sz{sz}
     {}
+#endif
 
+#ifdef __APPLE__
+    // copy content from existing memory
+    explicit OwnedBuffer(const byte_t* ptr, size_t sz) : OwnedBuffer{res, sz}
+    {
+      std::copy_n(ptr, sz, buf.get());
+    }
+#else
     // copy content from existing memory
     explicit OwnedBuffer(
         const byte_t* ptr,
@@ -263,7 +283,7 @@ namespace llarp
     {
       std::copy_n(ptr, sz, buf.get());
     }
-
+#endif
     OwnedBuffer(const OwnedBuffer&) = delete;
     OwnedBuffer&
     operator=(const OwnedBuffer&) = delete;
