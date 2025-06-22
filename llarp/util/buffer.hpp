@@ -269,7 +269,7 @@ namespace llarp
 
 #ifdef __APPLE__
     // copy content from existing memory
-    explicit OwnedBuffer(const byte_t* ptr, size_t sz) : OwnedBuffer{res, sz}
+    explicit OwnedBuffer(const byte_t* ptr, size_t sz) : OwnedBuffer{sz}
     {
       std::copy_n(ptr, sz, buf.get());
     }
