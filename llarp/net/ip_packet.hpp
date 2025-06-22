@@ -189,6 +189,13 @@ namespace llarp::net
       return buf;
     }
 
+    /// resize underlying buffer.
+    inline void
+    truncate(size_t sz)
+    {
+      _buf.resize(sz);
+    }
+
     inline byte_t*
     data()
     {

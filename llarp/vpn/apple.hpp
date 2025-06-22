@@ -124,22 +124,19 @@ namespace llarp::vpn
     ReadNextPacket() override
     {
       constexpr int uintsize = sizeof(unsigned int);
-      net::IPPacket pkt;
+      net::IPPacket pkt{net::IPPacket::MaxSize};
 
       // Prepare storage for header + max-size packet.
-      pkt._buf.resize(net::IPPacket::MaxSize);  // _buf is a std::vector<byte_t>
       unsigned int pktinfo = 0;
-      std::array<iovec, 2> vecs = {
-          {.iov_base = &pktinfo, .iov_len = uintsize},
-          {.iov_base = pkt._buf.data(), .iov_len = pkt._buf.size()}};
+      std::array<iovec, 2> vecs = {iovec{&pktinfo, uintsize}, iovec{pkt.data(), pkt.size()}};
       int sz = ::readv(m_FD->fd(), vecs.data(), vecs.size());
       if (sz >= uintsize)
       {
-        pkt._buf.resize(sz - uintsize);  // shrink to actual size
+        pkt.truncate(sz - uintsize);  // shrink to actual size
       }
       else if (errno == EAGAIN || errno == EWOULDBLOCK)
       {
-        pkt._buf.resize(0);
+        pkt.truncate(0);
         errno = 0;
       }
       else
@@ -159,8 +156,8 @@ namespace llarp::vpn
       size_t af_len = sizeof(unsigned int);
 
       std::array<iovec, 2> vecs = {
-          {.iov_base = const_cast<void*>(af_ptr), .iov_len = af_len},
-          {.iov_base = const_cast<byte_t*>(pkt.data()), .iov_len = pkt.size()}};
+          iovec{const_cast<void*>(af_ptr), af_len},
+          iovec{const_cast<byte_t*>(pkt.data()), pkt.size()}};
       ssize_t n = ::writev(m_FD->fd(), vecs.data(), vecs.size());
       if (n >= static_cast<ssize_t>(af_len))
       {
