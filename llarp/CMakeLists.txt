@@ -197,6 +197,7 @@ add_library(lokinet-layer-onion
 # layer 2 frames into layer 1 symbols which in the case of iwp are encrypted udp/ip packets
 add_library(lokinet-layer-wire
   STATIC
+  iwp/hasher.cpp
   iwp/iwp.cpp
   iwp/linklayer.cpp
   iwp/message_buffer.cpp

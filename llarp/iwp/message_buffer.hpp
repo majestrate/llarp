@@ -52,6 +52,18 @@ namespace llarp
       llarp_time_t m_StartedAt = 0s;
       uint16_t m_ResendPriority;
 
+      inline size_t
+      size() const
+      {
+        return m_Data.size();
+      }
+
+      inline const byte_t*
+      data() const
+      {
+        return m_Data.data();
+      }
+
       bool
       operator<(const OutboundMessage& other) const
       {
@@ -89,6 +101,7 @@ namespace llarp
     struct InboundMessage
     {
       InboundMessage() = default;
+      InboundMessage(const InboundMessage&) = default;
       InboundMessage(uint64_t msgid, uint16_t sz, ShortHash h, llarp_time_t now);
 
       ILinkSession::Message_t m_Data;
@@ -97,6 +110,12 @@ namespace llarp
       llarp_time_t m_LastACKSent = 0s;
       llarp_time_t m_LastActiveAt = 0s;
       std::bitset<MAX_LINK_MSG_SIZE / FragmentSize> m_Acks;
+
+      inline uint64_t
+      msgid() const
+      {
+        return m_MsgID;
+      }
 
       void
       HandleData(uint16_t idx, const llarp_buffer_t& buf, llarp_time_t now);

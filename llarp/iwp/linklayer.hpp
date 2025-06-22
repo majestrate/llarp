@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <llarp/constants/link_layer.hpp>
 #include <llarp/crypto/crypto.hpp>
 #include <llarp/crypto/encrypted.hpp>
@@ -10,6 +11,8 @@
 #include <memory>
 
 #include <llarp/ev/ev.hpp>
+
+#include "hasher.hpp"
 
 namespace llarp::iwp
 {
@@ -32,6 +35,8 @@ namespace llarp::iwp
         WorkerFunc_t dowork,
         bool permitInbound);
 
+    ~LinkLayer() override;
+
     std::shared_ptr<ILinkSession>
     NewOutboundSession(const RouterContact& rc, const AddressInfo& ai) override;
 
@@ -50,13 +55,44 @@ namespace llarp::iwp
     std::string
     PrintableName() const;
 
+    Hasher*
+    hasher()
+    {
+      return &m_Hasher;
+    }
+
+    void
+    TriggerHashing(std::shared_ptr<Session> s);
+
    private:
     void
     HandleWakeupPlaintext();
 
-    const std::shared_ptr<EventLoopWakeup> m_Wakeup;
+    void
+    HandleWorkerCompletion();
+
+    struct SessionAddrHash
+    {
+      size_t
+      hash(const std::shared_ptr<Session>& s) const;
+
+      size_t
+      operator()(const std::shared_ptr<Session>& s) const
+      {
+        return hash(s);
+      }
+    };
+
+    const std::shared_ptr<EventLoopWakeup> m_Wakeup, m_HashingWakeup;
     std::vector<ILinkSession*> m_WakingUp;
+    std::unordered_set<std::shared_ptr<Session>, SessionAddrHash> m_CollectHash;
+
+    Hasher m_Hasher;
+
     const bool m_Inbound;
+
+    std::shared_ptr<Session>
+    SessionForAddr(const SockAddr& addr) const;
   };
 
   using LinkLayer_ptr = std::shared_ptr<LinkLayer>;
