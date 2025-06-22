@@ -246,8 +246,10 @@ namespace llarp::vpn
     }
 
     std::vector<net::ipaddr_t>
-    GetGatewaysNotOnInterface(NetworkInterface& vpn) override
-    {}
+    GetGatewaysNotOnInterface(NetworkInterface&) override
+    {
+      return {};
+    }
   };
 
   class ApplePlatform : public Platform
