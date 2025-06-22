@@ -2,7 +2,7 @@
 
 #include "platform.hpp"
 #include "common.hpp"
-#include <llarp/vpn/ioctl.hpp>
+#include <llarp/vpn/common.hpp>
 #include <llarp/util/fd.hpp>
 #include <llarp/util/non_blocking.hpp>
 
