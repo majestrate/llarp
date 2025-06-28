@@ -24,11 +24,11 @@
 #include <map>
 
 #ifdef __APPLE__
-  #include <crt_externs.h>
-  #define llarp_environ (*_NSGetEnviron())
+#include <crt_externs.h>
+#define llarp_environ (*_NSGetEnviron())
 #else
-  extern char **environ;
-  #define llarp_environ environ
+extern char** environ;
+#define llarp_environ environ
 #endif
 
 namespace llarp
@@ -1012,8 +1012,7 @@ namespace llarp
         {
           // port only case
           default_port = net::port_t::from_string(arg.substr(1));
-          if (!inbound)
-            addr = net_ptr->WildcardWithPort(default_port);
+          addr = net_ptr->WildcardWithPort(default_port);
         }
         else
         {
