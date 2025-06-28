@@ -34,7 +34,8 @@ namespace llarp::iwp
       })}
       , m_Inbound{allowInbound}
   {
-    m_Hasher.start(4, ev->make_waker([this]() { HandleWorkerCompletion(); }));
+    m_Hasher.start(
+        ev->num_worker_threads(), ev->make_waker([this]() { HandleWorkerCompletion(); }));
   }
 
   void
@@ -62,14 +63,19 @@ namespace llarp::iwp
         session->RecvHashed(std::move(msgs));
       }
     }
-
+    std::unordered_set<std::shared_ptr<Session>, SessionAddrHash> send_flush;
     for (const auto& [addr, msgids] : verified)
     {
       if (auto session = SessionForAddr(addr))
       {
+        send_flush.emplace(session);
         for (auto msgid : msgids)
           session->VerifiedMessage(msgid);
       }
+    }
+    for (const auto& session : send_flush)
+    {
+      session->SendMACK();
     }
 
     for (const auto& [addr, msgids] : drop)

@@ -84,6 +84,13 @@ namespace llarp
 
   }  // namespace
 
+  size_t
+  RouterConfig::num_worker_threads() const
+  {
+    if (m_workerThreads <= 0)
+      return std::thread::hardware_concurrency();
+    return m_workerThreads;
+  }
   void
   RouterConfig::defineConfigOptions(ConfigDefinition& conf, const ConfigGenParameters& params)
   {

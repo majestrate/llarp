@@ -144,6 +144,9 @@ namespace llarp
       TriggerHashGen();
 
       void
+      SendMACK();
+
+      void
       RecvHashed(std::vector<OutboundMessage> msgs);
 
      private:
@@ -257,9 +260,6 @@ namespace llarp
 
       bool
       DecryptMessageInPlace(Packet_t& pkt);
-
-      void
-      SendMACK();
 
       void
       HandleRecvMsgCompleted(const InboundMessage& msg);

@@ -85,6 +85,9 @@ namespace llarp
       return m_dataDir / file;
     }
 
+    size_t
+    num_worker_threads() const;
+
     void
     defineConfigOptions(ConfigDefinition& conf, const ConfigGenParameters& params);
   };

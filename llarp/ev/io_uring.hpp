@@ -100,6 +100,9 @@ namespace llarp::io_uring
 
     void
     queue_slow_work(std::unique_ptr<EventLoopWork> work) override;
+
+    size_t
+    num_worker_threads() const override;
   };
 
 }  // namespace llarp::io_uring

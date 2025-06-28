@@ -184,7 +184,6 @@ namespace llarp
         pktbuf.base = pkt.data() + HMACSIZE;
         pktbuf.sz = pkt.size() - HMACSIZE;
         CryptoManager::instance()->hmac(pkt.data(), pktbuf, m_SessionKey);
-        m_TXRate += pkt.size();
         Send_LL(pkt.data(), pkt.size());
       }
     }
@@ -920,8 +919,7 @@ namespace llarp
       if (m_ReplayFilter.emplace(rxid, m_Parent->Now()).second)
       {
         m_Parent->HandleMessage(this, msg.m_Data);
-        EncryptAndSend(msg.ACKS());
-        log::debug(logcat, "acked message {} from {}", rxid, m_RemoteAddr);
+        m_SendMACKs.emplace(rxid);
       }
       m_RXMsgs.erase(rxid);
     }

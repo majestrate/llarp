@@ -901,4 +901,10 @@ namespace llarp::io_uring
     m_Timers.clear();
     m_Run = false;
   }
+
+  size_t
+  Loop::num_worker_threads() const
+  {
+    return m_WorkerThreads.size();
+  }
 }  // namespace llarp::io_uring

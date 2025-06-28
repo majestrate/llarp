@@ -72,7 +72,7 @@ namespace llarp
     if (!loop)
     {
       auto jobQueueSize = std::max(event_loop_queue_size, config->router.m_JobQueueSize);
-      loop = EventLoop::create(jobQueueSize);
+      loop = EventLoop::create(config->router.num_worker_threads(), jobQueueSize);
     }
 
     crypto = std::make_shared<sodium::CryptoLibSodium>();
