@@ -21,6 +21,7 @@
 #include <cstdlib>
 #include <functional>
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
@@ -77,6 +78,12 @@ namespace llarp
     std::optional<net::ipaddr_t> PublicIP;
     /// deprecated
     std::optional<net::port_t> PublicPort;
+
+    inline fs::path
+    data_dir_file(const fs::path& file) const
+    {
+      return m_dataDir / file;
+    }
 
     void
     defineConfigOptions(ConfigDefinition& conf, const ConfigGenParameters& params);

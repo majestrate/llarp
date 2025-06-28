@@ -89,8 +89,9 @@ namespace llarp
   std::shared_ptr<NodeDB>
   Context::makeNodeDB()
   {
+    fs::path root = config->router.data_dir_file(nodedb_dirname);
     return std::make_shared<NodeDB>(
-        nodedb_dirname, [r = router.get()](auto call) { r->QueueDiskIO(std::move(call)); });
+        root, [r = router.get()](auto call) { r->QueueDiskIO(std::move(call)); });
   }
 
   std::shared_ptr<AbstractRouter>
