@@ -130,7 +130,10 @@ namespace llarp::uv
   }
 
   Loop::Loop(size_t queue_size, size_t worker_threads)
-      : llarp::EventLoop{}, m_LogicCalls{queue_size}, m_DiskCalls{128}, m_WorkCalls{128}
+      : llarp::EventLoop{}
+      , m_LogicCalls{queue_size}
+      , m_DiskCalls{128}
+      , m_WorkCalls{512 * worker_threads}
   {
     if (!(m_Impl = uvw::Loop::create()))
       throw std::runtime_error{"Failed to construct libuv loop"};
