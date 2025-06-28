@@ -1,6 +1,6 @@
 services:
   llarpd-router:
-    image: llarpd:latest
+    image: ghcr.io/majestrate/llarp:latest
     environment:
       LLARP_DATA_DIR: "/data"
       LLARP_PUBLIC_IP: "public.ip.goes.here"
