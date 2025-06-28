@@ -4,6 +4,7 @@ services:
     environment:
       LLARP_DATA_DIR: "/data"
       LLARP_PUBLIC_IP: "public.ip.goes.here"
+      LLARP_PUBLIC_PORT: "1090"
       LLARP_BIND_UDP_INBOUND: ":1090"
     volumes:
       - data:/data
