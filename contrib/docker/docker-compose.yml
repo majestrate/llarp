@@ -1,0 +1,12 @@
+services:
+  llarpd-router:
+    image: llarpd:latest
+    environment:
+      LLARP_DATA_DIR: "/data"
+      LLARP_PUBLIC_IP: "public.ip.goes.here"
+    volumes:
+      - data:/data
+    ports:
+      - "1090:1090/udp"
+volumes:
+  data:
