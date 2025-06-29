@@ -711,6 +711,8 @@ namespace llarp::net
       reply_pkt.icmp_code() = 0;
       auto* hdr = reply_pkt.Header();
       hdr->id++;
+      hdr->ttl--;
+      hdr->frag_offset = 0;
       reply_pkt.UpdateIPv4Address(ToNet(pkt.dstv4()), ToNet(pkt.srcv4()));
       hdr->check = 0;
       hdr->check = ipchksum(pkt.data(), std::min(size_t{hdr->ihl} * 4, pkt.size()));
