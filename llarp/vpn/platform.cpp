@@ -56,6 +56,9 @@ namespace llarp::vpn
     bool
     WritePacket(net::IPPacket _pkt) override
     {
+      // drop invalid packets.
+      if (not(_pkt.IsV4() or _pkt.IsV6()))
+        return false;
       // don't handle anything except icmp.
       if (_pkt.IsV4() and _pkt.protocol() != static_cast<uint8_t>(net::IPProtocol::ICMP))
         return true;
