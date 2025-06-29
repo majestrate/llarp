@@ -710,7 +710,7 @@ namespace llarp::net
       reply_pkt.icmp_type() = 0;
       reply_pkt.icmp_code() = 0;
       auto* hdr = reply_pkt.Header();
-      reply_pkt.UpdateIPv4Address(ToNet(pkt.srcv4()), ToNet(pkt.dstv4()));
+      reply_pkt.UpdateIPv4Address(ToNet(pkt.dstv4()), ToNet(pkt.srcv4()));
       hdr->check = 0;
       hdr->check = ipchksum(pkt.data(), std::min(size_t{hdr->ihl} * 4, pkt.size()));
       reply_pkt.icmp_checksum() = 0;
@@ -722,7 +722,7 @@ namespace llarp::net
     {
       reply_pkt.icmp_type() = 129;
       reply_pkt.icmp_code() = 0;
-      reply_pkt.UpdateIPv6Address(pkt.srcv6(), pkt.dstv6());
+      reply_pkt.UpdateIPv6Address(pkt.dstv6(), pkt.srcv6());
       reply_pkt.icmp_checksum() = 0;
 
       std::array<uint8_t, 40> psuedo_hdr{};
