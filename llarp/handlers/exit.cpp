@@ -711,15 +711,18 @@ namespace llarp
       if (networkConfig.m_endpointType == "null")
       {
         m_ShouldInitTun = false;
+        m_OurRange = IPRange::FromIPv4(10, 0, 0, 1, 8);
       }
-
-      m_OurRange = networkConfig.m_ifaddr;
-      if (!m_OurRange.addr.h)
+      else
       {
-        const auto maybe = m_Router->Net().FindFreeRange();
-        if (not maybe.has_value())
-          throw std::runtime_error("cannot find free interface range");
-        m_OurRange = *maybe;
+        m_OurRange = networkConfig.m_ifaddr;
+        if (!m_OurRange.addr.h)
+        {
+          const auto maybe = m_Router->Net().FindFreeRange();
+          if (not maybe.has_value())
+            throw std::runtime_error("cannot find free interface range");
+          m_OurRange = *maybe;
+        }
       }
       const auto host_str = m_OurRange.BaseAddressString();
       // string, or just a plain char array?
@@ -728,15 +731,18 @@ namespace llarp
       m_HigestAddr = m_OurRange.HighestAddr();
       m_UseV6 = not m_OurRange.IsV4();
 
-      m_ifname = networkConfig.m_ifname;
-      if (m_ifname.empty())
+      if (m_ShouldInitTun)
       {
-        const auto maybe = m_Router->Net().FindFreeTun();
-        if (not maybe.has_value())
-          throw std::runtime_error("cannot find free interface name");
-        m_ifname = *maybe;
+        m_ifname = networkConfig.m_ifname;
+        if (m_ifname.empty())
+        {
+          const auto maybe = m_Router->Net().FindFreeTun();
+          if (not maybe.has_value())
+            throw std::runtime_error("cannot find free interface name");
+          m_ifname = *maybe;
+        }
+        LogInfo(Name(), " set ifname to ", m_ifname);
       }
-      LogInfo(Name(), " set ifname to ", m_ifname);
     }
 
     huint128_t

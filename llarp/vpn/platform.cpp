@@ -76,7 +76,8 @@ namespace llarp::vpn
       // check if we have the destination address on link
       for (const auto& addr : m_Info.addrs)
       {
-        if (addr.range.Family() == _pkt.AF() and addr.range.BaseAddr() == _pkt.dstaddr())
+        // for now we check if it's on the range.
+        if (addr.range.Family() == _pkt.AF() and addr.range.Contains(_pkt.dstaddr()))
           on_link = true;
       }
       // dont reply to packets sent to offlink destinations.
