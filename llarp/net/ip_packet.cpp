@@ -710,8 +710,7 @@ namespace llarp::net
       reply_pkt.icmp_type() = 0;
       reply_pkt.icmp_code() = 0;
       auto* hdr = reply_pkt.Header();
-      hdr->ttl = 64;
-      hdr->frag_off = htons(0b0100000000000000);
+      hdr->id++;
       reply_pkt.UpdateIPv4Address(ToNet(pkt.dstv4()), ToNet(pkt.srcv4()));
       hdr->check = 0;
       hdr->check = ipchksum(pkt.data(), std::min(size_t{hdr->ihl} * 4, pkt.size()));
