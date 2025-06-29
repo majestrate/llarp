@@ -1,10 +1,13 @@
 #pragma once
 
+#include <cstdint>
 #include <llarp/service/endpoint.hpp>
 #include <llarp/service/protocol_type.hpp>
 #include <llarp/router/abstractrouter.hpp>
 #include <llarp/ev/ev.hpp>
 #include <llarp/vpn/egres_packet_router.hpp>
+#include <llarp/net/ip_packet.hpp>
+#include <llarp/util/buffer.hpp>
 
 namespace llarp::handlers
 {

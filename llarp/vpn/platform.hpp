@@ -144,6 +144,10 @@ namespace llarp::vpn
       return nullptr;
     }
 
+    /// create a network interface that doesn't actually write packets to the OS but instead only
+    /// replies to icmp.
+    std::shared_ptr<NetworkInterface> CreateDummyInterface(InterfaceInfo);
+
     /// get owned ip route manager for managing routing table
     virtual IRouteManager&
     RouteManager() = 0;

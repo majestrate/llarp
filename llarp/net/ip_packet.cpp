@@ -1,5 +1,6 @@
 #include "ip_packet.hpp"
 #include "ip.hpp"
+#include <llarp/net/net_int.hpp>
 #include <llarp/constants/net.hpp>
 #include <llarp/util/buffer.hpp>
 #include <llarp/util/mem.hpp>
@@ -698,4 +699,52 @@ namespace llarp::net
     // TODO: ipv6
     return net::IPPacket{size_t{}};
   }
+
+  IPPacket
+  IPPacket::make_icmp_reply(const net::IPPacket& pkt)
+  {
+    net::IPPacket reply_pkt{pkt.size()};
+    std::copy_n(pkt.data(), pkt.size(), reply_pkt.data());
+    if (pkt.IsV4())
+    {
+      reply_pkt.icmp_type() = 0;
+      reply_pkt.icmp_code() = 0;
+      auto* hdr = reply_pkt.Header();
+      reply_pkt.UpdateIPv4Address(ToNet(pkt.srcv4()), ToNet(pkt.dstv4()));
+      hdr->check = 0;
+      hdr->check = ipchksum(pkt.data(), std::min(size_t{hdr->ihl} * 4, pkt.size()));
+      reply_pkt.icmp_checksum() = 0;
+      reply_pkt.icmp_checksum() = ipchksum(
+          reply_pkt.data() + reply_pkt.payload_offset(),
+          reply_pkt.size() - reply_pkt.payload_offset());
+    }
+    else if (pkt.IsV6())
+    {
+      reply_pkt.icmp_type() = 129;
+      reply_pkt.icmp_code() = 0;
+      reply_pkt.UpdateIPv6Address(pkt.srcv6(), pkt.dstv6());
+      reply_pkt.icmp_checksum() = 0;
+
+      std::array<uint8_t, 40> psuedo_hdr{};
+      auto* hdr = reply_pkt.HeaderV6();
+      auto* ptr = psuedo_hdr.data();
+      std::copy_n(hdr->srcaddr.s6_addr, sizeof(in6_addr), ptr);
+      ptr += sizeof(in6_addr);
+      std::copy_n(hdr->dstaddr.s6_addr, sizeof(in6_addr), ptr);
+      ptr += sizeof(in6_addr);
+      const auto len =
+          ToNet(huint32_t{static_cast<uint32_t>(reply_pkt.size() - reply_pkt.payload_offset())});
+      std::copy_n(&len.n, sizeof(len.n), ptr);
+      psuedo_hdr[39] = hdr->protocol;
+      const auto psuedo_check = ipchksum(psuedo_hdr.data(), psuedo_hdr.size());
+
+      reply_pkt.icmp_checksum() = ipchksum(
+          reply_pkt.data() + reply_pkt.payload_offset(),
+          reply_pkt.size() - reply_pkt.payload_offset(),
+          psuedo_check);
+    }
+
+    return reply_pkt;
+  }
+
 }  // namespace llarp::net

@@ -109,6 +109,16 @@ namespace llarp
       return Contains(net::ExpandV4(ip));
     }
 
+    inline net::ipaddr_t
+    BaseAddr() const
+    {
+      if (IsV4())
+      {
+        return ToNet(net::TruncateV6(addr) + huint32_t{1});
+      }
+      return ToNet(addr + huint128_t{1});
+    }
+
     inline bool
     Contains(const net::ipaddr_t& ip) const
     {

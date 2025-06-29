@@ -1,12 +1,15 @@
 #pragma once
 
 #include <oxenc/endian.h>
+#include <cstdint>
 #include <llarp/ev/ev.hpp>
+#include "net_int.hpp"
 #include "net.hpp"
 #include <llarp/util/buffer.hpp>
 #include <llarp/util/time.hpp>
 #include <memory>
 #include <llarp/service/protocol_type.hpp>
+#include <stdexcept>
 #include <utility>
 
 namespace llarp::net
@@ -163,6 +166,9 @@ namespace llarp::net
         return net::IPPacket{size_t{}};
     }
 
+    static IPPacket
+    make_icmp_reply(const net::IPPacket& pkt);
+
     [[deprecated("deprecated because of llarp_buffer_t")]] inline bool
     Load(const llarp_buffer_t& buf)
     {
@@ -228,6 +234,61 @@ namespace llarp::net
 
     byte_view_t
     view() const;
+
+    inline size_t
+    payload_offset() const
+    {
+      size_t offset{};
+      if (IsV4())
+      {
+        offset = size_t{Header()->ihl} * 4;
+      }
+      else if (IsV6())
+      {
+        offset = 40;
+      }
+      return offset;
+    }
+
+    inline const byte_t&
+    icmp_type() const
+    {
+      return view()[payload_offset()];
+    }
+
+    inline const byte_t&
+    icmp_code() const
+    {
+      return view()[payload_offset() + 1];
+    }
+
+    inline byte_t&
+    icmp_type()
+    {
+      return _buf[payload_offset()];
+    }
+
+    inline byte_t&
+    icmp_code()
+    {
+      return _buf[payload_offset() + 1];
+    }
+
+    inline const uint16_t&
+    icmp_checksum() const
+    {
+      const byte_t* ptr = view().data();
+      ptr += payload_offset() + 2;
+      return *reinterpret_cast<const uint16_t*>(ptr);
+    }
+
+    inline uint16_t&
+    icmp_checksum()
+    {
+      byte_t* ptr = data();
+      ptr += payload_offset() + 2;
+      return *reinterpret_cast<uint16_t*>(ptr);
+    }
 
     struct CompareSize
     {
@@ -309,6 +370,16 @@ namespace llarp::net
       return service::ProtocolType::Control;
     }
 
+    inline int
+    AF() const
+    {
+      if (IsV4())
+        return AF_INET;
+      if (IsV6())
+        return AF_INET6;
+      return AF_UNSPEC;
+    }
+
     huint128_t
     srcv6() const;
 
@@ -332,6 +403,28 @@ namespace llarp::net
 
     huint128_t
     dst4to6Lan() const;
+
+    inline net::ipaddr_t
+    srcaddr() const
+    {
+      if (IsV4())
+        return ToNet(srcv4());
+      else if (IsV6())
+        return ToNet(srcv6());
+      else
+        throw std::runtime_error{"invalid ip packet"};
+    }
+
+    inline net::ipaddr_t
+    dstaddr() const
+    {
+      if (IsV4())
+        return ToNet(dstv4());
+      else if (IsV6())
+        return ToNet(dstv6());
+      else
+        throw std::runtime_error{"invalid ip packet"};
+    }
 
     SockAddr
     src() const;

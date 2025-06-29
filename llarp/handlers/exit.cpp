@@ -442,30 +442,33 @@ namespace llarp
       m_IPActivity[ip] = std::numeric_limits<llarp_time_t>::max();
       m_SNodeKeys.insert(us);
 
+      vpn::InterfaceInfo info;
+      info.ifname = m_ifname;
+      info.addrs.emplace_back(m_OurRange);
+
       if (m_ShouldInitTun)
       {
-        vpn::InterfaceInfo info;
-        info.ifname = m_ifname;
-        info.addrs.emplace_back(m_OurRange);
-
         m_NetIf = GetRouter()->GetVPNPlatform()->CreateInterface(std::move(info), m_Router);
-        if (not m_NetIf)
-        {
-          llarp::LogError("Could not create interface");
-          return false;
-        }
-        if (not GetRouter()->loop()->add_network_interface(
-                m_NetIf, [this](net::IPPacket pkt) { OnInetPacket(std::move(pkt)); }))
-        {
-          llarp::LogWarn("Could not create tunnel for exit endpoint");
-          return false;
-        }
-
-        GetRouter()->loop()->add_ticker([this] { Flush(); });
         m_Resolver = std::make_shared<dns::Server>(
             m_Router->loop(), m_DNSConf, if_nametoindex(m_ifname.c_str()));
         m_Resolver->Start();
       }
+      else
+      {
+        m_NetIf = GetRouter()->GetVPNPlatform()->CreateDummyInterface(std::move(info));
+      }
+      if (not m_NetIf)
+      {
+        llarp::LogError("Could not create interface");
+        return false;
+      }
+      if (not GetRouter()->loop()->add_network_interface(
+              m_NetIf, [this](net::IPPacket pkt) { OnInetPacket(std::move(pkt)); }))
+      {
+        llarp::LogWarn("Could not create tunnel for exit endpoint");
+        return false;
+      }
+      GetRouter()->loop()->add_ticker([this] { Flush(); });
       return true;
     }
 

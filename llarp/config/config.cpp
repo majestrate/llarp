@@ -317,7 +317,12 @@ namespace llarp
     const Default DefaultEndpointType{params.isRelay ? "null" : "tun"};
 
     conf.defineOption<std::string>(
-        "network", "type", DefaultEndpointType, Hidden, AssignmentAcceptor(m_endpointType));
+        "network",
+        "type",
+        DefaultEndpointType,
+        Hidden,
+        Env{"LLARP_ENDPOINT_TYPE", get_env},
+        AssignmentAcceptor(m_endpointType));
 
     conf.defineOption<bool>(
         "network",
