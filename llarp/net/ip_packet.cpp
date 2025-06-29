@@ -710,11 +710,14 @@ namespace llarp::net
       reply_pkt.icmp_type() = 0;
       reply_pkt.icmp_code() = 0;
       auto* hdr = reply_pkt.Header();
+      hdr->ttl = 64;
+      hdr->frag_off = htons(0b0100000000000000);
       reply_pkt.UpdateIPv4Address(ToNet(pkt.dstv4()), ToNet(pkt.srcv4()));
       hdr->check = 0;
       hdr->check = ipchksum(pkt.data(), std::min(size_t{hdr->ihl} * 4, pkt.size()));
-      reply_pkt.icmp_checksum() = 0;
-      reply_pkt.icmp_checksum() = ipchksum(
+      auto* check = reply_pkt.icmp_checksum();
+      *check = 0;
+      *check = ipchksum(
           reply_pkt.data() + reply_pkt.payload_offset(),
           reply_pkt.size() - reply_pkt.payload_offset());
     }
@@ -723,7 +726,8 @@ namespace llarp::net
       reply_pkt.icmp_type() = 129;
       reply_pkt.icmp_code() = 0;
       reply_pkt.UpdateIPv6Address(pkt.dstv6(), pkt.srcv6());
-      reply_pkt.icmp_checksum() = 0;
+      auto* check = reply_pkt.icmp_checksum();
+      *check = 0;
 
       std::array<uint8_t, 40> psuedo_hdr{};
       auto* hdr = reply_pkt.HeaderV6();
@@ -738,7 +742,7 @@ namespace llarp::net
       psuedo_hdr[39] = hdr->protocol;
       const auto psuedo_check = ipchksum(psuedo_hdr.data(), psuedo_hdr.size());
 
-      reply_pkt.icmp_checksum() = ipchksum(
+      *check = ipchksum(
           reply_pkt.data() + reply_pkt.payload_offset(),
           reply_pkt.size() - reply_pkt.payload_offset(),
           psuedo_check);

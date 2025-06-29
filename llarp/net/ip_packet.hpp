@@ -282,12 +282,12 @@ namespace llarp::net
       return *reinterpret_cast<const uint16_t*>(ptr);
     }
 
-    inline uint16_t&
+    inline uint16_t*
     icmp_checksum()
     {
       byte_t* ptr = data();
       ptr += payload_offset() + 2;
-      return *reinterpret_cast<uint16_t*>(ptr);
+      return reinterpret_cast<uint16_t*>(ptr);
     }
 
     struct CompareSize
