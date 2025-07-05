@@ -11,11 +11,6 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
-    services:
-      registry:
-        image: registry:2
-        ports:
-          - 5000:5000
     permissions:
       contents: read
       packages: write
@@ -38,27 +33,19 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-      - name: Build base image
-        id: base
-        uses: docker/build-push-action@v5
-        with:
-          file: contrib/docker/Dockerfile.base
-          context: .
-          push: true
-          tags: localhost:5000/llarp:base
       - name: Compile in docker container
         id: build
         uses: docker/build-push-action@v5
         with:
-          file: contrib/docker/Dockerfile.build
+          file: contrib/docker/Dockerfile
           context: .
-          push: true
-          tags: localhost:5000/llarp:build
+          push: false
+          stage: build
       - name: Assemble final docker image
         id: assemble
         uses: docker/build-push-action@v5
         with:
-          file: contrib/docker/Dockerfile.final
+          file: contrib/docker/Dockerfile
           context: .
           push: true
           tags: ${{ steps.meta.outputs.tags }}
