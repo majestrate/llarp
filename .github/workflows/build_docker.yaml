@@ -37,7 +37,6 @@ jobs:
         id: assemble
         uses: docker/build-push-action@v5
         with:
-          file: contrib/docker/Dockerfile
           context: .
           push: true
           tags: ${{ steps.meta.outputs.tags }}
@@ -46,5 +45,5 @@ jobs:
         uses: actions/attest-build-provenance@v2
         with:
           subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME}}
-          subject-digest: ${{ steps.push.outputs.digest }}
+          subject-digest: ${{ steps.assemble.outputs.digest }}
           push-to-registry: true
