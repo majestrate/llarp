@@ -1,4 +1,0 @@
-FROM debian:stable-slim
-
-RUN apt update -q -y && apt upgrade -q -y
-RUN apt install -q -y libuv1-dev libsodium-dev nettle-dev libevent-dev libunbound-dev

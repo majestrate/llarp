@@ -1,6 +1,0 @@
-FROM localhost:5000/llarp:base AS base
-WORKDIR /usr/local/src
-COPY . ./llarp
-RUN apt update -q -y && apt upgrade -q -y
-RUN apt install -q -y build-essential cmake git pkg-config automake libtool ninja-build
-RUN mkdir -p llarp/build && cd llarp && cmake -B build -S . -DNATIVE_BUILD=OFF -DWITH_SETCAP=OFF -G Ninja && ninja -C build && ninja -C build install
