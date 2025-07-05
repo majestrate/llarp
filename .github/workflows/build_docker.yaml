@@ -39,7 +39,7 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
       - name: Build base image
-        id: push
+        id: base
         uses: docker/build-push-action@v5
         with:
           file: contrib/docker/Dockerfile.base
@@ -47,7 +47,7 @@ jobs:
           push: true
           tags: localhost:5000/llarp:base
       - name: Compile in docker container
-        id: push
+        id: build
         uses: docker/build-push-action@v5
         with:
           file: contrib/docker/Dockerfile.build
@@ -55,7 +55,7 @@ jobs:
           push: true
           tags: localhost:5000/llarp:build
       - name: Assemble final docker image
-        id: push
+        id: assemble
         uses: docker/build-push-action@v5
         with:
           file: contrib/docker/Dockerfile.final
