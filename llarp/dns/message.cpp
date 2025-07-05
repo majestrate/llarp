@@ -175,7 +175,7 @@ namespace llarp
         }
         else
         {
-          const auto addr = net::TruncateV6(ip);
+          const auto addr = ToHost(net::TruncateV6(ToNet(ip)));
           rec.rr_type = qTypeA;
           rec.rData.resize(4);
           oxenc::write_host_as_big(addr.h, rec.rData.data());

@@ -380,37 +380,37 @@ namespace llarp::net
       return AF_UNSPEC;
     }
 
-    huint128_t
+    net::ipv6addr_t
     srcv6() const;
 
-    huint128_t
+    net::ipv6addr_t
     dstv6() const;
 
-    huint32_t
+    net::ipv4addr_t
     srcv4() const;
 
-    huint32_t
+    net::ipv4addr_t
     dstv4() const;
 
-    huint128_t
+    net::ipv6addr_t
     src4to6() const;
 
-    huint128_t
+    net::ipv6addr_t
     dst4to6() const;
 
-    huint128_t
+    net::ipv6addr_t
     src4to6Lan() const;
 
-    huint128_t
+    net::ipv6addr_t
     dst4to6Lan() const;
 
     inline net::ipaddr_t
     srcaddr() const
     {
       if (IsV4())
-        return ToNet(srcv4());
+        return srcv4();
       else if (IsV6())
-        return ToNet(srcv6());
+        return srcv6();
       else
         throw std::runtime_error{"invalid ip packet"};
     }
@@ -419,9 +419,9 @@ namespace llarp::net
     dstaddr() const
     {
       if (IsV4())
-        return ToNet(dstv4());
+        return dstv4();
       else if (IsV6())
-        return ToNet(dstv6());
+        return dstv6();
       else
         throw std::runtime_error{"invalid ip packet"};
     }
@@ -457,15 +457,17 @@ namespace llarp::net
 
     void
     UpdateIPv6Address(
-        huint128_t src, huint128_t dst, std::optional<nuint32_t> flowlabel = std::nullopt);
+        net::ipv6addr_t src,
+        net::ipv6addr_t dst,
+        std::optional<net::flowlabel_t> flowlabel = std::nullopt);
 
     /// set addresses to zero and recacluate checksums
     void
-    ZeroAddresses(std::optional<nuint32_t> flowlabel = std::nullopt);
+    ZeroAddresses(std::optional<net::flowlabel_t> flowlabel = std::nullopt);
 
     /// zero out source address
     void
-    ZeroSourceAddress(std::optional<nuint32_t> flowlabel = std::nullopt);
+    ZeroSourceAddress(std::optional<net::flowlabel_t> flowlabel = std::nullopt);
 
     /// make an icmp unreachable reply packet based of this ip packet
     std::optional<IPPacket>

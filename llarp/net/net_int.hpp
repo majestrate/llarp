@@ -143,25 +143,6 @@ namespace llarp
       return nuint_t{UInt_t(~n)};
     }
 
-    inline nuint_t
-    operator++()
-    {
-      ++n;
-      return *this;
-    }
-    inline nuint_t
-    operator--()
-    {
-      --n;
-      return *this;
-    }
-
-    constexpr bool
-    operator<(nuint_t x) const
-    {
-      return n < x.n;
-    }
-
     constexpr bool
     operator!=(nuint_t x) const
     {
@@ -235,6 +216,8 @@ namespace llarp
     ipv4addr_t ToNet(huint32_t);
     ipv6addr_t ToNet(huint128_t);
 
+    ipv6addr_t ExpandV4(ipv4addr_t);
+
   }  // namespace net
 
   template <>
@@ -296,4 +279,27 @@ namespace std
       return std::hash<UInt_t>{}(x.h);
     }
   };
+
+  template <>
+  struct hash<llarp::net::ipv4addr_t>
+  {
+    size_t
+    operator()(const llarp::net::ipv4addr_t& ip) const
+    {
+      const auto v6 = llarp::net::ExpandV4(ip);
+      return std::hash<llarp::net::ipv6addr_t>{}(v6);
+    }
+  };
+
+  template <>
+  struct hash<llarp::net::ipaddr_t>
+  {
+    size_t
+    operator()(const llarp::net::ipaddr_t& ip) const
+    {
+      return std::visit(
+          [](auto&& x) -> size_t { return std::hash<std::remove_cvref_t<decltype(x)>>{}(x); }, ip);
+    }
+  };
+
 }  // namespace std

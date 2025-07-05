@@ -132,7 +132,7 @@ namespace llarp
     std::unordered_map<service::Address, service::AuthInfo> m_ExitAuths;
     std::unordered_map<std::string, service::AuthInfo> m_LNSExitAuths;
 
-    std::unordered_map<huint128_t, service::Address> m_mapAddrs;
+    std::unordered_map<net::ipv6addr_t, service::Address> m_mapAddrs;
 
     service::AuthType m_AuthType = service::AuthType::eAuthTypeNone;
     service::AuthFileType m_AuthFileType = service::AuthFileType::eAuthFileHashes;
@@ -144,7 +144,7 @@ namespace llarp
 
     std::vector<llarp::dns::SRVData> m_SRVRecords;
 
-    std::optional<huint128_t> m_baseV6Address;
+    std::optional<net::ipv6addr_t> m_baseV6Address;
 
     std::set<IPRange> m_OwnedRanges;
     std::optional<net::TrafficPolicy> m_TrafficPolicy;

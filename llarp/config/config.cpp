@@ -712,7 +712,7 @@ namespace llarp
             m_baseV6Address = std::nullopt;
             return;
           }
-          m_baseV6Address = huint128_t{};
+          m_baseV6Address = net::ipv6addr_t{};
           if (not m_baseV6Address->FromString(arg))
             throw std::invalid_argument{
                 fmt::format("[network]:ip6-range invalid value: '{}'", arg)};
@@ -735,7 +735,7 @@ namespace llarp
         [this](std::string arg) {
           if (arg.empty())
             return;
-          huint128_t ip;
+          net::ipv6addr_t ip;
           service::Address addr;
           const auto pos = arg.find(":");
           if (pos == std::string::npos)
@@ -746,7 +746,7 @@ namespace llarp
           std::string ipstr = arg.substr(pos + 1);
           if (not ip.FromString(ipstr))
           {
-            huint32_t ipv4;
+            net::ipv4addr_t ipv4;
             if (not ipv4.FromString(ipstr))
             {
               throw std::invalid_argument{fmt::format("[endpoint]:mapaddr invalid ip: {}", ipstr)};
@@ -1366,13 +1366,13 @@ namespace llarp
   {
     if (m_UniqueHopsNetmaskSize == 0)
       return true;
-    const auto netmask = netmask_ipv6_bits(96 + m_UniqueHopsNetmaskSize);
+    const auto netmask = net::netmask_ipv6_bits(96 + m_UniqueHopsNetmaskSize);
     std::set<IPRange> seenRanges;
     for (const auto& hop : rcs)
     {
       for (const auto& addr : hop.addrs)
       {
-        const auto network_addr = net::In6ToHUInt(addr.ip) & netmask;
+        const auto network_addr = addr.ip & netmask;
         if (auto [it, inserted] = seenRanges.emplace(network_addr, netmask); not inserted)
         {
           return false;

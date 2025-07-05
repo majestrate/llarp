@@ -17,7 +17,7 @@
 #endif
 
 #include <cstdio>
-#include <list>
+#include <set>
 #include <type_traits>
 
 namespace llarp::net
@@ -80,13 +80,13 @@ namespace llarp::net
     std::optional<IPRange>
     FindFreeRange() const override
     {
-      std::list<IPRange> currentRanges;
+      std::set<IPRange> currentRanges;
       iter_all([&currentRanges](auto i) {
         if (i and i->ifa_addr and i->ifa_addr->sa_family == AF_INET)
         {
           ipv4addr_t addr{reinterpret_cast<sockaddr_in*>(i->ifa_addr)->sin_addr.s_addr};
           ipv4addr_t mask{reinterpret_cast<sockaddr_in*>(i->ifa_netmask)->sin_addr.s_addr};
-          currentRanges.emplace_back(IPRange::FromIPv4(addr, mask));
+          currentRanges.emplace(IPRange::FromIPv4(addr, mask));
         }
       });
 
@@ -106,7 +106,7 @@ namespace llarp::net
       int num = 0;
       while (num < 255)
       {
-        std::string ifname = fmt::format("lokitun{}", num);
+        std::string ifname = fmt::format("llarp{}", num);
         if (GetInterfaceAddr(ifname, AF_INET) == std::nullopt)
           return ifname;
         num++;
@@ -147,7 +147,7 @@ namespace llarp::net
       const auto zero = IPRange::FromIPv4(0, 0, 0, 0, 8);
       // when we cannot find an address but we are looking for 0.0.0.0 just default to the old
       // style
-      if (not found and (fallback.isIPv4() and zero.Contains(fallback.asIPv4())))
+      if (not found and (fallback.isIPv4() and zero.Contains(fallback.getIPv4())))
         found = Wildcard(fallback.Family());
       return found;
     }
@@ -163,7 +163,19 @@ namespace llarp::net
         if (not(i and i->ifa_addr))
           return;
         const SockAddr addr{*i->ifa_addr};
-        found = addr.getIP() == ip;
+        found = std::visit(
+            [&ip](auto&& x) {
+              return std::visit(
+                  [&x](auto&& y) {
+                    if constexpr (std::is_same_v<
+                                      std::decay_t<decltype(x)>,
+                                      std::decay_t<decltype(y)>>)
+                      return x == y;
+                    return false;
+                  },
+                  ip);
+            },
+            addr.getIP());
       });
       return found;
     }
@@ -187,7 +199,7 @@ namespace llarp::net
         }
         SockAddr addr{*i->ifa_addr};
         SockAddr mask{*i->ifa_netmask};
-        ent.addrs.emplace_back(addr.asIPv6(), mask.asIPv6());
+        ent.addrs.emplace_back(addr.getIPv6(), mask.getIPv6());
       });
       std::vector<InterfaceInfo> all;
       for (auto& [name, ent] : ifmap)

@@ -97,11 +97,12 @@ namespace llarp
       inline bool
       IsLoopbackAddress(ipaddr_t ip) const
       {
+        const IPRange loopback4 = IPRange::FromIPv4(127, 0, 0, 0, 8);
+        const IPRange loopback6{
+            net::ipv6addr_t::from_host(uint128_t{0UL, 1UL}), netmask_ipv6_bits(128)};
         return var::visit(
-            [loopback6 = IPRange{huint128_t{uint128_t{0UL, 1UL}}, netmask_ipv6_bits(128)},
-             loopback4 = IPRange::FromIPv4(127, 0, 0, 0, 8)](auto&& ip) {
-              const auto h_ip = ToHost(ip);
-              return loopback4.Contains(h_ip) or loopback6.Contains(h_ip);
+            [&loopback4, &loopback6](auto&& ip) {
+              return loopback4.Contains(ip) or loopback6.Contains(ip);
             },
             ip);
       }
@@ -137,18 +138,18 @@ namespace llarp
       virtual std::optional<SockAddr>
       GetInterfaceAddr(std::string_view ifname, int af = AF_INET) const = 0;
 
-      inline std::optional<huint128_t>
+      inline std::optional<net::ipv6addr_t>
       GetInterfaceIPv6Address(std::string_view ifname) const
       {
         if (auto maybe_addr = GetInterfaceAddr(ifname, AF_INET6))
-          return maybe_addr->asIPv6();
+          return maybe_addr->getIPv6();
         return std::nullopt;
       }
 
       inline bool
       IsBogon(const SockAddr& addr) const
       {
-        return IsBogonIP(addr.asIPv6());
+        return IsBogonIP(addr.getIPv6());
       }
 
       inline bool
@@ -158,7 +159,7 @@ namespace llarp
         if (range.IsV4() and range.netmask_bits == netmask_ipv6_bits(96))
           return false;
         // special case for ::/0
-        if (IsWildcardAddress(ToNet(range.netmask_bits)))
+        if (IsWildcardAddress(range.netmask_bits))
           return false;
         return IsBogonIP(range.addr) or IsBogonIP(range.HighestAddr());
       }
@@ -169,14 +170,14 @@ namespace llarp
         return IsBogonIP(var::visit(
             [](auto&& ip) {
               if constexpr (std::is_same_v<net::ipv4addr_t, std::decay_t<decltype(ip)>>)
-                return ExpandV4(ToHost(ip));
+                return ExpandV4(ip);
               else
-                return ToHost(ip);
+                return ip;
             },
             addr));
       }
       inline bool
-      IsBogonIP(const huint128_t& addr) const
+      IsBogonIP(const net::ipv6addr_t& addr) const
       {
         if (not IPRange::V4MappedRange().Contains(addr))
         {
