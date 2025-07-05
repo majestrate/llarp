@@ -9,7 +9,14 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  build-release:
+  docker:
+    runs-on: ubuntu-latest
+    services:
+      registry:
+        image: registry:2
+        ports:
+          - 5000:5000
+  build:
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -33,10 +40,27 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-      - name: Build and push Docker image
+      - name: Build base image
         id: push
         uses: docker/build-push-action@v5
         with:
+          file: contrib/docker/Dockerfile.base
+          context: .
+          push: true
+          tags: localhost:5000/llarp:base
+      - name: Compile in docker container
+        id: push
+        uses: docker/build-push-action@v5
+        with:
+          file: contrib/docker/Dockerfile.build
+          context: .
+          push: true
+          tags: localhost:5000/llarp:build
+      - name: Assemble final docker image
+        id: push
+        uses: docker/build-push-action@v5
+        with:
+          file: contrib/docker/Dockerfile.final
           context: .
           push: true
           tags: ${{ steps.meta.outputs.tags }}

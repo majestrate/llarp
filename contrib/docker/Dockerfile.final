@@ -1,0 +1,10 @@
+FROM localhost:5000/llarp:base 
+FROM localhost:5000/llarp:build AS build
+
+RUN mkdir -p /var/lib/llarpd/
+RUN mkdir -p /data/
+COPY ./contrib/docker/entrypoint.sh /entrypoint.sh
+COPY ./contrib/docker/llarpd.ini /var/lib/llarpd/llarpd.ini
+COPY ./contrib/bootstrap/opennet.signed /var/lib/llarpd/bootstrap.signed
+COPY --from=build /usr/local/bin/llarpd /usr/local/bin/
+ENTRYPOINT /entrypoint.sh
