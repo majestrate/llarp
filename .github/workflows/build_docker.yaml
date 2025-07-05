@@ -9,15 +9,13 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  docker:
+  build:
     runs-on: ubuntu-latest
     services:
       registry:
         image: registry:2
         ports:
           - 5000:5000
-  build:
-    runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
