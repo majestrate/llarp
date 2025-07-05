@@ -33,15 +33,7 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-      - name: Compile in docker container
-        id: build
-        uses: docker/build-push-action@v5
-        with:
-          file: contrib/docker/Dockerfile
-          context: .
-          push: false
-          stage: build
-      - name: Assemble final docker image
+      - name: Assemble docker image
         id: assemble
         uses: docker/build-push-action@v5
         with:
