@@ -13,7 +13,7 @@ namespace llarp::net
     /// ip protocol byte of this protocol
     IPProtocol protocol;
     /// the layer 3 port if applicable
-    std::optional<nuint16_t> port;
+    std::optional<port_t> port;
 
     bool
     BEncode(llarp_buffer_t* buf) const;
@@ -29,7 +29,9 @@ namespace llarp::net
     bool
     operator<(const ProtocolInfo& other) const
     {
-      return std::tie(protocol, port) < std::tie(other.protocol, other.port);
+      const auto h_port = ToHost(port.value_or(port_t{}));
+      const auto h_other_port = ToHost(other.port.value_or(port_t{}));
+      return std::tie(protocol, h_port) < std::tie(other.protocol, h_other_port);
     }
 
     ProtocolInfo() = default;

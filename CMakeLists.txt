@@ -21,9 +21,9 @@ if(CCACHE_PROGRAM)
 endif()
 
 
-project(lokinet
+project(llarp
     VERSION 0.10.0
-    DESCRIPTION "lokinet - IP packet onion router"
+    DESCRIPTION "llarp - IP packet onion router"
     LANGUAGES ${LANGS})
 
 set(RELEASE_MOTTO "Just like me frfr" CACHE STRING "Release motto")
@@ -225,11 +225,16 @@ unset(GIT_VERSION)
 unset(GIT_VERSION_REAL)
 
 if(NOT GIT_VERSION)
-  exec_program("git" ${CMAKE_CURRENT_SOURCE_DIR} ARGS "rev-parse --short HEAD" OUTPUT_VARIABLE GIT_VERSION_UNSTRIP)
-  string(STRIP "${GIT_VERSION_UNSTRIP}" GIT_VERSION)
+  if(EXISTS ${CMAKE_SOURCE_DIR}/.git)
+    exec_program("git" ${CMAKE_CURRENT_SOURCE_DIR} ARGS "rev-parse --short HEAD" OUTPUT_VARIABLE GIT_VERSION_UNSTRIP)
+    string(STRIP "${GIT_VERSION_UNSTRIP}" GIT_VERSION)
+  else()
+    set(GIT_VERSION "nogit")
+  endif()
 endif()
 
 string(REGEX REPLACE "^fatal.*$" nogit GIT_VERSION_REAL "${GIT_VERSION}")
+set(GIT_VERSION "${GIT_VERSION_REAL}")
 
 find_package(PkgConfig REQUIRED)
 

@@ -88,7 +88,7 @@ namespace llarp
             return std::nullopt;
           name.remove_prefix(pos + 1);
         }
-        return net::ExpandV4(llarp::ipaddr_ipv4_bits(q[0], q[1], q[2], q[3]));
+        return ToHost(net::ExpandV4(net::ipaddr_ipv4_bits(q[0], q[1], q[2], q[3])));
       }
       if (numdots == 32 && name.size() == 64 && isV6)
       {

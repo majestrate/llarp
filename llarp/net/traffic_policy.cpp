@@ -57,7 +57,7 @@ namespace llarp::net
     }
     for (const auto& range : ranges)
     {
-      huint128_t dst;
+      net::ipv6addr_t dst;
       if (pkt.IsV6())
         dst = pkt.dstv6();
       else if (pkt.IsV4())

@@ -3,21 +3,26 @@
 
 namespace llarp
 {
-  static constexpr std::array bogonRanges_v6 = {
-      // zero
-      IPRange{huint128_t{0}, netmask_ipv6_bits(128)},
-      // loopback
-      IPRange{huint128_t{1}, netmask_ipv6_bits(128)},
-      // yggdrasil
-      IPRange{huint128_t{uint128_t{0x0200'0000'0000'0000UL, 0UL}}, netmask_ipv6_bits(7)},
-      // multicast
-      IPRange{huint128_t{uint128_t{0xff00'0000'0000'0000UL, 0UL}}, netmask_ipv6_bits(8)},
-      // local
-      IPRange{huint128_t{uint128_t{0xfc00'0000'0000'0000UL, 0UL}}, netmask_ipv6_bits(8)},
-      // local
-      IPRange{huint128_t{uint128_t{0xf800'0000'0000'0000UL, 0UL}}, netmask_ipv6_bits(8)}};
 
-  static constexpr std::array bogonRanges_v4 = {
+  static inline std::array bogonRanges_v6 = {
+      // zero
+      IPRange{ToNet(huint128_t{0}), net::netmask_ipv6_bits(128)},
+      // loopback
+      IPRange{ToNet(huint128_t{1}), net::netmask_ipv6_bits(128)},
+      // yggdrasil
+      IPRange{
+          ToNet(huint128_t{uint128_t{0x0200'0000'0000'0000UL, 0UL}}), net::netmask_ipv6_bits(7)},
+      // multicast
+      IPRange{
+          ToNet(huint128_t{uint128_t{0xff00'0000'0000'0000UL, 0UL}}), net::netmask_ipv6_bits(8)},
+      // local
+      IPRange{
+          ToNet(huint128_t{uint128_t{0xfc00'0000'0000'0000UL, 0UL}}), net::netmask_ipv6_bits(8)},
+      // local
+      IPRange{
+          ToNet(huint128_t{uint128_t{0xf800'0000'0000'0000UL, 0UL}}), net::netmask_ipv6_bits(8)}};
+
+  static inline std::array bogonRanges_v4 = {
       IPRange::FromIPv4(0, 0, 0, 0, 8),
       IPRange::FromIPv4(10, 0, 0, 0, 8),
       IPRange::FromIPv4(100, 64, 0, 0, 10),

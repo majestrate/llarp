@@ -108,6 +108,9 @@ namespace llarp::uv
   run_disk_thread(void*);
 
   void
+  run_worker_thread(void*);
+
+  void
   Loop::FlushLogic()
   {
     llarp::LogTrace("Loop::FlushLogic() start");
@@ -126,7 +129,11 @@ namespace llarp::uv
     FlushLogic();
   }
 
-  Loop::Loop(size_t queue_size) : llarp::EventLoop{}, m_LogicCalls{queue_size}, m_DiskCalls{128}
+  Loop::Loop(size_t queue_size, size_t worker_threads)
+      : llarp::EventLoop{}
+      , m_LogicCalls{queue_size}
+      , m_DiskCalls{128}
+      , m_WorkCalls{512 * worker_threads}
   {
     if (!(m_Impl = uvw::Loop::create()))
       throw std::runtime_error{"Failed to construct libuv loop"};
@@ -145,6 +152,11 @@ namespace llarp::uv
     m_WakeUp->on<uvw::AsyncEvent>([this](const auto&, auto&) { tick_event_loop(); });
     m_DiskThread =
         std::make_unique<std::thread>([queue = &m_DiskCalls]() { run_disk_thread(queue); });
+    do
+    {
+      m_WorkThreads.emplace_back([queue = &m_WorkCalls]() { run_worker_thread(queue); });
+      worker_threads--;
+    } while (worker_threads > 0);
   }
 
   bool
@@ -232,6 +244,13 @@ namespace llarp::uv
       m_Impl->stop();
 
       m_Run.store(false);
+
+      m_WorkCalls.disable();
+
+      for (auto& t : m_WorkThreads)
+        t.join();
+
+      m_WorkThreads.clear();
     }
   }
 
@@ -249,17 +268,8 @@ namespace llarp::uv
       std::shared_ptr<llarp::vpn::NetworkInterface> netif,
       std::function<void(llarp::net::IPPacket)> handler)
   {
-#ifdef __linux__
     using event_t = uvw::PollEvent;
     auto handle = m_Impl->resource<uvw::PollHandle>(netif->PollFD());
-#else
-    // we use a uv_prepare_t because it fires before blocking for new io events unconditionally
-    // we want to match what linux does, using a uv_check_t does not suffice as the order of
-    // operations is not what we need.
-    using event_t = uvw::PrepareEvent;
-    auto handle = m_Impl->resource<uvw::PrepareHandle>();
-#endif
-
     if (!handle)
       return false;
 
@@ -278,11 +288,7 @@ namespace llarp::uv
       }
     });
 
-#ifdef __linux__
     handle->start(uvw::PollHandle::Event::READABLE);
-#else
-    handle->start();
-#endif
 
     return true;
   }
@@ -386,57 +392,31 @@ namespace llarp::uv
     return true;
   }
 
-  namespace
+  void
+  run_worker_thread(void* arg)
   {
-    struct Work
+    using Queue_t = llarp::thread::Queue<std::function<void(void)>>;
+    llarp::util::SetThreadName("llarpd-worker");
+    LogInfo("Worker started");
+    auto* queue = reinterpret_cast<Queue_t*>(arg);
+    while (queue->enabled())
     {
-      uv_work_t uv_work;
-      std::unique_ptr<EventLoopWork> _work;
-
-      static void
-      work_callback(uv_work_t* req)
-      {
-        static_cast<Work*>(req->data)->work();
-      }
-
-      static void
-      after_work_callback(uv_work_t* req, int st)
-      {
-        auto* work = static_cast<Work*>(req->data);
-        work->cleanup(st == UV_ECANCELED);
-        delete work;
-      }
-
-      Work(std::unique_ptr<EventLoopWork> work) : _work{std::move(work)}
-      {
-        uv_work.data = this;
-      }
-
-      constexpr uv_work_t*
-      uv()
-      {
-        return &uv_work;
-      }
-
-      void
-      work() const
-      {
-        _work->work();
-      }
-      void
-      cleanup(bool cancel) const
-      {
-        _work->cleanup(cancel);
-      }
-    };
-
-  }  // namespace
+      auto maybe = queue->popFrontWithTimeout(1s);
+      if (maybe)
+        maybe.value()();
+    }
+    LogInfo("Worker ended");
+  }
 
   void
   Loop::queue_work(std::unique_ptr<EventLoopWork> ev_work)
   {
-    Work* work = new Work{std::move(ev_work)};
-    uv_queue_work(m_Impl->raw(), work->uv(), Work::work_callback, Work::after_work_callback);
+    if (not m_WorkCalls.enabled())
+      return;
+    m_WorkCalls.pushBack([work = std::shared_ptr<EventLoopWork>(ev_work.release()), self = this]() {
+      work->work();
+      self->call_soon([work]() { work->cleanup(false); });
+    });
   }
 
   void
@@ -545,6 +525,12 @@ namespace llarp::uv
   Loop::add_poller(int fd, std::function<void()> callback)
   {
     return std::make_shared<Poller>(*m_Impl, fd, std::move(callback));
+  }
+
+  size_t
+  Loop::num_worker_threads() const
+  {
+    return m_WorkThreads.size();
   }
 
 }  // namespace llarp::uv

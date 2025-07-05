@@ -16,12 +16,12 @@ namespace llarp
 {
 
   EventLoop_ptr
-  EventLoop::create(size_t queueLength)
+  EventLoop::create(size_t threads, size_t queueLength)
   {
 #ifdef USE_IO_URING
-    return std::make_shared<llarp::io_uring::Loop>(queueLength, 2);
+    return std::make_shared<llarp::io_uring::Loop>(queueLength, threads);
 #else
-    return std::make_shared<llarp::uv::Loop>(queueLength);
+    return std::make_shared<llarp::uv::Loop>(queueLength, threads);
 #endif
   }
 

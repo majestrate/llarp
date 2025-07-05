@@ -33,7 +33,6 @@ namespace llarp::vpn
   {
     std::string ifname;
     unsigned int index;
-    huint32_t dnsaddr;
     std::vector<InterfaceAddress> addrs;
 
     /// get address number N
@@ -42,8 +41,8 @@ namespace llarp::vpn
     {
       const auto& range = addrs[idx].range;
       if (range.IsV4())
-        return ToNet(net::TruncateV6(range.addr));
-      return ToNet(range.addr);
+        return net::TruncateV6(range.addr);
+      return range.addr;
     }
   };
 
@@ -58,6 +57,7 @@ namespace llarp::vpn
     {}
     NetworkInterface(const NetworkInterface&) = delete;
     NetworkInterface(NetworkInterface&&) = delete;
+    ~NetworkInterface() override = default;
 
     const InterfaceInfo&
     Info() const
@@ -142,6 +142,10 @@ namespace llarp::vpn
       }
       return nullptr;
     }
+
+    /// create a network interface that doesn't actually write packets to the OS but instead only
+    /// replies to icmp.
+    std::shared_ptr<NetworkInterface> CreateDummyInterface(InterfaceInfo);
 
     /// get owned ip route manager for managing routing table
     virtual IRouteManager&

@@ -12,7 +12,7 @@ namespace llarp
         const llarp::PubKey& remoteIdent,
         const llarp::path::HopHandler_ptr& beginPath,
         bool rewriteIP,
-        huint128_t ip,
+        net::ipv6addr_t ip,
         llarp::handlers::ExitEndpoint* parent)
         : createdAt{parent->Now()}
         , m_Parent{parent}
@@ -109,7 +109,7 @@ namespace llarp
 
       if (pkt.IsV6() && m_Parent->SupportsV6())
       {
-        huint128_t dst;
+        net::ipv6addr_t dst;
         if (m_RewriteSource)
           dst = m_Parent->GetIfAddr();
         else
@@ -118,12 +118,12 @@ namespace llarp
       }
       else if (pkt.IsV4() && !m_Parent->SupportsV6())
       {
-        huint32_t dst;
+        net::ipv4addr_t dst;
         if (m_RewriteSource)
           dst = net::TruncateV6(m_Parent->GetIfAddr());
         else
           dst = pkt.dstv4();
-        pkt.UpdateIPv4Address(xhtonl(net::TruncateV6(m_IP)), xhtonl(dst));
+        pkt.UpdateIPv4Address(net::TruncateV6(m_IP), dst);
       }
       else
       {
@@ -142,7 +142,7 @@ namespace llarp
       if (pkt.empty())
         return false;
 
-      huint128_t src;
+      net::ipv6addr_t src;
       if (m_RewriteSource)
         src = m_Parent->GetIfAddr();
       else
@@ -150,7 +150,7 @@ namespace llarp
       if (pkt.IsV6())
         pkt.UpdateIPv6Address(src, m_IP);
       else
-        pkt.UpdateIPv4Address(xhtonl(net::TruncateV6(src)), xhtonl(net::TruncateV6(m_IP)));
+        pkt.UpdateIPv4Address(net::TruncateV6(src), net::TruncateV6(m_IP));
 
       buf = pkt.steal();
 

@@ -20,12 +20,12 @@ namespace llarp
   inline fs::path
   GetDefaultDataDir()
   {
-    fs::path datadir{"/var/lib/lokinet"};
+    fs::path datadir{"/var/lib/llarpd"};
     if (auto uid = geteuid())
     {
       if (auto* pw = getpwuid(uid))
       {
-        datadir = fs::path{pw->pw_dir} / ".lokinet";
+        datadir = fs::path{pw->pw_dir} / ".llarpd";
       }
     }
     return datadir;
@@ -34,7 +34,7 @@ namespace llarp
   inline fs::path
   GetDefaultConfigFilename()
   {
-    return "lokinet.ini";
+    return "llarpd.ini";
   }
 
   inline fs::path

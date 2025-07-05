@@ -1,10 +1,13 @@
 #pragma once
 
+#include <cstdint>
 #include <llarp/service/endpoint.hpp>
 #include <llarp/service/protocol_type.hpp>
 #include <llarp/router/abstractrouter.hpp>
 #include <llarp/ev/ev.hpp>
 #include <llarp/vpn/egres_packet_router.hpp>
+#include <llarp/net/ip_packet.hpp>
+#include <llarp/util/buffer.hpp>
 
 namespace llarp::handlers
 {
@@ -87,14 +90,14 @@ namespace llarp::handlers
     void
     SendPacketToRemote(const llarp_buffer_t&, service::ProtocolType) override{};
 
-    huint128_t
+    net::ipv6addr_t
     ObtainIPForAddr(std::variant<service::Address, RouterID>) override
     {
       return {0};
     }
 
     std::optional<std::variant<service::Address, RouterID>>
-    ObtainAddrForIP(huint128_t) const override
+    ObtainAddrForIP(net::ipv6addr_t) const override
     {
       return std::nullopt;
     }

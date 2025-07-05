@@ -17,21 +17,40 @@ namespace llarp
   bool
   BootstrapList::BDecode(llarp_buffer_t* buf)
   {
-    return bencode_read_list(
-        [&](llarp_buffer_t* b, bool more) -> bool {
-          if (more)
-          {
-            RouterContact rc{};
-            if (not rc.BDecode(b))
-            {
-              log::error(logcat, "invalid rc in bootstrap list: {}", llarp::buffer_printer{*b});
-              return false;
-            }
-            emplace(std::move(rc));
-          }
-          return true;
-        },
-        buf);
+    std::unique_ptr<RouterContact> rc;
+    switch (static_cast<char>(*buf->cur))
+    {
+      case 'l':
+        return bencode_read_list(
+            [&](llarp_buffer_t* b, bool more) -> bool {
+              if (more)
+              {
+                rc = std::make_unique<RouterContact>();
+                if (not rc->BDecode(b))
+                {
+                  log::error(logcat, "invalid rc in bootstrap list: {}", llarp::buffer_printer{*b});
+                  return false;
+                }
+                emplace(std::move(*rc));
+                rc.reset();
+              }
+              return true;
+            },
+            buf);
+      case 'd':
+        rc = std::make_unique<RouterContact>();
+        if (not rc->BDecode(buf))
+        {
+          log::error(logcat, "invalid rc: {}", llarp::buffer_printer{*buf});
+          return false;
+        }
+        emplace(std::move(*rc));
+        rc.reset();
+        return true;
+      default:
+        log::error(logcat, "invalid data: {}", llarp::buffer_printer{*buf});
+        return false;
+    }
   }
 
   bool

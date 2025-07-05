@@ -21,6 +21,7 @@
 #include <cstdlib>
 #include <functional>
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
@@ -78,6 +79,15 @@ namespace llarp
     /// deprecated
     std::optional<net::port_t> PublicPort;
 
+    inline fs::path
+    data_dir_file(const fs::path& file) const
+    {
+      return m_dataDir / file;
+    }
+
+    size_t
+    num_worker_threads() const;
+
     void
     defineConfigOptions(ConfigDefinition& conf, const ConfigGenParameters& params);
   };
@@ -122,7 +132,7 @@ namespace llarp
     std::unordered_map<service::Address, service::AuthInfo> m_ExitAuths;
     std::unordered_map<std::string, service::AuthInfo> m_LNSExitAuths;
 
-    std::unordered_map<huint128_t, service::Address> m_mapAddrs;
+    std::unordered_map<net::ipv6addr_t, service::Address> m_mapAddrs;
 
     service::AuthType m_AuthType = service::AuthType::eAuthTypeNone;
     service::AuthFileType m_AuthFileType = service::AuthFileType::eAuthFileHashes;
@@ -134,7 +144,7 @@ namespace llarp
 
     std::vector<llarp::dns::SRVData> m_SRVRecords;
 
-    std::optional<huint128_t> m_baseV6Address;
+    std::optional<net::ipv6addr_t> m_baseV6Address;
 
     std::set<IPRange> m_OwnedRanges;
     std::optional<net::TrafficPolicy> m_TrafficPolicy;

@@ -1,5 +1,6 @@
 #include "ip_packet.hpp"
 #include "ip.hpp"
+#include <llarp/net/net_int.hpp>
 #include <llarp/constants/net.hpp>
 #include <llarp/util/buffer.hpp>
 #include <llarp/util/mem.hpp>
@@ -69,20 +70,28 @@ namespace llarp::net
     return (uint32_t*)addr.s6_addr;
   }
 
-  huint128_t
+  net::ipv6addr_t
   IPPacket::srcv6() const
   {
     if (IsV6())
-      return In6ToHUInt(HeaderV6()->srcaddr);
+    {
+      net::ipv6addr_t x{};
+      std::copy_n(HeaderV6()->srcaddr.s6_addr, 16, reinterpret_cast<uint8_t*>(&x.n));
+      return x;
+    }
 
     return ExpandV4(srcv4());
   }
 
-  huint128_t
+  net::ipv6addr_t
   IPPacket::dstv6() const
   {
     if (IsV6())
-      return In6ToHUInt(HeaderV6()->dstaddr);
+    {
+      net::ipv6addr_t x{};
+      std::copy_n(HeaderV6()->dstaddr.s6_addr, 16, reinterpret_cast<uint8_t*>(&x.n));
+      return x;
+    }
 
     return ExpandV4(dstv4());
   }
@@ -111,9 +120,9 @@ namespace llarp::net
     const auto port = SrcPort().value_or(net::port_t{});
 
     if (IsV4())
-      return SockAddr{ToNet(srcv4()), port};
+      return SockAddr{srcv4(), port};
     else
-      return SockAddr{ToNet(srcv6()), port};
+      return SockAddr{srcv6(), port};
   }
 
   SockAddr
@@ -121,9 +130,9 @@ namespace llarp::net
   {
     auto port = *DstPort();
     if (IsV4())
-      return SockAddr{ToNet(dstv4()), port};
+      return SockAddr{dstv4(), port};
     else
-      return SockAddr{ToNet(dstv6()), port};
+      return SockAddr{dstv6(), port};
   }
 
   IPPacket::IPPacket(std::vector<byte_t>&& stolen) : _buf{stolen}
@@ -165,37 +174,37 @@ namespace llarp::net
     }
   }
 
-  huint32_t
+  net::ipv4addr_t
   IPPacket::srcv4() const
   {
-    return huint32_t{ntohl(Header()->saddr)};
+    return net::ipv4addr_t{Header()->saddr};
   }
 
-  huint32_t
+  net::ipv4addr_t
   IPPacket::dstv4() const
   {
-    return huint32_t{ntohl(Header()->daddr)};
+    return net::ipv4addr_t{Header()->daddr};
   }
 
-  huint128_t
+  net::ipv6addr_t
   IPPacket::dst4to6() const
   {
     return ExpandV4(dstv4());
   }
 
-  huint128_t
+  net::ipv6addr_t
   IPPacket::src4to6() const
   {
     return ExpandV4(srcv4());
   }
 
-  huint128_t
+  net::ipv6addr_t
   IPPacket::dst4to6Lan() const
   {
     return ExpandV4Lan(dstv4());
   }
 
-  huint128_t
+  net::ipv6addr_t
   IPPacket::src4to6Lan() const
   {
     return ExpandV4Lan(srcv4());
@@ -440,7 +449,8 @@ namespace llarp::net
   }
 
   void
-  IPPacket::UpdateIPv6Address(huint128_t src, huint128_t dst, std::optional<nuint32_t> flowlabel)
+  IPPacket::UpdateIPv6Address(
+      net::ipv6addr_t src, net::ipv6addr_t dst, std::optional<net::flowlabel_t> flowlabel)
   {
     const size_t ihs = 4 + 4 + 16 + 16;
     const auto sz = size();
@@ -461,8 +471,9 @@ namespace llarp::net
     const uint32_t* oDstIP = in6_uint32_ptr(oldDstIP);
 
     // IPv6 address
-    hdr->srcaddr = HUIntToIn6(src);
-    hdr->dstaddr = HUIntToIn6(dst);
+    std::copy_n(reinterpret_cast<const uint8_t*>(&src.n), 16, hdr->srcaddr.s6_addr);
+    std::copy_n(reinterpret_cast<const uint8_t*>(&dst.n), 16, hdr->dstaddr.s6_addr);
+
     const uint32_t* nSrcIP = in6_uint32_ptr(hdr->srcaddr);
     const uint32_t* nDstIP = in6_uint32_ptr(hdr->dstaddr);
 
@@ -531,7 +542,7 @@ namespace llarp::net
   }
 
   void
-  IPPacket::ZeroAddresses(std::optional<nuint32_t> flowlabel)
+  IPPacket::ZeroAddresses(std::optional<net::flowlabel_t> flowlabel)
   {
     if (IsV4())
     {
@@ -544,11 +555,11 @@ namespace llarp::net
   }
 
   void
-  IPPacket::ZeroSourceAddress(std::optional<nuint32_t> flowlabel)
+  IPPacket::ZeroSourceAddress(std::optional<net::flowlabel_t> flowlabel)
   {
     if (IsV4())
     {
-      UpdateIPv4Address({0}, xhtonl(dstv4()));
+      UpdateIPv4Address({0}, dstv4());
     }
     else if (IsV6())
     {
@@ -698,4 +709,57 @@ namespace llarp::net
     // TODO: ipv6
     return net::IPPacket{size_t{}};
   }
+
+  IPPacket
+  IPPacket::make_icmp_reply(const net::IPPacket& pkt)
+  {
+    net::IPPacket reply_pkt{pkt.size()};
+    std::copy_n(pkt.data(), pkt.size(), reply_pkt.data());
+    if (pkt.IsV4())
+    {
+      reply_pkt.icmp_type() = 0;
+      reply_pkt.icmp_code() = 0;
+      auto* hdr = reply_pkt.Header();
+      hdr->id++;
+      hdr->ttl--;
+      hdr->frag_off = 0;
+      reply_pkt.UpdateIPv4Address(pkt.dstv4(), pkt.srcv4());
+      hdr->check = 0;
+      hdr->check = ipchksum(reply_pkt.data(), std::min(size_t{hdr->ihl} * 4, pkt.size()));
+      auto* check = reply_pkt.icmp_checksum();
+      *check = 0;
+      *check = ipchksum(
+          reply_pkt.data() + reply_pkt.payload_offset(),
+          reply_pkt.size() - reply_pkt.payload_offset());
+    }
+    else if (pkt.IsV6())
+    {
+      reply_pkt.icmp_type() = 129;
+      reply_pkt.icmp_code() = 0;
+      reply_pkt.UpdateIPv6Address(pkt.dstv6(), pkt.srcv6());
+      auto* check = reply_pkt.icmp_checksum();
+      *check = 0;
+
+      std::array<uint8_t, 40> psuedo_hdr{};
+      auto* hdr = reply_pkt.HeaderV6();
+      auto* ptr = psuedo_hdr.data();
+      std::copy_n(hdr->srcaddr.s6_addr, sizeof(in6_addr), ptr);
+      ptr += sizeof(in6_addr);
+      std::copy_n(hdr->dstaddr.s6_addr, sizeof(in6_addr), ptr);
+      ptr += sizeof(in6_addr);
+      const auto len =
+          ToNet(huint32_t{static_cast<uint32_t>(reply_pkt.size() - reply_pkt.payload_offset())});
+      std::copy_n(&len.n, sizeof(len.n), ptr);
+      psuedo_hdr[39] = hdr->protocol;
+      const auto psuedo_check = ipchksum(psuedo_hdr.data(), psuedo_hdr.size());
+
+      *check = ipchksum(
+          reply_pkt.data() + reply_pkt.payload_offset(),
+          reply_pkt.size() - reply_pkt.payload_offset(),
+          psuedo_check);
+    }
+
+    return reply_pkt;
+  }
+
 }  // namespace llarp::net

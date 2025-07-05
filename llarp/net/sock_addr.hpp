@@ -165,12 +165,6 @@ namespace llarp
     std::variant<nuint32_t, nuint128_t>
     getIP() const;
 
-    /// in host order
-    huint128_t
-    asIPv6() const;
-    huint32_t
-    asIPv4() const;
-
    private:
     bool m_empty = true;
     sockaddr_in6 m_addr;
@@ -197,8 +191,8 @@ namespace std
     operator()(const llarp::SockAddr& addr) const noexcept
     {
       const std::hash<uint16_t> port{};
-      const std::hash<llarp::huint128_t> ip{};
-      return (port(addr.getPort()) << 3) ^ ip(addr.asIPv6());
+      const std::hash<llarp::net::ipv6addr_t> ip{};
+      return (port(addr.getPort()) << 3) ^ ip(addr.getIPv6());
     }
   };
 }  // namespace std

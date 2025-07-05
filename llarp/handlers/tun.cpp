@@ -113,7 +113,7 @@ namespace llarp
       explicit TunDNS(TunEndpoint* ep, const llarp::DnsConfig& conf)
           : dns::Server{ep->Router()->loop(), conf, 0}
           , m_QueryBind{conf.m_QueryBind}
-          , m_OurIP{ToNet(ep->GetIfAddr())}
+          , m_OurIP{ep->GetIfAddr()}
           , m_Endpoint{ep}
       {}
 
@@ -126,8 +126,8 @@ namespace llarp
             },
             m_OurIP,
             conf);
-        PacketSource = ptr;
-        return ptr;
+        PacketSource = std::static_pointer_cast<dns::PacketSource_Base>(ptr);
+        return PacketSource;
       }
     };
 
@@ -239,7 +239,7 @@ namespace llarp
       }
 
       m_OurRange = conf.m_ifaddr;
-      if (!m_OurRange.addr.h)
+      if (!m_OurRange.addr.n)
       {
         const auto maybe = m_router->Net().FindFreeRange();
         if (not maybe.has_value())
@@ -296,7 +296,7 @@ namespace llarp
             const auto parsed = oxenc::bt_deserialize<oxenc::bt_dict>(bdata);
             for (const auto& [key, value] : parsed)
             {
-              huint128_t ip{};
+              net::ipv6addr_t ip{};
               if (not ip.FromString(key))
               {
                 LogWarn(Name(), " malformed IP in addr map data: ", key);
@@ -342,8 +342,8 @@ namespace llarp
                 m_SNodes[*snode] = true;
                 LogInfo(Name(), " remapped ", ip, " to ", *snode);
               }
-              if (m_NextIP < ip)
-                m_NextIP = ip;
+              if (m_NextIP < ToHost(ip))
+                m_NextIP = ToHost(ip);
               // make sure we dont unmap this guy
               MarkIPActive(ip);
             }
@@ -360,7 +360,7 @@ namespace llarp
     }
 
     bool
-    TunEndpoint::HasLocalIP(const huint128_t& ip) const
+    TunEndpoint::HasLocalIP(const net::ipv6addr_t& ip) const
     {
       return m_IPToAddr.find(ip) != m_IPToAddr.end();
     }
@@ -401,7 +401,7 @@ namespace llarp
     }
 
     std::optional<std::variant<service::Address, RouterID>>
-    TunEndpoint::ObtainAddrForIP(huint128_t ip) const
+    TunEndpoint::ObtainAddrForIP(net::ipv6addr_t ip) const
     {
       auto itr = m_IPToAddr.find(ip);
       if (itr == m_IPToAddr.end())
@@ -669,8 +669,8 @@ namespace llarp
         else if (is_localhost_loki(msg))
         {
           const bool lookingForExit = msg.questions[0].Subdomains() == "exit";
-          huint128_t ip = GetIfAddr();
-          if (ip.h)
+          auto ip = GetIfAddr();
+          if (ip.n)
           {
             if (lookingForExit)
             {
@@ -678,7 +678,7 @@ namespace llarp
               {
                 m_ExitMap.ForEachEntry(
                     [&msg](const auto&, const auto& exit) { msg.AddCNAMEReply(exit.ToString()); });
-                msg.AddINReply(ip, isV6);
+                msg.AddINReply(ToHost(ip), isV6);
               }
               else
               {
@@ -688,7 +688,7 @@ namespace llarp
             else
             {
               msg.AddCNAMEReply(m_Identity.pub.Name(), 1);
-              msg.AddINReply(ip, isV6);
+              msg.AddINReply(ToHost(ip), isV6);
             }
           }
           else
@@ -750,7 +750,7 @@ namespace llarp
         // reverse dns
         if (auto ip = dns::DecodePTR(msg.questions[0].qname))
         {
-          if (auto maybe = ObtainAddrForIP(*ip))
+          if (auto maybe = ObtainAddrForIP(ToNet(*ip)))
           {
             var::visit([&msg](auto&& result) { msg.AddAReply(result.ToString()); }, *maybe);
             reply(msg);
@@ -824,8 +824,11 @@ namespace llarp
         // hook any ranges we own
         if (msg.questions[0].qtype == llarp::dns::qTypePTR)
         {
-          if (auto ip = dns::DecodePTR(msg.questions[0].qname))
-            return m_OurRange.Contains(*ip);
+          if (auto maybe = dns::DecodePTR(msg.questions[0].qname))
+          {
+            auto ip = ToNet(*maybe);
+            return m_OurRange.Contains(ip) or ip == m_OurIPv6;
+          }
           return false;
         }
       }
@@ -840,7 +843,7 @@ namespace llarp
     }
 
     bool
-    TunEndpoint::MapAddress(const service::Address& addr, huint128_t ip, bool SNode)
+    TunEndpoint::MapAddress(const service::Address& addr, net::ipv6addr_t ip, bool SNode)
     {
       auto itr = m_IPToAddr.find(ip);
       if (itr != m_IPToAddr.end())
@@ -883,7 +886,7 @@ namespace llarp
     bool
     TunEndpoint::SetupTun()
     {
-      m_NextIP = m_OurIP;
+      m_NextIP = ToHost(m_OurIP);
       m_MaxIP = m_OurRange.HighestAddr();
       llarp::LogInfo(Name(), " set ", m_IfName, " to have address ", m_OurIP);
       llarp::LogInfo(Name(), " allocated up to ", m_MaxIP, " on range ", m_OurRange);
@@ -934,14 +937,17 @@ namespace llarp
         return false;
       }
 
-      m_OurIPv6 = llarp::huint128_t{
-          llarp::uint128_t{0xfd2e'6c6f'6b69'0000, llarp::net::TruncateV6(m_OurRange.addr).h}};
+      m_OurIPv6 = net::ipv6addr_t::from_host(llarp::uint128_t{
+          0xfd2e'6c6f'6b69'0000, ToHost(llarp::net::TruncateV6(m_OurRange.addr)).h});
 
       if (auto maybe = m_router->Net().GetInterfaceIPv6Address(m_IfName))
       {
         m_OurIPv6 = *maybe;
         LogInfo(Name(), " has ipv6 address ", m_OurIPv6);
       }
+
+      if (not MapAddress(ourAddr, m_OurIPv6, false))
+        return false;
 
       LogInfo(Name(), " setting up dns...");
       SetupDNS();
@@ -1012,7 +1018,7 @@ namespace llarp
 
     std::optional<service::Address>
     TunEndpoint::ObtainExitAddressFor(
-        huint128_t ip,
+        net::ipv6addr_t ip,
         std::function<service::Address(std::unordered_set<service::Address>)> exitSelectionStrat)
     {
       // is it already mapped? return the mapping
@@ -1051,7 +1057,7 @@ namespace llarp
     void
     TunEndpoint::HandleGotUserPacket(net::IPPacket pkt)
     {
-      huint128_t dst, src;
+      net::ipv6addr_t dst, src;
       if (pkt.IsV4())
       {
         dst = pkt.dst4to6();
@@ -1205,7 +1211,7 @@ namespace llarp
       }
       else
         return false;
-      huint128_t src, dst;
+      net::ipv6addr_t src, dst;
 
       net::IPPacket pkt;
       if (not pkt.Load(buf))
@@ -1227,7 +1233,7 @@ namespace llarp
           else if (pkt.IsV6())
           {
             dst = pkt.dstv6();
-            src = net::ExpandV4Lan(net::TruncateV6(src));
+            src = pkt.src4to6Lan();
           }
         }
         else
@@ -1278,7 +1284,7 @@ namespace llarp
 
     bool
     TunEndpoint::HandleWriteIPPacket(
-        const llarp_buffer_t& b, huint128_t src, huint128_t dst, uint64_t seqno)
+        const llarp_buffer_t& b, net::ipv6addr_t src, net::ipv6addr_t dst, uint64_t seqno)
     {
       ManagedBuffer buf(b);
       WritePacket write;
@@ -1291,7 +1297,7 @@ namespace llarp
       }
       if (pkt.IsV4())
       {
-        pkt.UpdateIPv4Address(xhtonl(net::TruncateV6(src)), xhtonl(net::TruncateV6(dst)));
+        pkt.UpdateIPv4Address(net::TruncateV6(src), net::TruncateV6(dst));
       }
       else if (pkt.IsV6())
       {
@@ -1303,17 +1309,17 @@ namespace llarp
       return true;
     }
 
-    huint128_t
+    net::ipv6addr_t
     TunEndpoint::GetIfAddr() const
     {
       return m_OurIP;
     }
 
-    huint128_t
+    net::ipv6addr_t
     TunEndpoint::ObtainIPForAddr(std::variant<service::Address, RouterID> addr)
     {
       llarp_time_t now = Now();
-      huint128_t nextIP = {0};
+      net::ipv6addr_t nextIP = {0};
       AlignedBuffer<32> ident{};
       bool snode = false;
 
@@ -1335,13 +1341,13 @@ namespace llarp
         }
       }
       // allocate new address
-      if (m_NextIP < m_MaxIP)
+      if (m_NextIP < ToHost(m_MaxIP))
       {
         do
         {
-          nextIP = ++m_NextIP;
-        } while (m_IPToAddr.find(nextIP) != m_IPToAddr.end() && m_NextIP < m_MaxIP);
-        if (nextIP < m_MaxIP)
+          nextIP = ToNet(++m_NextIP);
+        } while (m_IPToAddr.find(nextIP) != m_IPToAddr.end() && m_NextIP < ToHost(m_MaxIP));
+        if (ToHost(nextIP) < ToHost(m_MaxIP))
         {
           m_AddrToIP[ident] = nextIP;
           m_IPToAddr[nextIP] = ident;
@@ -1357,7 +1363,7 @@ namespace llarp
       // we are full
       // expire least active ip
       // TODO: prevent DoS
-      std::pair<huint128_t, llarp_time_t> oldest = {huint128_t{0}, 0s};
+      std::pair<net::ipv6addr_t, llarp_time_t> oldest = {net::ipv6addr_t{}, 0s};
 
       // find oldest entry
       auto itr = m_IPActivity.begin();
@@ -1386,20 +1392,20 @@ namespace llarp
     }
 
     bool
-    TunEndpoint::HasRemoteForIP(huint128_t ip) const
+    TunEndpoint::HasRemoteForIP(net::ipv6addr_t ip) const
     {
       return m_IPToAddr.find(ip) != m_IPToAddr.end();
     }
 
     void
-    TunEndpoint::MarkIPActive(huint128_t ip)
+    TunEndpoint::MarkIPActive(net::ipv6addr_t ip)
     {
       llarp::LogDebug(Name(), " address ", ip, " is active");
       m_IPActivity[ip] = std::max(Now(), m_IPActivity[ip]);
     }
 
     void
-    TunEndpoint::MarkIPActiveForever(huint128_t ip)
+    TunEndpoint::MarkIPActiveForever(net::ipv6addr_t ip)
     {
       m_IPActivity[ip] = std::numeric_limits<llarp_time_t>::max();
     }

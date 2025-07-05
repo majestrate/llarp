@@ -156,32 +156,32 @@ namespace llarp
       bool
       HasLocalMappedAddrFor(const PubKey& pk) const;
 
-      huint128_t
+      net::ipv6addr_t
       GetIfAddr() const;
 
       void
       Flush();
 
-      huint128_t
+      net::ipv6addr_t
       GetIPForIdent(const PubKey pk);
       /// async obtain snode session and call callback when it's ready to send
       void
       ObtainSNodeSession(const RouterID& router, exit::SessionReadyFunc obtainCb);
 
      private:
-      huint128_t
+      net::ipv6addr_t
       AllocateNewAddress();
 
       /// obtain ip for service node session, creates a new session if one does
       /// not existing already
-      huint128_t
+      net::ipv6addr_t
       ObtainServiceNodeIP(const RouterID& router);
 
       bool
-      QueueSNodePacket(const llarp_buffer_t& buf, huint128_t from);
+      QueueSNodePacket(const llarp_buffer_t& buf, net::ipv6addr_t from);
 
       void
-      MarkIPActive(huint128_t ip);
+      MarkIPActive(net::ipv6addr_t ip);
 
       void
       KickIdentOffExit(const PubKey& pk);
@@ -197,7 +197,7 @@ namespace llarp
 
       std::unordered_multimap<PubKey, std::unique_ptr<exit::Endpoint>> m_ActiveExits;
 
-      using KeyMap_t = std::unordered_map<PubKey, huint128_t>;
+      using KeyMap_t = std::unordered_map<PubKey, net::ipv6addr_t>;
 
       KeyMap_t m_KeyToIP;
 
@@ -209,16 +209,16 @@ namespace llarp
       /// snode sessions we are talking to directly
       SNodeSessions_t m_SNodeSessions;
 
-      std::unordered_map<huint128_t, PubKey> m_IPToKey;
+      std::unordered_map<net::ipv6addr_t, PubKey> m_IPToKey;
 
-      huint128_t m_IfAddr;
-      huint128_t m_HigestAddr;
+      net::ipv6addr_t m_IfAddr;
+      net::ipv6addr_t m_HigestAddr;
 
       huint128_t m_NextAddr;
       IPRange m_OurRange;
       std::string m_ifname;
 
-      std::unordered_map<huint128_t, llarp_time_t> m_IPActivity;
+      std::unordered_map<net::ipv6addr_t, llarp_time_t> m_IPActivity;
 
       std::shared_ptr<vpn::NetworkInterface> m_NetIf;
 

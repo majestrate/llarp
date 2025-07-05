@@ -248,7 +248,7 @@ namespace llarp
 
     // Constructs and initializes a new default (libuv) event loop
     static std::shared_ptr<EventLoop>
-    create(size_t queueLength = event_loop_queue_size);
+    create(size_t num_threads, size_t queueLength = event_loop_queue_size);
 
     // Returns true if called from within the event loop thread, false otherwise.
     virtual bool
@@ -273,6 +273,9 @@ namespace llarp
 
     virtual void
     queue_slow_work(std::unique_ptr<EventLoopWork> work) = 0;
+
+    virtual size_t
+    num_worker_threads() const = 0;
   };
 
   using EventLoop_ptr = std::shared_ptr<EventLoop>;

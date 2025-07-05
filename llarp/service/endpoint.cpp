@@ -1618,8 +1618,8 @@ namespace llarp
       using namespace std::placeholders;
       if (nodeSessions.count(snode) == 0)
       {
-        const auto src = xhtonl(net::TruncateV6(GetIfAddr()));
-        const auto dst = xhtonl(net::TruncateV6(ObtainIPForAddr(snode)));
+        const auto src = net::TruncateV6(GetIfAddr());
+        const auto dst = net::TruncateV6(ObtainIPForAddr(snode));
 
         auto session = std::make_shared<exit::SNodeSession>(
             snode,

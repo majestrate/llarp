@@ -1,5 +1,6 @@
 #include "session.hpp"
 
+#include <cstdint>
 #include <llarp/messages/link_intro.hpp>
 #include <llarp/messages/discard.hpp>
 #include <llarp/util/meta/memfn.hpp>
@@ -11,6 +12,8 @@ namespace llarp
 {
   namespace iwp
   {
+    static auto logcat = log::Cat("iwp");
+
     ILinkSession::Packet_t
     CreatePacket(Command cmd, size_t plainsize, size_t minpad, size_t variance)
     {
@@ -145,6 +148,7 @@ namespace llarp
         LogError("failed to encode LIM for ", m_RemoteAddr);
         return;
       }
+      data.resize(buf.cur - buf.base);
       if (not SendMessageBuffer(std::move(data), h))
       {
         LogError("failed to send LIM to ", m_RemoteAddr);
@@ -211,19 +215,79 @@ namespace llarp
       }
       const auto now = m_Parent->Now();
       const auto msgid = m_TXID++;
-      const auto bufsz = buf.size();
-      auto& msg =
-          m_TXMsgs.emplace(msgid, OutboundMessage{msgid, std::move(buf), now, completed, priority})
-              .first->second;
-      TriggerPump();
+
+      m_TXMsgs.emplace(msgid, OutboundMessage{msgid, std::move(buf), now, completed, priority});
+      m_ToHash.emplace(msgid);
+      m_Parent->TriggerHashing(shared_from_this());
+      return true;
+    }
+
+    void
+    Session::TriggerHashGen()
+    {
+      std::vector<OutboundMessage> msgs;
+      for (auto msgid : m_ToHash)
+        msgs.emplace_back(m_TXMsgs[msgid]);
+
+      log::trace(logcat, "hash {} outbound messages", msgs.size());
+
+      if (msgs.empty())
+        return;
+
+      m_Parent->hasher()->async_hash_many(m_RemoteAddr, std::move(msgs));
+
+      m_ToHash.clear();
+    }
+
+    void
+    Session::RecvHashed(std::vector<OutboundMessage> msgs)
+    {
+      log::trace(logcat, "got {} messages ready to send to {}", msgs.size(), m_RemoteAddr);
+      for (auto& msg : msgs)
+        HandleGeneratedHash(msg);
+      Pump();
+    }
+
+    void
+    Session::HandleGeneratedHash(const OutboundMessage& m)
+    {
+      uint64_t msgid = m.m_MsgID;
+      auto& msg = m_TXMsgs[msgid];
+      msg.m_Digest = m.m_Digest;
+      auto bufsz = msg.size();
       EncryptAndSend(msg.XMIT());
       if (bufsz > FragmentSize)
       {
+        auto now = m_Parent->Now();
         msg.FlushUnAcked(util::memFn(&Session::EncryptAndSend, this), now);
       }
       m_Stats.totalInFlightTX++;
-      LogDebug("send message ", msgid, " to ", m_RemoteAddr);
-      return true;
+      log::debug(
+          logcat,
+          "send message {} to {} hash={} {} bytes",
+          msgid,
+          m_RemoteAddr,
+          msg.m_Digest,
+          bufsz);
+    }
+
+    void
+    Session::VerifiedMessage(uint64_t msgid)
+    {
+      log::debug(logcat, "got verified message {} from {}", msgid, m_RemoteAddr);
+      if (m_RXMsgs.count(msgid))
+        HandleRecvMsgCompleted(m_RXMsgs[msgid]);
+      if (auto itr = m_PendingHash.find(msgid); itr != m_PendingHash.end())
+        m_PendingHash.erase(itr);
+    }
+
+    void
+    Session::DropMessage(uint64_t msgid)
+    {
+      if (auto itr = m_RXMsgs.find(msgid); itr != m_RXMsgs.end())
+        m_RXMsgs.erase(itr);
+      if (auto itr = m_PendingHash.find(msgid); itr != m_PendingHash.end())
+        m_PendingHash.erase(itr);
     }
 
     void
@@ -800,21 +864,9 @@ namespace llarp
           sz = std::min(sz, uint16_t{FragmentSize});
           if ((data.size() - XMITOverhead) == sz)
           {
-            {
-              const llarp_buffer_t buf(data.data() + (data.size() - sz), sz);
-              itr->second.HandleData(0, buf, now);
-              if (not itr->second.IsCompleted())
-              {
-                return;
-              }
-
-              if (not itr->second.Verify())
-              {
-                LogError("bad short xmit hash from ", m_RemoteAddr);
-                return;
-              }
-            }
-            HandleRecvMsgCompleted(itr->second);
+            const llarp_buffer_t buf(data.data() + (data.size() - sz), sz);
+            itr->second.HandleData(0, buf, now);
+            maybe_queue_verify(itr);
           }
         }
         else
@@ -857,18 +909,7 @@ namespace llarp
             data.data() + PacketOverhead + 12, data.size() - (PacketOverhead + 12));
         itr->second.HandleData(sz, buf, m_Parent->Now());
       }
-
-      if (itr->second.IsCompleted())
-      {
-        if (itr->second.Verify())
-        {
-          HandleRecvMsgCompleted(itr->second);
-        }
-        else
-        {
-          LogError("hash mismatch for message ", itr->first);
-        }
-      }
+      maybe_queue_verify(itr);
     }
 
     void
@@ -878,8 +919,7 @@ namespace llarp
       if (m_ReplayFilter.emplace(rxid, m_Parent->Now()).second)
       {
         m_Parent->HandleMessage(this, msg.m_Data);
-        EncryptAndSend(msg.ACKS());
-        LogDebug("recv'd message ", rxid, " from ", m_RemoteAddr);
+        m_SendMACKs.emplace(rxid);
       }
       m_RXMsgs.erase(rxid);
     }

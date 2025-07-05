@@ -23,7 +23,7 @@ namespace llarp::uv
    public:
     using Callback = std::function<void()>;
 
-    Loop(size_t queue_size);
+    Loop(size_t queue_size, size_t worker_num_threads);
 
     virtual void
     run() override;
@@ -83,6 +83,9 @@ namespace llarp::uv
     void
     queue_slow_work(std::unique_ptr<EventLoopWork> work) override;
 
+    size_t
+    num_worker_threads() const override;
+
    protected:
     std::shared_ptr<uvw::Loop> m_Impl;
     std::optional<std::thread::id> m_EventLoopThreadID;
@@ -93,7 +96,9 @@ namespace llarp::uv
     using AtomicQueue_t = llarp::thread::Queue<std::function<void(void)>>;
     AtomicQueue_t m_LogicCalls;
     AtomicQueue_t m_DiskCalls;
+    AtomicQueue_t m_WorkCalls;
     std::unique_ptr<std::thread> m_DiskThread;
+    std::vector<std::thread> m_WorkThreads;
 
 #ifdef LOKINET_DEBUG
     uint64_t last_time;

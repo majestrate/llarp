@@ -1,5 +1,4 @@
 #pragma once
-
 #include "platform.hpp"
 #include <unistd.h>
 #include <sys/socket.h>
@@ -22,6 +21,8 @@
 #include <llarp.hpp>
 
 #include <llarp/util/fs.hpp>
+#include <llarp/util/ioctl.hpp>
+#include <llarp/util/non_blocking.hpp>
 
 namespace llarp::vpn
 {
@@ -34,30 +35,33 @@ namespace llarp::vpn
 
   class LinuxInterface : public NetworkInterface
   {
-    const int m_fd;
+    std::unique_ptr<util::FD> m_FD;
 
    public:
     LinuxInterface(InterfaceInfo info)
-        : NetworkInterface{std::move(info)}, m_fd{::open("/dev/net/tun", O_RDWR)}
+        : NetworkInterface{std::move(info)}
+        , m_FD{std::make_unique<util::FD>(::open("/dev/net/tun", O_RDWR))}
 
     {
-      if (m_fd == -1)
+      if (m_FD->fd() == -1)
         throw std::runtime_error("cannot open /dev/net/tun " + std::string{strerror(errno)});
-
       ifreq ifr{};
       in6_ifreq ifr6{};
-      ifr.ifr_flags = IFF_TUN | IFF_NO_PI;
-      std::copy_n(
-          m_Info.ifname.c_str(),
-          std::min(m_Info.ifname.size(), sizeof(ifr.ifr_name)),
-          ifr.ifr_name);
-      if (::ioctl(m_fd, TUNSETIFF, &ifr) == -1)
-        throw std::runtime_error("cannot set interface name: " + std::string{strerror(errno)});
-      IOCTL control{AF_INET};
+      {
+        ifr.ifr_flags = IFF_TUN | IFF_NO_PI;
+        std::copy_n(
+            m_Info.ifname.c_str(),
+            std::min(m_Info.ifname.size(), sizeof(ifr.ifr_name)),
+            ifr.ifr_name);
+        util::IOCTL ioc{*m_FD};
+        ioc.ioctl(TUNSETIFF, &ifr);
+      }
+      vpn::IOCTL control_v4{AF_INET};
+      std::unique_ptr<vpn::IOCTL> control_v6;
 
-      control.ioctl(SIOCGIFFLAGS, &ifr);
+      control_v4.ioctl(SIOCGIFFLAGS, &ifr);
       const int flags = ifr.ifr_flags;
-      control.ioctl(SIOCGIFINDEX, &ifr);
+      control_v4.ioctl(SIOCGIFINDEX, &ifr);
       m_Info.index = ifr.ifr_ifindex;
 
       for (const auto& ifaddr : m_Info.addrs)
@@ -65,22 +69,25 @@ namespace llarp::vpn
         if (ifaddr.fam == AF_INET)
         {
           ifr.ifr_addr.sa_family = AF_INET;
-          const nuint32_t addr = ToNet(net::TruncateV6(ifaddr.range.addr));
+          const nuint32_t addr = net::TruncateV6(ifaddr.range.addr);
           ((sockaddr_in*)&ifr.ifr_addr)->sin_addr.s_addr = addr.n;
-          control.ioctl(SIOCSIFADDR, &ifr);
+          control_v4.ioctl(SIOCSIFADDR, &ifr);
 
-          const nuint32_t mask = ToNet(net::TruncateV6(ifaddr.range.netmask_bits));
+          const nuint32_t mask = net::TruncateV6(ifaddr.range.netmask_bits);
           ((sockaddr_in*)&ifr.ifr_netmask)->sin_addr.s_addr = mask.n;
-          control.ioctl(SIOCSIFNETMASK, &ifr);
+          control_v4.ioctl(SIOCSIFNETMASK, &ifr);
         }
         if (ifaddr.fam == AF_INET6)
         {
-          ifr6.addr = net::HUIntToIn6(ifaddr.range.addr);
+          std::copy_n(
+              reinterpret_cast<const uint8_t*>(&ifaddr.range.addr.n), 16, ifr6.addr.s6_addr);
           ifr6.prefixlen = llarp::bits::count_bits(ifaddr.range.netmask_bits);
           ifr6.ifindex = m_Info.index;
           try
           {
-            IOCTL{AF_INET6}.ioctl(SIOCSIFADDR, &ifr6);
+            if (not control_v6)
+              control_v6 = std::make_unique<vpn::IOCTL>(AF_INET6);
+            control_v6->ioctl(SIOCSIFADDR, &ifr6);
           }
           catch (std::exception& ex)
           {
@@ -89,18 +96,17 @@ namespace llarp::vpn
         }
       }
       ifr.ifr_flags = static_cast<short>(flags | IFF_UP | IFF_NO_PI);
-      control.ioctl(SIOCSIFFLAGS, &ifr);
+      control_v4.ioctl(SIOCSIFFLAGS, &ifr);
+
+      util::NonBlocking{*m_FD};
     }
 
-    virtual ~LinuxInterface()
-    {
-      ::close(m_fd);
-    }
+    ~LinuxInterface() override = default;
 
     int
     PollFD() const override
     {
-      return m_fd;
+      return m_FD->fd();
     }
 
     net::IPPacket
@@ -108,7 +114,7 @@ namespace llarp::vpn
     {
       std::vector<byte_t> pkt;
       pkt.resize(net::IPPacket::MaxSize);
-      const auto sz = read(m_fd, pkt.data(), pkt.capacity());
+      const auto sz = read(m_FD->fd(), pkt.data(), pkt.capacity());
       if (sz < 0)
       {
         if (errno == EAGAIN or errno == EWOULDBLOCK)
@@ -125,7 +131,7 @@ namespace llarp::vpn
     bool
     WritePacket(net::IPPacket pkt) override
     {
-      const auto sz = write(m_fd, pkt.data(), pkt.size());
+      const auto sz = write(m_FD->fd(), pkt.data(), pkt.size());
       if (sz <= 0)
         return false;
       return sz == static_cast<ssize_t>(pkt.size());
@@ -134,7 +140,7 @@ namespace llarp::vpn
 
   class LinuxRouteManager : public IRouteManager
   {
-    const int fd;
+    const util::FD m_FD;
 
     enum class GatewayMode
     {
@@ -147,7 +153,7 @@ namespace llarp::vpn
     {
       nlmsghdr n;
       rtmsg r;
-      char buf[4096];
+      std::array<char, 128> buf;
 
       void
       AddData(int type, const void* data, int alen)
@@ -195,7 +201,7 @@ namespace llarp::vpn
     };
 
     void
-    Blackhole(int cmd, int flags, int af)
+    Blackhole(int cmd, int flags, int af) const
     {
       NLRequest nl_request{};
       /* Initialize request structure */
@@ -217,7 +223,7 @@ namespace llarp::vpn
         uint128_t addr{};
         nl_request.AddData(RTA_DST, &addr, sizeof(addr));
       }
-      send(fd, &nl_request, sizeof(nl_request), 0);
+      send(m_FD.fd(), &nl_request, sizeof(nl_request), 0);
     }
 
     void
@@ -227,7 +233,7 @@ namespace llarp::vpn
         const _inet_addr& dst,
         const _inet_addr& gw,
         GatewayMode mode,
-        int if_idx)
+        unsigned int if_idx) const
     {
       NLRequest nl_request{};
 
@@ -282,7 +288,7 @@ namespace llarp::vpn
         }
       }
       /* Send message to the netlink */
-      send(fd, &nl_request, sizeof(nl_request), 0);
+      ::send(m_FD.fd(), &nl_request, sizeof(nl_request), 0);
     }
 
     void
@@ -295,15 +301,15 @@ namespace llarp::vpn
         throw std::runtime_error{"we dont have our own network interface?"};
 
       const _inet_addr gateway{maybe->getIPv4()};
-      const _inet_addr lower{ToNet(ipaddr_ipv4_bits(0, 0, 0, 0)), 1};
-      const _inet_addr upper{ToNet(ipaddr_ipv4_bits(128, 0, 0, 0)), 1};
+      const _inet_addr lower{net::ipaddr_ipv4_bits(0, 0, 0, 0), 1};
+      const _inet_addr upper{net::ipaddr_ipv4_bits(128, 0, 0, 0), 1};
 
       Route(cmd, flags, lower, gateway, GatewayMode::eLowerDefault, info.index);
       Route(cmd, flags, upper, gateway, GatewayMode::eUpperDefault, info.index);
 
       if (const auto maybe6 = Net().GetInterfaceIPv6Address(info.ifname))
       {
-        const _inet_addr gateway6{ToNet(*maybe6), 128};
+        const _inet_addr gateway6{*maybe6, 128};
         for (const std::string str : {"::", "4000::", "8000::", "c000::"})
         {
           const _inet_addr hole6{net::ipv6addr_t::from_string(str), 2};
@@ -325,8 +331,7 @@ namespace llarp::vpn
         const auto gateway = var::visit([](auto&& ip) { return _inet_addr{ip}; }, maybe->getIP());
 
         const _inet_addr addr{
-            ToNet(net::TruncateV6(range.addr)),
-            bits::count_bits(net::TruncateV6(range.netmask_bits))};
+            net::TruncateV6(range.addr), bits::count_bits(net::TruncateV6(range.netmask_bits))};
 
         Route(cmd, flags, addr, gateway, GatewayMode::eUpperDefault, info.index);
       }
@@ -335,8 +340,8 @@ namespace llarp::vpn
         const auto maybe = Net().GetInterfaceIPv6Address(info.ifname);
         if (not maybe)
           throw std::runtime_error{"we dont have our own network interface?"};
-        const _inet_addr gateway{ToNet(*maybe), 128};
-        const _inet_addr addr{ToNet(range.addr), bits::count_bits(range.netmask_bits)};
+        const _inet_addr gateway{*maybe, 128};
+        const _inet_addr addr{range.addr, bits::count_bits(range.netmask_bits)};
         Route(cmd, flags, addr, gateway, GatewayMode::eUpperDefault, info.index);
       }
     }
@@ -351,16 +356,13 @@ namespace llarp::vpn
     }
 
    public:
-    LinuxRouteManager() : fd{socket(AF_NETLINK, SOCK_DGRAM, NETLINK_ROUTE)}
+    LinuxRouteManager() : m_FD{socket(AF_NETLINK, SOCK_DGRAM, NETLINK_ROUTE)}
     {
-      if (fd == -1)
+      if (m_FD.fd() == -1)
         throw std::runtime_error{"failed to make netlink socket"};
     }
 
-    ~LinuxRouteManager()
-    {
-      close(fd);
-    }
+    ~LinuxRouteManager() override = default;
 
     void
     AddRoute(net::ipaddr_t ip, net::ipaddr_t gateway) override
@@ -444,7 +446,8 @@ namespace llarp::vpn
     std::shared_ptr<NetworkInterface>
     ObtainInterface(InterfaceInfo info, AbstractRouter*) override
     {
-      return std::make_shared<LinuxInterface>(std::move(info));
+      return std::static_pointer_cast<NetworkInterface>(
+          std::make_shared<LinuxInterface>(std::move(info)));
     };
 
     IRouteManager&

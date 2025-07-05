@@ -1,4 +1,3 @@
 build/
 .vscode/
-lokinet
-lokinet.exe
+.cache/

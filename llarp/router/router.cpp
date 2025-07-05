@@ -1411,14 +1411,6 @@ namespace llarp
       if (bind_addr.getPort() == 0)
         throw std::invalid_argument{"inbound link cannot use port 0"};
 
-      if (Net().IsWildcardAddress(bind_addr.getIP()))
-      {
-        if (auto maybe_ip = OurPublicIP())
-          bind_addr.setIP(*maybe_ip);
-        else
-          throw std::runtime_error{"no public ip provided for inbound socket"};
-      }
-
       auto server = iwp::NewInboundLink(
           m_keyManager,
           loop(),

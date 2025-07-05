@@ -12,11 +12,14 @@ add_library(lokinet-util
   ${CMAKE_CURRENT_BINARY_DIR}/constants/version.cpp
   util/bencode.cpp
   util/buffer.cpp
+  util/fd.cpp
   util/file.cpp
   util/logging.cpp
   util/logging/buffer.cpp
   util/easter_eggs.cpp
+  util/ioctl.cpp
   util/mem.cpp
+  util/non_blocking.cpp
   util/str.cpp
   util/thread/queue_manager.cpp
   util/thread/threading.cpp
@@ -194,6 +197,7 @@ add_library(lokinet-layer-onion
 # layer 2 frames into layer 1 symbols which in the case of iwp are encrypted udp/ip packets
 add_library(lokinet-layer-wire
   STATIC
+  iwp/hasher.cpp
   iwp/iwp.cpp
   iwp/linklayer.cpp
   iwp/message_buffer.cpp

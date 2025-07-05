@@ -100,7 +100,11 @@ namespace llarp::log
     format_sl(const llarp::util::source_location& loc)
     {
       static constexpr std::string_view source_prefix = LOGGING_SOURCE_ROOT;
-      std::string_view filename{loc.file_name()};
+      std::string_view filename;
+      if (auto fn = loc.file_name())
+        filename = fn;
+      else
+        filename = "<unknown>";
       if (filename.substr(0, source_prefix.size()) == source_prefix)
       {
         filename.remove_prefix(source_prefix.size());

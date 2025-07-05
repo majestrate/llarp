@@ -28,7 +28,7 @@ namespace llarp
   void
   SockAddr::applyIPv4MapBytes()
   {
-    std::memcpy(m_addr.sin6_addr.s6_addr, ipv4_map_prefix.data(), ipv4_map_prefix.size());
+    std::memcpy(m_addr.sin6_addr.s6_addr, net::ipv4_map_prefix.data(), net::ipv4_map_prefix.size());
   }
 
   SockAddr::SockAddr()
@@ -147,7 +147,7 @@ namespace llarp
     init();
 
     memcpy(&m_addr, &other, sizeof(sockaddr_in6));
-    if (IPRange::V4MappedRange().Contains(asIPv6()))
+    if (IPRange::V4MappedRange().Contains(getIPv6()))
     {
       setIPv4(
           other.sin6_addr.s6_addr[12],
@@ -171,7 +171,7 @@ namespace llarp
   {
     init();
     memcpy(&m_addr.sin6_addr.s6_addr, &other.s6_addr, sizeof(m_addr.sin6_addr.s6_addr));
-    if (IPRange::V4MappedRange().Contains(asIPv6()))
+    if (IPRange::V4MappedRange().Contains(getIPv6()))
     {
       setIPv4(other.s6_addr[12], other.s6_addr[13], other.s6_addr[14], other.s6_addr[15]);
       m_addr4.sin_port = m_addr.sin6_port;
@@ -213,19 +213,6 @@ namespace llarp
   SockAddr::operator==(const SockAddr& other) const
   {
     return m_addr == other.m_addr;
-  }
-
-  huint128_t
-  SockAddr::asIPv6() const
-  {
-    return net::In6ToHUInt(m_addr.sin6_addr);
-  }
-
-  huint32_t
-  SockAddr::asIPv4() const
-  {
-    const nuint32_t n{m_addr4.sin_addr.s_addr};
-    return ToHost(n);
   }
 
   void
@@ -316,7 +303,7 @@ namespace llarp
   bool
   SockAddr::isIPv4() const
   {
-    return IPRange::V4MappedRange().Contains(asIPv6());
+    return IPRange::V4MappedRange().Contains(getIPv6());
   }
   bool
   SockAddr::isIPv6() const
@@ -380,8 +367,8 @@ namespace llarp
     ip6[13] = b;
     ip6[14] = c;
     ip6[15] = d;
-    const auto ip = ipaddr_ipv4_bits(a, b, c, d);
-    m_addr4.sin_addr.s_addr = htonl(ip.h);
+    const auto ip = net::ipaddr_ipv4_bits(a, b, c, d);
+    m_addr4.sin_addr.s_addr = ip.n;
     m_empty = false;
   }
 

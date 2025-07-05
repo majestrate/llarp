@@ -19,9 +19,8 @@ namespace llarp
         , m_StartedAt{now}
         , m_ResendPriority{priority}
     {
-      const llarp_buffer_t buf(m_Data);
-      CryptoManager::instance()->shorthash(m_Digest, buf);
       m_Acks.set(0);
+      m_Digest.Fill(0);
     }
 
     ILinkSession::Packet_t
@@ -51,6 +50,8 @@ namespace llarp
     bool
     OutboundMessage::ShouldFlush(llarp_time_t now) const
     {
+      if (m_Digest.IsZero())
+        return false;
       return now - m_LastFlush >= TXFlushInterval;
     }
 
