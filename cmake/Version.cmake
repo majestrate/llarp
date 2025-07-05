@@ -1,7 +1,7 @@
 # We do this via a custom command that re-invokes a cmake script because we need the DEPENDS on .git/index so that we will re-run it (to regenerate the commit tag in the version) whenever the current commit changes. If we used a configure_file directly here, it would only re-run when something else causes cmake to re-run.
 
-if(LOKINET_VERSIONTAG)
-  set(VERSIONTAG "${LOKINET_VERSIONTAG}")
+if(LLARP_VERSIONTAG)
+  set(VERSIONTAG "${LLARP_VERSIONTAG}")
   configure_file("${CMAKE_CURRENT_SOURCE_DIR}/constants/version.cpp.in" "${CMAKE_CURRENT_BINARY_DIR}/constants/version.cpp" @ONLY)
 else()
   set(VERSIONTAG "${GIT_VERSION}")
@@ -10,7 +10,7 @@ else()
   if(EXISTS "${GIT_INDEX_FILE}" AND ( GIT_FOUND OR Git_FOUND) )
       message(STATUS "Found Git: ${GIT_EXECUTABLE}")
       set(genversion_args "-DGIT=${GIT_EXECUTABLE}")
-      foreach(v lokinet_VERSION lokinet_VERSION_MAJOR lokinet_VERSION_MINOR lokinet_VERSION_PATCH RELEASE_MOTTO)
+      foreach(v llarp_VERSION llarp_VERSION_MAJOR llarp_VERSION_MINOR llarp_VERSION_PATCH RELEASE_MOTTO)
           list(APPEND genversion_args "-D${v}=${${v}}")
       endforeach()
 

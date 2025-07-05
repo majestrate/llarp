@@ -21,9 +21,9 @@ if(CCACHE_PROGRAM)
 endif()
 
 
-project(lokinet
+project(llarp
     VERSION 0.10.0
-    DESCRIPTION "lokinet - IP packet onion router"
+    DESCRIPTION "llarp - IP packet onion router"
     LANGUAGES ${LANGS})
 
 set(RELEASE_MOTTO "Just like me frfr" CACHE STRING "Release motto")
