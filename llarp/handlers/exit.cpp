@@ -178,7 +178,7 @@ namespace llarp
       if (msg.questions[0].qtype == dns::qTypePTR)
       {
         if (auto ip = dns::DecodePTR(msg.questions[0].qname))
-          return m_OurRange.Contains(*ip);
+          return m_OurRange.Contains(ToNet(*ip));
         return false;
       }
       if (msg.questions[0].qtype == dns::qTypeA || msg.questions[0].qtype == dns::qTypeCNAME
@@ -213,9 +213,10 @@ namespace llarp
     {
       if (msg.questions[0].qtype == dns::qTypePTR)
       {
-        auto ip = dns::DecodePTR(msg.questions[0].qname);
-        if (not ip)
+        auto maybe = dns::DecodePTR(msg.questions[0].qname);
+        if (not maybe)
           return false;
+        auto ip = ToNet(*maybe);
         if (ip == m_IfAddr)
         {
           RouterID us = GetRouter()->pubkey();
@@ -223,7 +224,7 @@ namespace llarp
         }
         else
         {
-          auto itr = m_IPToKey.find(*ip);
+          auto itr = m_IPToKey.find(ip);
           if (itr != m_IPToKey.end() && m_SNodeKeys.find(itr->second) != m_SNodeKeys.end())
           {
             RouterID them = itr->second;
@@ -262,7 +263,7 @@ namespace llarp
           {
             msg.AddCNAMEReply(random.ToString(), 1);
             auto ip = ObtainServiceNodeIP(random);
-            msg.AddINReply(ip, false);
+            msg.AddINReply(ToHost(ip), false);
           }
           else
             msg.AddNXReply();
@@ -271,7 +272,7 @@ namespace llarp
         }
         if (msg.questions[0].IsName("localhost.loki"))
         {
-          msg.AddINReply(GetIfAddr(), isV6);
+          msg.AddINReply(ToHost(GetIfAddr()), isV6);
           reply(msg);
           return true;
         }
@@ -279,7 +280,7 @@ namespace llarp
         RouterID r;
         if (r.FromString(msg.questions[0].Name()))
         {
-          huint128_t ip;
+          net::ipv6addr_t ip;
           PubKey pubKey(r);
           if (isV4 && SupportsV6())
           {
@@ -294,7 +295,7 @@ namespace llarp
                     std::shared_ptr<exit::BaseSession> session) {
                   if (session && session->IsReady())
                   {
-                    msg->AddINReply(m_KeyToIP[pubKey], isV6);
+                    msg->AddINReply(ToHost(m_KeyToIP[pubKey]), isV6);
                   }
                   else
                   {
@@ -311,7 +312,7 @@ namespace llarp
             if (itr != m_KeyToIP.end())
             {
               ip = itr->second;
-              msg.AddINReply(ip, isV6);
+              msg.AddINReply(ToHost(ip), isV6);
             }
             else  // fallback case that should never happen (probably)
               msg.AddNXReply();
@@ -436,7 +437,7 @@ namespace llarp
     {
       // map our address
       const PubKey us(m_Router->pubkey());
-      const huint128_t ip = GetIfAddr();
+      const auto ip = GetIfAddr();
       m_KeyToIP[us] = ip;
       m_IPToKey[ip] = us;
       m_IPActivity[ip] = std::numeric_limits<llarp_time_t>::max();
@@ -478,7 +479,7 @@ namespace llarp
       return m_Router;
     }
 
-    huint128_t
+    net::ipv6addr_t
     ExitEndpoint::GetIfAddr() const
     {
       return m_IfAddr;
@@ -507,10 +508,10 @@ namespace llarp
       return m_KeyToIP.find(pk) != m_KeyToIP.end();
     }
 
-    huint128_t
+    net::ipv6addr_t
     ExitEndpoint::GetIPForIdent(const PubKey pk)
     {
-      huint128_t found{};
+      net::ipv6addr_t found{};
       if (!HasLocalMappedAddrFor(pk))
       {
         // allocate and map
@@ -539,20 +540,20 @@ namespace llarp
       return found;
     }
 
-    huint128_t
+    net::ipv6addr_t
     ExitEndpoint::AllocateNewAddress()
     {
-      if (m_NextAddr < m_HigestAddr)
-        return ++m_NextAddr;
+      if (m_NextAddr < ToHost(m_HigestAddr))
+        return ToNet(++m_NextAddr);
 
       // find oldest activity ip address
-      huint128_t found = {0};
+      net::ipv6addr_t found = {0};
       llarp_time_t min = std::numeric_limits<llarp_time_t>::max();
       for (const auto& [addr, time] : m_IPActivity)
       {
         if (time < min)
         {
-          found.h = addr.h;
+          found = addr;
           min = time;
         }
       }
@@ -626,7 +627,7 @@ namespace llarp
     ExitEndpoint::KickIdentOffExit(const PubKey& pk)
     {
       LogInfo(Name(), " kicking ", pk, " off exit");
-      huint128_t ip = m_KeyToIP[pk];
+      net::ipv6addr_t ip = m_KeyToIP[pk];
       m_KeyToIP.erase(pk);
       m_IPToKey.erase(ip);
       for (auto [exit_itr, end] = m_ActiveExits.equal_range(pk); exit_itr != end;)
@@ -634,7 +635,7 @@ namespace llarp
     }
 
     void
-    ExitEndpoint::MarkIPActive(huint128_t ip)
+    ExitEndpoint::MarkIPActive(net::ipv6addr_t ip)
     {
       m_IPActivity[ip] = GetRouter()->Now();
     }
@@ -646,7 +647,7 @@ namespace llarp
     }
 
     bool
-    ExitEndpoint::QueueSNodePacket(const llarp_buffer_t& buf, huint128_t from)
+    ExitEndpoint::QueueSNodePacket(const llarp_buffer_t& buf, net::ipv6addr_t from)
     {
       net::IPPacket pkt{buf.view_all()};
       if (pkt.empty())
@@ -655,7 +656,7 @@ namespace llarp
       if (m_UseV6)
         pkt.UpdateIPv6Address(from, m_IfAddr);
       else
-        pkt.UpdateIPv4Address(xhtonl(net::TruncateV6(from)), xhtonl(net::TruncateV6(m_IfAddr)));
+        pkt.UpdateIPv4Address(net::TruncateV6(from), net::TruncateV6(m_IfAddr));
       return m_NetIf and m_NetIf->WritePacket(std::move(pkt));
     }
 
@@ -716,7 +717,7 @@ namespace llarp
       else
       {
         m_OurRange = networkConfig.m_ifaddr;
-        if (!m_OurRange.addr.h)
+        if (!m_OurRange.addr.n)
         {
           const auto maybe = m_Router->Net().FindFreeRange();
           if (not maybe.has_value())
@@ -727,7 +728,7 @@ namespace llarp
       const auto host_str = m_OurRange.BaseAddressString();
       // string, or just a plain char array?
       m_IfAddr = m_OurRange.addr;
-      m_NextAddr = m_IfAddr;
+      m_NextAddr = ToHost(m_IfAddr);
       m_HigestAddr = m_OurRange.HighestAddr();
       m_UseV6 = not m_OurRange.IsV4();
 
@@ -745,7 +746,7 @@ namespace llarp
       }
     }
 
-    huint128_t
+    net::ipv6addr_t
     ExitEndpoint::ObtainServiceNodeIP(const RouterID& other)
     {
       const PubKey pubKey{other};
@@ -754,7 +755,7 @@ namespace llarp
       if (pubKey == us)
         return m_IfAddr;
 
-      huint128_t ip = GetIPForIdent(pubKey);
+      auto ip = GetIPForIdent(pubKey);
       if (m_SNodeKeys.emplace(pubKey).second)
       {
         auto session = std::make_shared<exit::SNodeSession>(

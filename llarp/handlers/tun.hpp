@@ -99,7 +99,7 @@ namespace llarp
       TickTun(llarp_time_t now);
 
       bool
-      MapAddress(const service::Address& remote, huint128_t ip, bool SNode);
+      MapAddress(const service::Address& remote, net::ipv6addr_t ip, bool SNode);
 
       bool
       Start() override;
@@ -139,14 +139,14 @@ namespace llarp
       /// handle inbound traffic
       bool
       HandleWriteIPPacket(
-          const llarp_buffer_t& buf, huint128_t src, huint128_t dst, uint64_t seqno);
+          const llarp_buffer_t& buf, net::ipv6addr_t src, net::ipv6addr_t dst, uint64_t seqno);
 
       /// we got a packet from the user
       void
       HandleGotUserPacket(llarp::net::IPPacket pkt);
 
       /// get the local interface's address
-      huint128_t
+      net::ipv6addr_t
       GetIfAddr() const override;
 
       /// we have an interface addr
@@ -157,7 +157,7 @@ namespace llarp
       }
 
       bool
-      HasLocalIP(const huint128_t& ip) const;
+      HasLocalIP(const net::ipv6addr_t& ip) const;
 
       std::optional<net::TrafficPolicy>
       GetExitPolicy() const override
@@ -185,7 +185,7 @@ namespace llarp
 
       /// get a key for ip address
       std::optional<std::variant<service::Address, RouterID>>
-      ObtainAddrForIP(huint128_t ip) const override;
+      ObtainAddrForIP(net::ipv6addr_t ip) const override;
 
       bool
       HasAddress(const AlignedBuffer<32>& addr) const
@@ -194,7 +194,7 @@ namespace llarp
       }
 
       /// get ip address for key unconditionally
-      huint128_t
+      net::ipv6addr_t
       ObtainIPForAddr(std::variant<service::Address, RouterID> addr) override;
 
       void
@@ -221,31 +221,31 @@ namespace llarp
 
       /// return true if we have a remote loki address for this ip address
       bool
-      HasRemoteForIP(huint128_t ipv4) const;
+      HasRemoteForIP(net::ipv6addr_t ipv4) const;
 
       /// mark this address as active
       void
-      MarkIPActive(huint128_t ip);
+      MarkIPActive(net::ipv6addr_t ip);
 
       /// mark this address as active forever
       void
-      MarkIPActiveForever(huint128_t ip);
+      MarkIPActiveForever(net::ipv6addr_t ip);
 
       /// flush writing ip packets to interface
       void
       FlushWrite();
 
-      /// maps ip to key (host byte order)
-      std::unordered_map<huint128_t, AlignedBuffer<32>> m_IPToAddr;
-      /// maps key to ip (host byte order)
-      std::unordered_map<AlignedBuffer<32>, huint128_t> m_AddrToIP;
+      /// maps ip to key
+      std::unordered_map<net::ipv6addr_t, AlignedBuffer<32>> m_IPToAddr;
+      /// maps key to ip
+      std::unordered_map<AlignedBuffer<32>, net::ipv6addr_t> m_AddrToIP;
 
       /// maps key to true if key is a service node, maps key to false if key is
       /// a hidden service
       std::unordered_map<AlignedBuffer<32>, bool> m_SNodes;
 
       /// maps ip address to an exit endpoint, useful when we have multiple exits on a range
-      std::unordered_map<huint128_t, service::Address> m_ExitIPToExitAddress;
+      std::unordered_map<net::ipv6addr_t, service::Address> m_ExitIPToExitAddress;
 
      private:
       /// given an ip address that is not mapped locally find the address it shall be forwarded to
@@ -254,7 +254,7 @@ namespace llarp
       /// return std::nullopt if we cannot route this address to an exit
       std::optional<service::Address>
       ObtainExitAddressFor(
-          huint128_t ip,
+          net::ipv6addr_t ip,
           std::function<service::Address(std::unordered_set<service::Address>)> exitSelectionStrat =
               nullptr);
 
@@ -269,9 +269,9 @@ namespace llarp
       {
         if (ctx)
         {
-          huint128_t ip = ObtainIPForAddr(addr);
+          auto ip = ObtainIPForAddr(addr);
           query->answers.clear();
-          query->AddINReply(ip, sendIPv6);
+          query->AddINReply(ToHost(ip), sendIPv6);
         }
         else
           query->AddNXReply();
@@ -284,16 +284,16 @@ namespace llarp
       DnsConfig m_DnsConfig;
 
       /// maps ip address to timestamp last active
-      std::unordered_map<huint128_t, llarp_time_t> m_IPActivity;
-      /// our ip address (host byte order)
-      huint128_t m_OurIP;
+      std::unordered_map<net::ipv6addr_t, llarp_time_t> m_IPActivity;
+      /// our ip address
+      net::ipv6addr_t m_OurIP;
       /// our network interface's ipv6 address
-      huint128_t m_OurIPv6;
+      net::ipv6addr_t m_OurIPv6;
 
       /// next ip address to allocate (host byte order)
       huint128_t m_NextIP;
-      /// highest ip address to allocate (host byte order)
-      huint128_t m_MaxIP;
+      /// highest ip address to allocate
+      net::ipv6addr_t m_MaxIP;
       /// our ip range we are using
       llarp::IPRange m_OurRange;
       /// list of strict connect addresses for hooks
@@ -302,7 +302,7 @@ namespace llarp
       bool m_UseV6;
       std::string m_IfName;
 
-      std::optional<huint128_t> m_BaseV6Address;
+      std::optional<net::ipv6addr_t> m_BaseV6Address;
 
       std::shared_ptr<vpn::NetworkInterface> m_NetIf;
 

@@ -1,8 +1,7 @@
 #include "ip_range.hpp"
 
-#include "oxenc/bt_serialize.h"
-
-#include "llarp/util/bencode.h"
+#include <oxenc/bt_serialize.h>
+#include <llarp/util/bencode.h>
 
 namespace llarp
 {
@@ -46,7 +45,7 @@ namespace llarp
     }
     if (colinpos == std::string::npos)
     {
-      huint32_t ip;
+      net::ipv4addr_t ip;
       if (!ip.FromString(str))
         return false;
       addr = net::ExpandV4(ip);
@@ -55,10 +54,10 @@ namespace llarp
         const auto bits = stoi(bitsstr);
         if (bits < 0 || bits > 32)
           return false;
-        netmask_bits = netmask_ipv6_bits(96 + bits);
+        netmask_bits = net::netmask_ipv6_bits(96 + bits);
       }
       else
-        netmask_bits = netmask_ipv6_bits(128);
+        netmask_bits = net::netmask_ipv6_bits(128);
     }
     else
     {
@@ -69,11 +68,11 @@ namespace llarp
         auto bits = atoi(bitsstr.c_str());
         if (bits < 0 || bits > 128)
           return false;
-        netmask_bits = netmask_ipv6_bits(bits);
+        netmask_bits = net::netmask_ipv6_bits(bits);
       }
       else
       {
-        netmask_bits = netmask_ipv6_bits(128);
+        netmask_bits = net::netmask_ipv6_bits(128);
       }
     }
     return true;
@@ -84,7 +83,7 @@ namespace llarp
   {
     if (IsV4())
     {
-      const huint32_t addr4 = net::TruncateV6(addr);
+      const auto addr4 = net::TruncateV6(addr);
       return addr4.ToString();
     }
     return addr.ToString();
@@ -95,14 +94,14 @@ namespace llarp
   {
     if (IsV4())
     {
-      const huint32_t mask = net::TruncateV6(netmask_bits);
+      const auto mask = net::TruncateV6(netmask_bits);
       return mask.ToString();
     }
     return netmask_bits.ToString();
   }
 
   std::optional<IPRange>
-  IPRange::FindPrivateRange(const std::list<IPRange>& excluding)
+  IPRange::FindPrivateRange(const std::set<IPRange>& excluding)
   {
     auto good = [&excluding](const IPRange& range) -> bool {
       for (const auto& ex : excluding)

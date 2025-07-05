@@ -105,7 +105,7 @@ namespace llarp
       GetBestConvoTagFor(std::variant<Address, RouterID> addr) const override;
 
       /// get our ifaddr if it is set
-      virtual huint128_t
+      virtual net::ipv6addr_t
       GetIfAddr() const
       {
         return {0};
@@ -206,11 +206,11 @@ namespace llarp
       void
       SetAuthInfoForEndpoint(Address remote, AuthInfo info);
 
-      virtual huint128_t ObtainIPForAddr(std::variant<Address, RouterID>) = 0;
+      virtual net::ipv6addr_t ObtainIPForAddr(std::variant<Address, RouterID>) = 0;
 
       /// get a key for ip address
       virtual std::optional<std::variant<service::Address, RouterID>>
-      ObtainAddrForIP(huint128_t ip) const = 0;
+      ObtainAddrForIP(net::ipv6addr_t ip) const = 0;
 
       // virtual bool
       // HasServiceAddress(const AlignedBuffer< 32 >& addr) const = 0;

@@ -1,12 +1,13 @@
 #pragma once
 
 #include "ip.hpp"
+#include "net_int.hpp"
 #include "net_bits.hpp"
 #include <llarp/util/bits.hpp>
 #include <llarp/util/buffer.hpp>
 #include <llarp/util/types.hpp>
 
-#include <list>
+#include <set>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -15,13 +16,13 @@ namespace llarp
 {
   struct IPRange
   {
-    using Addr_t = huint128_t;
-    huint128_t addr = {0};
-    huint128_t netmask_bits = {0};
+    using Addr_t = net::ipv6addr_t;
+    Addr_t addr = {0};
+    Addr_t netmask_bits = {0};
 
-    constexpr IPRange()
-    {}
-    constexpr IPRange(huint128_t address, huint128_t netmask)
+    constexpr IPRange() = default;
+
+    constexpr IPRange(Addr_t address, Addr_t netmask)
         : addr{std::move(address)}, netmask_bits{std::move(netmask)}
     {}
 
@@ -32,35 +33,34 @@ namespace llarp
             fmt::format("IP string '{}' cannot be parsed as IP range", _range)};
     }
 
-    static constexpr IPRange
+    static inline IPRange
     V4MappedRange()
     {
-      return IPRange{huint128_t{0x0000'ffff'0000'0000UL}, netmask_ipv6_bits(96)};
+      return IPRange{Addr_t::from_host(0x0000'ffff'0000'0000UL), net::netmask_ipv6_bits(96)};
     }
 
-    static constexpr IPRange
+    static inline IPRange
     FromIPv4(byte_t a, byte_t b, byte_t c, byte_t d, byte_t mask)
     {
-      return IPRange{net::ExpandV4(ipaddr_ipv4_bits(a, b, c, d)), netmask_ipv6_bits(mask + 96)};
+      return IPRange{
+          net::ExpandV4(net::ipaddr_ipv4_bits(a, b, c, d)), net::netmask_ipv6_bits(mask + 96)};
     }
 
     static inline IPRange
     FromIPv4(net::ipv4addr_t addr, net::ipv4addr_t netmask)
     {
-      return IPRange{
-          net::ExpandV4(llarp::net::ToHost(addr)),
-          netmask_ipv6_bits(bits::count_bits(netmask) + 96)};
+      return IPRange{net::ExpandV4(addr), net::netmask_ipv6_bits(bits::count_bits(netmask) + 96)};
     }
 
     /// return true if this iprange is in the IPv4 mapping range for containing ipv4 addresses
-    constexpr bool
+    inline bool
     IsV4() const
     {
       return V4MappedRange().Contains(addr);
     }
 
     /// get address family
-    constexpr int
+    inline int
     Family() const
     {
       if (IsV4())
@@ -69,7 +69,7 @@ namespace llarp
     }
 
     /// return the number of bits set in the hostmask
-    constexpr int
+    inline int
     HostmaskBits() const
     {
       if (IsV4())
@@ -80,14 +80,14 @@ namespace llarp
     }
 
     /// return true if our range and other intersect
-    constexpr bool
+    inline bool
     operator*(const IPRange& other) const
     {
       return Contains(other) or other.Contains(*this);
     }
 
     /// return true if the other range is inside our range
-    constexpr bool
+    inline bool
     Contains(const IPRange& other) const
     {
       return Contains(other.addr) and Contains(other.HighestAddr());
@@ -101,8 +101,8 @@ namespace llarp
     }
 
     /// return true if we are a ipv4 range and contains this ip
-    constexpr bool
-    Contains(const huint32_t& ip) const
+    inline bool
+    Contains(const net::ipv4addr_t& ip) const
     {
       if (not IsV4())
         return false;
@@ -114,39 +114,43 @@ namespace llarp
     {
       if (IsV4())
       {
-        return ToNet(net::TruncateV6(addr) + huint32_t{1});
+        return ToNet(ToHost(net::TruncateV6(addr)) + huint32_t{1});
       }
-      return ToNet(addr + huint128_t{1});
+      return ToNet(ToHost(addr) + huint128_t{1});
     }
 
     inline bool
     Contains(const net::ipaddr_t& ip) const
     {
-      return var::visit([this](auto&& ip) { return Contains(llarp::net::ToHost(ip)); }, ip);
+      return var::visit([this](auto&& ip) { return Contains(ip); }, ip);
     }
 
     /// get the highest address on this range
-    constexpr huint128_t
+    inline Addr_t
     HighestAddr() const
     {
-      return (addr & netmask_bits) + (huint128_t{1} << (128 - bits::count_bits_128(netmask_bits.h)))
-          - huint128_t{1};
+      return ToNet(
+          ToHost(addr & netmask_bits)
+          + (huint128_t{1} << (128 - bits::count_bits_128(netmask_bits.n))) - huint128_t{1});
     }
 
-    bool
+    inline bool
     operator<(const IPRange& other) const
     {
-      auto maskedA = addr & netmask_bits, maskedB = other.addr & other.netmask_bits;
-      return std::tie(maskedA, netmask_bits) < std::tie(maskedB, other.netmask_bits);
+      const auto maskedA = ToHost(addr & netmask_bits),
+                 maskedB = ToHost(other.addr & other.netmask_bits);
+      const auto h_net_bits = ToHost(netmask_bits);
+      const auto h_other_bits = ToHost(other.netmask_bits);
+      return std::tie(maskedA, h_net_bits) < std::tie(maskedB, h_other_bits);
     }
 
-    bool
+    inline bool
     operator==(const IPRange& other) const
     {
       return addr == other.addr and netmask_bits == other.netmask_bits;
     }
 
-    std::string
+    inline std::string
     ToString() const
     {
       return BaseAddressString() + "/" + std::to_string(HostmaskBits());
@@ -169,7 +173,7 @@ namespace llarp
 
     /// Finds a free private use range not overlapping the given ranges.
     static std::optional<IPRange>
-    FindPrivateRange(const std::list<IPRange>& excluding);
+    FindPrivateRange(const std::set<IPRange>& excluding);
   };
 
   template <>

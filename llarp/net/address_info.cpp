@@ -6,6 +6,7 @@
 #include "net.hpp"
 #include <llarp/util/bencode.h>
 #include <llarp/util/mem.h>
+#include <netinet/in.h>
 
 #include <cstring>
 
@@ -22,7 +23,9 @@ namespace llarp
   bool
   operator<(const AddressInfo& lhs, const AddressInfo& rhs)
   {
-    return std::tie(lhs.rank, lhs.ip, lhs.port) < std::tie(rhs.rank, rhs.ip, rhs.port);
+    const auto l_ip = ToHost(lhs.ip);
+    const auto r_ip = ToHost(rhs.ip);
+    return std::tie(lhs.rank, l_ip, lhs.port) < std::tie(rhs.rank, r_ip, rhs.port);
   }
 
   std::variant<nuint32_t, nuint128_t>
@@ -35,7 +38,7 @@ namespace llarp
   AddressInfo::DecodeKey(const llarp_buffer_t& key, llarp_buffer_t* buf)
   {
     uint64_t i;
-    char tmp[128] = {0};
+    std::array<char, 128> tmp{};
 
     llarp_buffer_t strbuf;
 
@@ -57,11 +60,11 @@ namespace llarp
     {
       if (!bencode_read_string(buf, &strbuf))
         return false;
-      if (strbuf.sz > sizeof(tmp))
+      if (strbuf.sz > tmp.size())
         return false;
-      memcpy(tmp, strbuf.base, strbuf.sz);
+      std::copy_n(strbuf.base, strbuf.sz, tmp.data());
       tmp[strbuf.sz] = 0;
-      dialect = std::string(tmp);
+      dialect = std::string(tmp.data());
       return true;
     }
 
@@ -76,13 +79,11 @@ namespace llarp
     {
       if (!bencode_read_string(buf, &strbuf))
         return false;
-
       if (strbuf.sz >= sizeof(tmp))
         return false;
-
-      memcpy(tmp, strbuf.base, strbuf.sz);
+      std::copy_n(strbuf.base, strbuf.sz, tmp.data());
       tmp[strbuf.sz] = 0;
-      return inet_pton(AF_INET6, tmp, &ip.s6_addr[0]) == 1;
+      return inet_pton(AF_INET6, tmp.data(), reinterpret_cast<uint8_t*>(&ip.n)) == 1;
     }
 
     // port
@@ -113,7 +114,7 @@ namespace llarp
   bool
   AddressInfo::BEncode(llarp_buffer_t* buff) const
   {
-    char ipbuff[128] = {0};
+    std::array<char, 128> ipbuff{};
     const char* ipstr;
     if (!bencode_start_dict(buff))
       return false;
@@ -133,12 +134,13 @@ namespace llarp
     if (!bencode_write_bytestring(buff, pubkey.data(), PUBKEYSIZE))
       return false;
     /** ip */
-    ipstr = inet_ntop(AF_INET6, (void*)&ip, ipbuff, sizeof(ipbuff));
+    ipstr =
+        inet_ntop(AF_INET6, reinterpret_cast<const uint8_t*>(&ip.n), ipbuff.data(), ipbuff.size());
     if (!ipstr)
       return false;
     if (!bencode_write_bytestring(buff, "i", 1))
       return false;
-    if (!bencode_write_bytestring(buff, ipstr, strnlen(ipstr, sizeof(ipbuff))))
+    if (!bencode_write_bytestring(buff, ipstr, strnlen(ipstr, ipbuff.size())))
       return false;
     /** port */
     if (!bencode_write_bytestring(buff, "p", 1))
@@ -157,15 +159,15 @@ namespace llarp
   AddressInfo::fromSockAddr(const SockAddr& addr)
   {
     const auto* addr6 = static_cast<const sockaddr_in6*>(addr);
-    memcpy(ip.s6_addr, addr6->sin6_addr.s6_addr, sizeof(ip.s6_addr));
+    std::copy_n(addr6->sin6_addr.s6_addr, 16, reinterpret_cast<uint8_t*>(&ip.n));
     port = addr.getPort();
   }
 
   std::string
   AddressInfo::ToString() const
   {
-    char tmp[INET6_ADDRSTRLEN] = {0};
-    inet_ntop(AF_INET6, (void*)&ip, tmp, sizeof(tmp));
-    return fmt::format("[{}]:{}", tmp, port);
+    std::array<char, INET6_ADDRSTRLEN> tmp{};
+    inet_ntop(AF_INET6, reinterpret_cast<const uint8_t*>(&ip.n), tmp.data(), tmp.size());
+    return fmt::format("[{}]:{}", std::string_view{tmp.data()}, port);
   }
 }  // namespace llarp

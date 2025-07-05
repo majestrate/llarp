@@ -29,7 +29,7 @@ namespace llarp
           const llarp::PubKey& remoteIdent,
           const llarp::path::HopHandler_ptr& path,
           bool rewriteIP,
-          huint128_t ip,
+          net::ipv6addr_t ip,
           llarp::handlers::ExitEndpoint* parent);
 
       ~Endpoint();
@@ -96,7 +96,7 @@ namespace llarp
         return m_RxRate;
       }
 
-      huint128_t
+      net::ipv6addr_t
       LocalIP() const
       {
         return m_IP;
@@ -108,7 +108,7 @@ namespace llarp
       llarp::handlers::ExitEndpoint* m_Parent;
       llarp::PubKey m_remoteSignKey;
       llarp::path::HopHandler_ptr m_CurrentPath;
-      llarp::huint128_t m_IP;
+      net::ipv6addr_t m_IP;
       uint64_t m_TxRate, m_RxRate;
       llarp_time_t m_LastActive;
       bool m_RewriteSource;

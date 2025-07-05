@@ -69,17 +69,18 @@ namespace llarp::vpn
         if (ifaddr.fam == AF_INET)
         {
           ifr.ifr_addr.sa_family = AF_INET;
-          const nuint32_t addr = ToNet(net::TruncateV6(ifaddr.range.addr));
+          const nuint32_t addr = net::TruncateV6(ifaddr.range.addr);
           ((sockaddr_in*)&ifr.ifr_addr)->sin_addr.s_addr = addr.n;
           control_v4.ioctl(SIOCSIFADDR, &ifr);
 
-          const nuint32_t mask = ToNet(net::TruncateV6(ifaddr.range.netmask_bits));
+          const nuint32_t mask = net::TruncateV6(ifaddr.range.netmask_bits);
           ((sockaddr_in*)&ifr.ifr_netmask)->sin_addr.s_addr = mask.n;
           control_v4.ioctl(SIOCSIFNETMASK, &ifr);
         }
         if (ifaddr.fam == AF_INET6)
         {
-          ifr6.addr = net::HUIntToIn6(ifaddr.range.addr);
+          std::copy_n(
+              reinterpret_cast<const uint8_t*>(&ifaddr.range.addr.n), 16, ifr6.addr.s6_addr);
           ifr6.prefixlen = llarp::bits::count_bits(ifaddr.range.netmask_bits);
           ifr6.ifindex = m_Info.index;
           try
@@ -300,15 +301,15 @@ namespace llarp::vpn
         throw std::runtime_error{"we dont have our own network interface?"};
 
       const _inet_addr gateway{maybe->getIPv4()};
-      const _inet_addr lower{ToNet(ipaddr_ipv4_bits(0, 0, 0, 0)), 1};
-      const _inet_addr upper{ToNet(ipaddr_ipv4_bits(128, 0, 0, 0)), 1};
+      const _inet_addr lower{net::ipaddr_ipv4_bits(0, 0, 0, 0), 1};
+      const _inet_addr upper{net::ipaddr_ipv4_bits(128, 0, 0, 0), 1};
 
       Route(cmd, flags, lower, gateway, GatewayMode::eLowerDefault, info.index);
       Route(cmd, flags, upper, gateway, GatewayMode::eUpperDefault, info.index);
 
       if (const auto maybe6 = Net().GetInterfaceIPv6Address(info.ifname))
       {
-        const _inet_addr gateway6{ToNet(*maybe6), 128};
+        const _inet_addr gateway6{*maybe6, 128};
         for (const std::string str : {"::", "4000::", "8000::", "c000::"})
         {
           const _inet_addr hole6{net::ipv6addr_t::from_string(str), 2};
@@ -330,8 +331,7 @@ namespace llarp::vpn
         const auto gateway = var::visit([](auto&& ip) { return _inet_addr{ip}; }, maybe->getIP());
 
         const _inet_addr addr{
-            ToNet(net::TruncateV6(range.addr)),
-            bits::count_bits(net::TruncateV6(range.netmask_bits))};
+            net::TruncateV6(range.addr), bits::count_bits(net::TruncateV6(range.netmask_bits))};
 
         Route(cmd, flags, addr, gateway, GatewayMode::eUpperDefault, info.index);
       }
@@ -340,8 +340,8 @@ namespace llarp::vpn
         const auto maybe = Net().GetInterfaceIPv6Address(info.ifname);
         if (not maybe)
           throw std::runtime_error{"we dont have our own network interface?"};
-        const _inet_addr gateway{ToNet(*maybe), 128};
-        const _inet_addr addr{ToNet(range.addr), bits::count_bits(range.netmask_bits)};
+        const _inet_addr gateway{*maybe, 128};
+        const _inet_addr addr{range.addr, bits::count_bits(range.netmask_bits)};
         Route(cmd, flags, addr, gateway, GatewayMode::eUpperDefault, info.index);
       }
     }

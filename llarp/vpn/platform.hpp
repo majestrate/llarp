@@ -33,7 +33,6 @@ namespace llarp::vpn
   {
     std::string ifname;
     unsigned int index;
-    huint32_t dnsaddr;
     std::vector<InterfaceAddress> addrs;
 
     /// get address number N
@@ -42,8 +41,8 @@ namespace llarp::vpn
     {
       const auto& range = addrs[idx].range;
       if (range.IsV4())
-        return ToNet(net::TruncateV6(range.addr));
-      return ToNet(range.addr);
+        return net::TruncateV6(range.addr);
+      return range.addr;
     }
   };
 
