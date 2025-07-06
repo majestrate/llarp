@@ -19,3 +19,7 @@ Make use of it by switching to systemd-resolved:
 sudo ln -sf /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf
 sudo systemctl enable --now systemd-resolved
 ```
+
+
+Alternatively you can have systemd-resolved use the DNS provided at `127.3.2.1:53` by llarpd by
+copying the `llarpd.conf` file in this directory to `/etc/systemd/resolved.conf.d/llarpd.conf`.
