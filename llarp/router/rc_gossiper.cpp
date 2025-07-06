@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "rc_gossiper.hpp"
 #include <llarp/messages/dht_immediate.hpp>
 #include <llarp/dht/messages/gotrouter.hpp>

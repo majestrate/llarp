@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "findrouter.hpp"
 
 #include <llarp/dht/context.hpp>

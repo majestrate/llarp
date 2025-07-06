@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "async_key_exchange.hpp"
 
 #include <llarp/crypto/crypto.hpp>

@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "policy.hpp"
 
 namespace llarp

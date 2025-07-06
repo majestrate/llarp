@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "packet_router.hpp"
 
 namespace llarp::vpn

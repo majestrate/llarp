@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "traffic_policy.hpp"
 #include "llarp/util/str.hpp"
 

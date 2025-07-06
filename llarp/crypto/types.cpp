@@ -1,5 +1,5 @@
+#include <llarp/util/alloc.h>
 #include "types.hpp"
-
 #include <llarp/util/buffer.hpp>
 #include <llarp/util/file.hpp>
 #include <llarp/util/fs.hpp>

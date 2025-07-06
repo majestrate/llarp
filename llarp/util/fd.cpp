@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "fd.hpp"
 #include <unistd.h>
 

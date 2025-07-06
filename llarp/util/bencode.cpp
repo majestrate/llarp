@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "bencode.hpp"
 #include <cstdlib>
 #include <cinttypes>

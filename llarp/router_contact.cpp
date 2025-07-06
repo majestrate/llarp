@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "router_contact.hpp"
 
 #include "constants/version.hpp"

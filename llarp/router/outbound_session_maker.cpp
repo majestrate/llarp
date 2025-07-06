@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "outbound_session_maker.hpp"
 
 #include "abstractrouter.hpp"

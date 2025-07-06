@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "time.hpp"
 #include <chrono>
 #include <iomanip>

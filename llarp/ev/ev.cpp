@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "ev.hpp"
 #include <llarp/util/mem.hpp>
 #include <llarp/util/str.hpp>

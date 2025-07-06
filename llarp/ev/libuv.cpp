@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "libuv.hpp"
 #include <uv.h>
 #include <memory>

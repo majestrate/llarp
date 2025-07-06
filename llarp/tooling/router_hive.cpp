@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "router_hive.hpp"
 
 #include <llarp.hpp>

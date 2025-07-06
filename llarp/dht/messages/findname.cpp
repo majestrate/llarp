@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "findname.hpp"
 #include <oxenc/bt_serialize.h>
 #include <llarp/dht/context.hpp>

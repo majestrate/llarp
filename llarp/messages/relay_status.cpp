@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "relay_status.hpp"
 
 #include <llarp/crypto/crypto.hpp>

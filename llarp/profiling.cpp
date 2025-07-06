@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "profiling.hpp"
 #include <oxenc/bt_producer.h>
 #include <oxenc/bt_serialize.h>
@@ -99,7 +100,7 @@ namespace llarp
     return checkIsGood(pathFailCount, pathSuccessCount, chances);
   }
 
-  Profiling::Profiling() : m_DisableProfiling(false)
+  Profiling::Profiling() : m_DisableProfiling(true)
   {}
 
   void
@@ -161,6 +162,8 @@ namespace llarp
   void
   Profiling::MarkConnectTimeout(const RouterID& r)
   {
+    if (m_DisableProfiling.load())
+      return;
     util::Lock lock{m_ProfilesMutex};
     auto& profile = m_Profiles[r];
     profile.connectTimeoutCount += 1;
@@ -186,6 +189,8 @@ namespace llarp
   void
   Profiling::MarkHopFail(const RouterID& r)
   {
+    if (m_DisableProfiling.load())
+      return;
     util::Lock lock{m_ProfilesMutex};
     auto& profile = m_Profiles[r];
     profile.pathFailCount += 1;
@@ -195,6 +200,8 @@ namespace llarp
   void
   Profiling::MarkPathFail(path::Path* p)
   {
+    if (m_DisableProfiling.load())
+      return;
     util::Lock lock{m_ProfilesMutex};
     bool first = true;
     for (const auto& hop : p->hops)
@@ -214,6 +221,8 @@ namespace llarp
   void
   Profiling::MarkPathTimeout(path::Path* p)
   {
+    if (m_DisableProfiling.load())
+      return;
     util::Lock lock{m_ProfilesMutex};
     for (const auto& hop : p->hops)
     {
@@ -243,6 +252,11 @@ namespace llarp
   bool
   Profiling::Save(const fs::path fpath)
   {
+    if (m_DisableProfiling.load())
+    {
+      m_LastSave = llarp::time_now_ms();
+      return true;
+    }
     std::string buf;
     {
       util::Lock lock{m_ProfilesMutex};
@@ -297,6 +311,11 @@ namespace llarp
   bool
   Profiling::Load(const fs::path fname)
   {
+    if (m_DisableProfiling.load())
+    {
+      m_LastSave = llarp::time_now_ms();
+      return true;
+    }
     try
     {
       std::string data = util::slurp_file(fname);

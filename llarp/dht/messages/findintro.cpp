@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include <llarp/dht/context.hpp>
 #include "findintro.hpp"
 #include "gotintro.hpp"

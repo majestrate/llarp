@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "file.hpp"
 #include <fstream>
 #include <ios>

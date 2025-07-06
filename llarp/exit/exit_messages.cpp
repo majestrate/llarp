@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "exit_messages.hpp"
 
 #include <llarp/crypto/crypto.hpp>

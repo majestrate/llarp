@@ -9,6 +9,7 @@ target_sources(lokinet-cryptography PRIVATE
 
 add_library(lokinet-util
   STATIC
+  util/alloc.cpp
   ${CMAKE_CURRENT_BINARY_DIR}/constants/version.cpp
   util/bencode.cpp
   util/buffer.cpp

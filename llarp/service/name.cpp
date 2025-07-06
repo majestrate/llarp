@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "name.hpp"
 #include <llarp/crypto/crypto.hpp>
 #include <llarp/util/str.hpp>

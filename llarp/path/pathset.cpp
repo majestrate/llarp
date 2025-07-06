@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "pathset.hpp"
 
 #include <llarp/dht/messages/pubintro.hpp>

@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "transfer_traffic_message.hpp"
 
 #include "handler.hpp"

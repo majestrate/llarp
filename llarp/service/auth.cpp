@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "auth.hpp"
 #include <unordered_map>
 

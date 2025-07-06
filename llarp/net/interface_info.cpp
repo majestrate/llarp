@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "interface_info.hpp"
 #include <fmt/ranges.h>
 namespace llarp::net

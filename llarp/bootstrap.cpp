@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "bootstrap.hpp"
 #include <llarp/util/fs.hpp>
 #include <llarp/util/bencode.hpp>

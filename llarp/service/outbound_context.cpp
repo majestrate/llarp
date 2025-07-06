@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "outbound_context.hpp"
 #include "async_key_exchange.hpp"
 #include "hidden_service_address_lookup.hpp"

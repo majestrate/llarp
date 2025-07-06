@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "intro.hpp"
 #include <llarp/util/time.hpp>
 

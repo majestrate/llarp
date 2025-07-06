@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "hasher.hpp"
 #include <sodium/crypto_generichash.h>
 #include <functional>
@@ -11,10 +12,10 @@ namespace llarp::iwp
   void
   Hasher::run_worker_thread()
   {
-    llarp::util::SetThreadName("llarp-iwp-work");
+    llarp::util::SetThreadName("llarpd-iwp-work");
     do
     {
-      auto maybe = m_VerifyHash.popFrontWithTimeout(1s);
+      auto maybe = m_VerifyHash.popFrontWithTimeout(50ms);
       if (not maybe and not m_VerifyHash.enabled())
         return;
       if (not maybe)

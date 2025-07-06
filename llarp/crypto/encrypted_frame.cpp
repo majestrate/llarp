@@ -1,5 +1,5 @@
+#include <llarp/util/alloc.h>
 #include "encrypted_frame.hpp"
-
 #include "crypto.hpp"
 #include <llarp/util/logging.hpp>
 #include <llarp/util/mem.hpp>

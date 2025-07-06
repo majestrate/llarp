@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "ioctl.hpp"
 
 namespace llarp::util

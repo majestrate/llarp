@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "ihophandler.hpp"
 #include <llarp/router/abstractrouter.hpp>
 

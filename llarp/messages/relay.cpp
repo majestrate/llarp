@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "relay.hpp"
 
 #include <llarp/path/path_context.hpp>

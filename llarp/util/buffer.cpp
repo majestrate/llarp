@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "buffer.hpp"
 #include <oxenc/endian.h>
 

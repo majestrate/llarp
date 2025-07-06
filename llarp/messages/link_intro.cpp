@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "link_intro.hpp"
 
 #include <llarp/crypto/crypto.hpp>

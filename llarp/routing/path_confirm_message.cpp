@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "path_confirm_message.hpp"
 
 #include "handler.hpp"

@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "crypto_libsodium.hpp"
 #include <sodium/crypto_generichash.h>
 #include <sodium/crypto_sign.h>

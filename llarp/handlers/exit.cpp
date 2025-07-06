@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "exit.hpp"
 
 #include <llarp/dns/dns.hpp>

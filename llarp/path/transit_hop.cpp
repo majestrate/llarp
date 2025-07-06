@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "path.hpp"
 
 #include <llarp/dht/context.hpp>

@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include <lokinet.h>
 #include <llarp.hpp>
 #include <llarp/config/config.hpp>

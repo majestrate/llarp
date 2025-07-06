@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "rr.hpp"
 #include "dns.hpp"
 #include <llarp/util/formattable.hpp>

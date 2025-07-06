@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "convotag.hpp"
 #include <llarp/net/ip.hpp>
 

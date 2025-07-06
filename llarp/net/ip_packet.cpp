@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "ip_packet.hpp"
 #include "ip.hpp"
 #include <llarp/net/net_int.hpp>

@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "pathbuilder.hpp"
 #include "path_context.hpp"
 

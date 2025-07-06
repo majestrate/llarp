@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "address.hpp"
 #include <llarp/crypto/crypto.hpp>
 #include <oxenc/base32z.h>

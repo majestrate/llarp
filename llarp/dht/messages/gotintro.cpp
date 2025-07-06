@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "gotintro.hpp"
 
 #include <llarp/service/intro.hpp>

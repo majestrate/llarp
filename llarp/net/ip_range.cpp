@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "ip_range.hpp"
 
 #include <oxenc/bt_serialize.h>

@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "key_manager.hpp"
 
 #include <system_error>

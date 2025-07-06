@@ -1,4 +1,5 @@
 #ifdef WITH_SYSTEMD
+#include <llarp/util/alloc.h>
 #include "dbus.hpp"
 
 namespace llarp::linux

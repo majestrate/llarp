@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "endpoint.hpp"
 
 #include <llarp/handlers/exit.hpp>

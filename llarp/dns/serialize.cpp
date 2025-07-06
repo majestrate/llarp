@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "serialize.hpp"
 #include <llarp/net/net_int.hpp>
 

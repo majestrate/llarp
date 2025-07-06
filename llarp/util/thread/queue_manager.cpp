@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "queue_manager.hpp"
 #include "threading.hpp"
 

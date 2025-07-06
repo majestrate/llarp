@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "sim_context.hpp"
 #include <llarp.hpp>
 

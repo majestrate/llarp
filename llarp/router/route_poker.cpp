@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "route_poker.hpp"
 #include <llarp/router/abstractrouter.hpp>
 #include <llarp/net/sock_addr.hpp>

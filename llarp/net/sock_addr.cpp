@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "sock_addr.hpp"
 #include "ip_range.hpp"
 #include "address_info.hpp"

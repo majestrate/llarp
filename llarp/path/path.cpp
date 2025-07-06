@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "path.hpp"
 
 #include <llarp/exit/exit_messages.hpp>

@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "protocol.hpp"
 #include <llarp/path/path.hpp>
 #include <llarp/routing/handler.hpp>

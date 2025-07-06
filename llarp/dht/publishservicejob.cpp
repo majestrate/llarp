@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "publishservicejob.hpp"
 
 #include "context.hpp"

@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "dht_immediate.hpp"
 
 #include <llarp/router/abstractrouter.hpp>

@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include <chrono>
 #include "rc_lookup_handler.hpp"
 

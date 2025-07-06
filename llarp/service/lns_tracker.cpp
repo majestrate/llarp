@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "lns_tracker.hpp"
 
 namespace llarp::service

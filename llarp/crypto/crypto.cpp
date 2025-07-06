@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "crypto.hpp"
 
 namespace llarp

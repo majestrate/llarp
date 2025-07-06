@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "router_id.hpp"
 #include <oxenc/base32z.h>
 

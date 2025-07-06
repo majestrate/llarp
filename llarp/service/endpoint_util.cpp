@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "endpoint_util.hpp"
 
 #include <llarp/exit/session.hpp>

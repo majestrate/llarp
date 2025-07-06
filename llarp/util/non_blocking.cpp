@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "non_blocking.hpp"
 #include <stdexcept>
 #include <fmt/format.h>

@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "net.hpp"
 #include "net_if.hpp"
 #include <stdexcept>

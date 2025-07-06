@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #ifdef WITH_SYSTEMD
 #include "sd_platform.hpp"
 

@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "serviceaddresslookup.hpp"
 
 #include "context.hpp"

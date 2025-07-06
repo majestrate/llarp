@@ -1,4 +1,4 @@
-#define NO_JEMALLOC
+#include <llarp/util/alloc.h>
 #include "mem.h"
 #include <cstdlib>
 
@@ -15,13 +15,6 @@ namespace llarp
     }
   }
 }  // namespace llarp
-
-void
-llarp_mem_slab(struct llarp_alloc* /*mem*/, uint32_t* /*buf*/, size_t /*sz*/)
-{
-  // not implemented
-  abort();
-}
 
 bool
 llarp_eq(const void* a, const void* b, size_t sz)

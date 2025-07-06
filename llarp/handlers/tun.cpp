@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include <algorithm>
 #include <iterator>
 #include <variant>

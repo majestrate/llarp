@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include <arpa/inet.h>
 
 #include "exit_info.hpp"

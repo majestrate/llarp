@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "hidden_service_address_lookup.hpp"
 
 #include <llarp/dht/messages/findintro.hpp>

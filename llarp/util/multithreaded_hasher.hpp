@@ -105,10 +105,10 @@ namespace llarp::util
     void
     run_thread_worker()
     {
-      llarp::util::SetThreadName("llarp-hasher");
+      llarp::util::SetThreadName("llarpd-hasher");
       do
       {
-        auto maybe = m_IngestData.popFrontWithTimeout(1s);
+        auto maybe = m_IngestData.popFrontWithTimeout(50ms);
         if (not maybe and not m_IngestData.enabled())
           return;
         if (not maybe)

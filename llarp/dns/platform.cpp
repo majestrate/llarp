@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "platform.hpp"
 
 namespace llarp::dns

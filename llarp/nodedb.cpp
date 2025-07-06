@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "nodedb.hpp"
 
 #include "crypto/crypto.hpp"

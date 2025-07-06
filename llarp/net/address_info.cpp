@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "address_info.hpp"
 #include <stdexcept>
 

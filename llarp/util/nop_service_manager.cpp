@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "service_manager.hpp"
 
 namespace llarp::sys

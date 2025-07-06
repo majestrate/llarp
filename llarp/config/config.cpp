@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "config.hpp"
 #include "definition.hpp"
 #include "ini.hpp"

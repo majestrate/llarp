@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "localrouterlookup.hpp"
 
 #include "context.hpp"

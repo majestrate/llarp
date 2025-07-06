@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include <llarp.hpp>
 #include "constants/version.hpp"
 #include "constants/evloop.hpp"

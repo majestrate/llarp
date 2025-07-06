@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "link_manager.hpp"
 
 #include <llarp/router/i_outbound_session_maker.hpp>

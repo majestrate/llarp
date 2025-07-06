@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "ini.hpp"
 
 #include <llarp/util/logging.hpp>

@@ -1,5 +1,5 @@
+#include <llarp/util/alloc.h>
 #include "relay_commit.hpp"
-#include "llarp/net/sock_addr.hpp"
 #include "relay_status.hpp"
 
 #include <llarp/crypto/crypto.hpp>
@@ -14,6 +14,7 @@
 #include <llarp/util/logging.hpp>
 #include <llarp/util/meta/memfn.hpp>
 #include <llarp/tooling/path_event.hpp>
+#include <llarp/net/sock_addr.hpp>
 
 #include <functional>
 #include <optional>

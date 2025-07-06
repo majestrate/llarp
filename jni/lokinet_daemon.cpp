@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "network_loki_lokinet_LokinetDaemon.h"
 #include "lokinet_jni_common.hpp"
 #include <llarp.hpp>

@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "context.hpp"
 #include "dht.h"
 #include <llarp/router_contact.hpp>

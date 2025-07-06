@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include <llarp/config/config.hpp>  // for ensure_config
 #include <llarp/constants/version.hpp>
 #include <llarp.hpp>

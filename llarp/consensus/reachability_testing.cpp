@@ -1,4 +1,4 @@
-
+#include <llarp/util/alloc.h>
 #include "reachability_testing.hpp"
 #include <chrono>
 #include <llarp/router/abstractrouter.hpp>

@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "router_lookup_job.hpp"
 
 #include "endpoint.hpp"

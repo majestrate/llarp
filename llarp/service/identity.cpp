@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "identity.hpp"
 
 #include <llarp/crypto/crypto.hpp>

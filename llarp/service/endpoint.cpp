@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "endpoint.hpp"
 #include "endpoint_state.hpp"
 #include "endpoint_util.hpp"

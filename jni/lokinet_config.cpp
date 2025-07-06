@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "network_loki_lokinet_LokinetConfig.h"
 #include <llarp.hpp>
 #include <llarp/config/config.hpp>

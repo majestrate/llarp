@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "router_version.hpp"
 #include "constants/version.hpp"
 #include "constants/proto.hpp"

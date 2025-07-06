@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "nm_platform.hpp"
 #ifdef WITH_SYSTEMD
 

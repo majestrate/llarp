@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "intro_set.hpp"
 #include <llarp/crypto/crypto.hpp>
 #include <llarp/path/path.hpp>

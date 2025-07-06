@@ -1,4 +1,4 @@
-
+#include <llarp/util/alloc.h>
 #include "platform.hpp"
 #include <cstdint>
 #include <stdexcept>

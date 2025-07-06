@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "lookup.hpp"
 
 #include <llarp/path/path.hpp>

@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "link_message_parser.hpp"
 
 #include "dht_immediate.hpp"
@@ -64,7 +65,7 @@ namespace llarp
       }
       // create the message to parse based off message type
       llarp::LogDebug("inbound message ", *strbuf.cur);
-      switch (*strbuf.cur)
+      switch (static_cast<char>(*strbuf.cur))
       {
         case 'i':
           msg = &holder->i;

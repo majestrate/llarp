@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "server.hpp"
 #include <llarp/ev/ev.hpp>
 #include <llarp/ev/udp_handle.hpp>

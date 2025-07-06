@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "message.hpp"
 #include <oxenc/endian.h>
 

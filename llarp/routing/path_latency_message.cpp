@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "path_latency_message.hpp"
 
 #include "handler.hpp"

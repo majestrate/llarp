@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "message_buffer.hpp"
 #include "session.hpp"
 #include <llarp/crypto/crypto.hpp>

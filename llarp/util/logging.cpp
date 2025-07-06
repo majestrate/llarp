@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "logging.hpp"
 #include "str.hpp"
 #include <spdlog/spdlog.h>

@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "lokinet_init.h"
 
 extern "C" int

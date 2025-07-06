@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "linklayer.hpp"
 #include <llarp/net/sock_addr.hpp>
 #include "session.hpp"
@@ -55,12 +56,13 @@ namespace llarp::iwp
     {
       hashed[result.to].emplace_back(std::move(result.msg));
     }
-
+    std::unordered_set<std::shared_ptr<Session>, SessionAddrHash> should_pump;
     for (auto& [addr, msgs] : hashed)
     {
       if (auto session = SessionForAddr(addr))
       {
         session->RecvHashed(std::move(msgs));
+        should_pump.emplace(session);
       }
     }
     std::unordered_set<std::shared_ptr<Session>, SessionAddrHash> send_flush;
@@ -69,6 +71,7 @@ namespace llarp::iwp
       if (auto session = SessionForAddr(addr))
       {
         send_flush.emplace(session);
+        should_pump.emplace(session);
         for (auto msgid : msgids)
           session->VerifiedMessage(msgid);
       }
@@ -77,7 +80,6 @@ namespace llarp::iwp
     {
       session->SendMACK();
     }
-
     for (const auto& [addr, msgids] : drop)
     {
       if (auto session = SessionForAddr(addr))
@@ -85,6 +87,10 @@ namespace llarp::iwp
         for (auto msgid : msgids)
           session->DropMessage(msgid);
       }
+    }
+    for (const auto& session : should_pump)
+    {
+      session->Pump();
     }
   }
 

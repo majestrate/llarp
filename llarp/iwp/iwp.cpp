@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "iwp.hpp"
 #include "linklayer.hpp"
 #include <memory>

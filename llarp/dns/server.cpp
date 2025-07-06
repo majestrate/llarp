@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include "server.hpp"
 #include <llarp/constants/platform.hpp>
 #include "dns.hpp"

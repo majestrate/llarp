@@ -1,3 +1,4 @@
+#include <llarp/util/alloc.h>
 #include <llarp/util/service_manager.hpp>
 
 #include <systemd/sd-daemon.h>
