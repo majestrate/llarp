@@ -1,6 +1,7 @@
 #pragma once
-
+#ifndef ANDROID
 #include <memory_resource>
+#endif
 #include <type_traits>
 #include "common.hpp"
 #include "mem.h"
@@ -233,7 +234,7 @@ namespace llarp
   // convertible to a llarp_buffer_t.
   struct OwnedBuffer
   {
-#ifdef __APPLE__
+#if defined(__APPLE__) || defined(ANDROID)
     // apple does not implement std::pmr even though they have it in the headers because of course
     // they don't, why would they?
     using alloc_t = std::allocator<byte_t>;
@@ -255,7 +256,7 @@ namespace llarp
     bufptr_t buf;
     size_t sz;
 
-#ifdef __APPLE__
+#if defined(__APPLE__) || defined(ANDROID)
     // Create a new, uninitialized owned buffer of the given size.
     explicit OwnedBuffer(size_t sz)
         : _alloc{}, buf{bufptr_t{_alloc.allocate(sz), destroyer{_alloc, sz}}}, sz{sz}
@@ -267,7 +268,7 @@ namespace llarp
     {}
 #endif
 
-#ifdef __APPLE__
+#if defined(__APPLE__) || defined(ANDROID)
     // copy content from existing memory
     explicit OwnedBuffer(const byte_t* ptr, size_t sz) : OwnedBuffer{sz}
     {

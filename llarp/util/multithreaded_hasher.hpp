@@ -11,10 +11,15 @@ namespace llarp::util
   {
     template <typename Iter_t, typename Value_t>
     concept is_iterator_for =
+#ifdef ANDROID
+        std::is_same_v<Value_t, typename Iter_t::value_type>;
+#else
         std::forward_iterator<Iter_t> and std::is_same_v<Value_t, typename Iter_t::value_type>;
+#endif
 
     template <typename T>
-    concept is_hashbuffer_compatible = std::move_constructible<T> and std::copy_constructible<T>;
+    concept is_hashbuffer_compatible =
+        std::is_move_constructible_v<T> and std::is_copy_constructible_v<T>;
   };  // namespace
 
   template <

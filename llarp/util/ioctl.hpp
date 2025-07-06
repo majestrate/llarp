@@ -7,6 +7,7 @@
 #include <cerrno>
 #include <cstring>
 #include <stdexcept>
+#include <fmt/format.h>
 
 namespace llarp::util
 {
@@ -34,7 +35,7 @@ namespace llarp::util
           throw permission_error{"we are not allowed to call this ioctl"};
         }
         else
-          throw std::runtime_error("ioctl failed: " + std::string{strerror(errno)});
+          throw std::runtime_error{fmt::format("ioctl failed: {}", std::string{strerror(errno)})};
       }
     }
 

@@ -221,7 +221,6 @@ namespace llarp
       std::unordered_set<uint64_t> m_ToHash;
       std::unordered_set<uint64_t> m_PendingHash;
       std::atomic_flag m_SentClosed;
-      std::thread m_VerifyThread;
 
       template <typename Iter_t>
       void

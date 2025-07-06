@@ -3,7 +3,6 @@
 #include <fmt/format.h>
 #include <spdlog/common.h>
 #include <type_traits>
-#include <source_location>
 #include <string_view>
 
 // Formattable types can specialize this to true and will get automatic fmt formattering support via
