@@ -57,19 +57,19 @@ add_custom_command(
 add_custom_target(clean_html COMMAND ${CMAKE_COMMAND} -E rm -rf html)
 
 add_custom_command(
-  OUTPUT markdown
+  OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/markdown
   COMMAND find ${CMAKE_CURRENT_BINARY_DIR}/gen/ -type f -name '*.md' -exec ${CMAKE_CURRENT_SOURCE_DIR}/fix-markdown.sh {} "\;" && ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_BINARY_DIR}/gen ${CMAKE_CURRENT_BINARY_DIR}/markdown
   DEPENDS gen
 )
 
 add_custom_command(
-  OUTPUT html
-  COMMAND ${MKDOCS} build
+  OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/html
+  COMMAND ${MKDOCS} build && find ${CMAKE_CURRENT_BINARY_DIR}/html -type f -name '*.html' -exec ${CMAKE_CURRENT_SOURCE_DIR}/fix-html.sh {} "\;" 
   DEPENDS
   clean_html
   ${CMAKE_CURRENT_BINARY_DIR}/markdown)
 
-add_custom_target(doc DEPENDS markdown)
+add_custom_target(doc DEPENDS html)
 
 configure_file(Doxyfile.in Doxyfile @ONLY)
 configure_file(index.md.in index.md @ONLY)
