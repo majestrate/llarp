@@ -1,8 +1,8 @@
-/* Allow lokinet to set DNS settings */
+/* Allow llarpd to set DNS settings */
 polkit.addRule(function(action, subject) {
     if ((action.id == "org.freedesktop.resolve1.set-dns-servers" ||
          action.id == "org.freedesktop.resolve1.set-domains") &&
-        subject.user == "_lokinet") {
+        subject.user == "_llarpd") {
         return polkit.Result.YES;
     }
 });
