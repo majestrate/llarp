@@ -1,0 +1,19 @@
+[Unit]
+Description=LLARP: Anonymous Network layer thingydoo, client
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User=_llarpd
+Type=notify
+WatchdogSec=30s
+SyslogIdentifier=llarpd
+WorkingDirectory=/var/lib/llarpd
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_BIND_SERVICE
+AmbientCapabilities=CAP_NET_ADMIN CAP_NET_BIND_SERVICE
+ExecStart=/usr/bin/llarpd /var/lib/llarpd/llarpd.ini
+Restart=always
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target
