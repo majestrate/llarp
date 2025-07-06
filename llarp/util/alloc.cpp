@@ -1,3 +1,4 @@
+#ifdef ENABLE_JEMALLOC
 #include "alloc.hpp"
 
 // Override global operator new
@@ -50,3 +51,5 @@ operator delete[](void* ptr, std::size_t size) noexcept
 {
   ::sdallocx(ptr, size, 0);
 }
+
+#endif
