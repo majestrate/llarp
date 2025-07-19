@@ -74,6 +74,7 @@ namespace llarp
   {
     ILinkLayer(
         std::shared_ptr<KeyManager> keyManager,
+        EventLoop_ptr evloop,
         GetRCFunc getrc,
         LinkMessageHandler handler,
         SignBufferFunc signFunc,
@@ -238,6 +239,9 @@ namespace llarp
       return m_ourAddr;
     }
 
+    void
+    TriggerPump();
+
    private:
     const SecretKey& m_RouterEncSecret;
 
@@ -268,6 +272,7 @@ namespace llarp
 
    private:
     std::shared_ptr<int> m_repeater_keepalive;
+    std::shared_ptr<EventLoopWakeup> m_Pumper;
   };
 
   using LinkLayer_ptr = std::shared_ptr<ILinkLayer>;

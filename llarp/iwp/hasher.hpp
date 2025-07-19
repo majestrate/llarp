@@ -58,9 +58,6 @@ namespace llarp::iwp
         Hasher::HashOutboundMessage, Hasher::GetOutboundMessageHash};
     std::shared_ptr<EventLoopWakeup> m_Waker;
 
-    void
-    run_worker_thread();
-
    public:
     void
     start(size_t N_threads, std::shared_ptr<EventLoopWakeup> waker);

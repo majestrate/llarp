@@ -89,10 +89,12 @@ namespace llarp::io_uring
     };
 
     /// handle event completion.
-    /// return true if we want to trigger ticker wakeup.
-    /// return false if we dont want to.
-    virtual bool
+    virtual void
     completed(int res) = 0;
+
+    /// return if this resource should wake up tickers.
+    virtual bool
+    should_wake_tickers() const = 0;
 
     /// submit events to submission queue
     virtual void
@@ -154,11 +156,11 @@ namespace llarp::io_uring
       m_Stop = true;
     }
 
-    bool
+    void
     completed(int res) override
     {
       if (m_Stop)
-        return false;
+        return;
 
       if (res > 0)
         m_Callback();
@@ -167,7 +169,12 @@ namespace llarp::io_uring
         shutdown();
       else
         poll();
-      return true;
+    }
+
+    bool
+    should_wake_tickers() const override
+    {
+      return not m_Stop;
     }
 
     void
@@ -285,11 +292,10 @@ namespace llarp::io_uring
       bool m_Stop{false};
       UDPSender(UDPSocket& sock, Loop& loop) : Resource{loop}, m_Sock{sock} {};
 
-      bool
+      void
       completed(int st) override
       {
         log::debug(cat, "udp send completion: fd={} result={}", m_Sock.m_FD, st);
-        return true;
       };
 
       std::string_view
@@ -302,7 +308,7 @@ namespace llarp::io_uring
       submit() override
       {
         Submission sub{m_Loop, this};
-        sub.sendmsg(m_Sock.m_FD, m_SendBuf->send_hdr(), MSG_DONTWAIT);
+        sub.sendmsg(m_Sock.m_FD, m_SendBuf->send_hdr(), 0);
       }
 
       void
@@ -315,6 +321,12 @@ namespace llarp::io_uring
       done() const override
       {
         return false;  // we aren't added to the event loop.
+      }
+
+      bool
+      should_wake_tickers() const override
+      {
+        return false;
       }
 
       void
@@ -398,23 +410,29 @@ namespace llarp::io_uring
       sub.recvmsg(m_FD, m_RecvMsg->recv_hdr(), 0);
     }
 
-    bool
+    void
     completed(int result) override
     {
       if (result < 0)
       {
         log::error(cat, "udp socket fd={} closed: {}", m_FD, strerror(0 - result));
         close();
-        return false;
+        return;
       }
+      m_Loop.io_wakeup();
       auto* vec = m_RecvMsg->recv_hdr()->msg_iov;
       auto addr = m_RecvMsg->addr();
       log::debug(cat, "udp socket recvmsg fd={} from={} result={}", m_FD, addr, result);
       OwnedBuffer pkt{reinterpret_cast<const byte_t*>(vec->iov_base), size_t(result), &m_RecvMem};
       on_recv(*this, std::move(addr), std::move(pkt));
       submit();
-      return true;
     };
+
+    bool
+    should_wake_tickers() const override
+    {
+      return not m_Done;
+    }
 
     std::optional<int>
     file_descriptor() override
@@ -453,7 +471,6 @@ namespace llarp::io_uring
     }
   };
 
-  template <bool ticker>
   class Wakeup : public EventLoopWakeup, public Resource
   {
     std::array<int, 2> m_Pipe;
@@ -467,7 +484,7 @@ namespace llarp::io_uring
       m_Flag.clear();
     }
 
-    bool
+    void
     completed(int result) override
     {
       if (result == -1)
@@ -475,7 +492,7 @@ namespace llarp::io_uring
         if (m_Pipe[0] != -1)
           ::close(m_Pipe[0]);
         m_Pipe[0] = -1;
-        return false;
+        return;
       }
       m_Flag.clear();
       if (m_Pipe[0] != -1)
@@ -484,16 +501,18 @@ namespace llarp::io_uring
         ::read(m_Pipe[0], &i, sizeof(i));
         m_Callback();
       }
-      return not ticker;
+    }
+
+    bool
+    should_wake_tickers() const override
+    {
+      return false;
     }
 
     std::string_view
     name() const override
     {
-      if constexpr (ticker)
-        return "ticker";
-      else
-        return "wakep";
+      return "wakep";
     }
 
     bool
@@ -530,10 +549,6 @@ namespace llarp::io_uring
     {
       if (m_Pipe[0] == -1)
         return;
-      if constexpr (ticker)
-      {
-        log::debug(cat, "wakeup ticker");
-      }
       Submission sub{m_Loop, this};
       sub.poll(m_Pipe[0], POLL_IN);
     }
@@ -555,7 +570,8 @@ namespace llarp::io_uring
 
     ~Repeater() override
     {
-      ::close(m_FD);
+      if (m_FD != -1)
+        ::close(m_FD);
     }
 
     std::string_view
@@ -582,24 +598,36 @@ namespace llarp::io_uring
       sub.poll(m_FD, POLL_IN);
     }
 
-    bool
+    void
     completed(int res) override
     {
       if (res < 0)
       {
         shutdown();
-        return false;
+        return;
       }
       uint64_t val;
       read(m_FD, &val, sizeof(val));
       m_Callback();
       if (m_Oneshot)
       {
+        m_Loop.remove_handles_where([fd = m_FD](const auto& h) -> bool {
+          if (auto self = std::dynamic_pointer_cast<Repeater>(h))
+          {
+            return self->m_FD == fd;
+          }
+          return false;
+        });
         shutdown();
       }
       else
         submit();
-      return true;
+    }
+
+    bool
+    should_wake_tickers() const override
+    {
+      return false;
     }
 
     void
@@ -628,11 +656,11 @@ namespace llarp::io_uring
       llarp::log::info(cat, "running {} thread", name);
       while (queue->enabled())
       {
-        auto maybe = queue->popFrontWithTimeout(1s);
+        auto maybe = queue->popFrontWithTimeout(50ms);
         if (maybe)
         {
           log::debug(cat, "queue {} got entry", name);
-          maybe.value()();
+          (*maybe)();
         }
       }
       llarp::log::info(cat, "ending {} thread", name);
@@ -644,7 +672,7 @@ namespace llarp::io_uring
       , m_EventLoopThreadID{std::nullopt}
       , m_LogicCalls{queue_size}
       , m_DiskCalls{128}
-      , m_WorkCalls{queue_size}
+      , m_WorkCalls{256}
       , m_Now{llarp::time_now_ms()}
   {
     ::io_uring_queue_init(1024, &m_Ring, 0);
@@ -670,7 +698,13 @@ namespace llarp::io_uring
   Loop::wakeup()
   {
     m_LogicWaker->Trigger();
-    m_TickWaker->Trigger();
+  }
+
+  void
+  Loop::io_wakeup() const
+  {
+    for (const auto& ticker : m_Tickers)
+      ticker();
   }
 
   namespace
@@ -685,8 +719,9 @@ namespace llarp::io_uring
       {
         _work->work();
         _loop->call_soon([w = _work]() {
-          w->cleanup(false);
-          delete w;
+          std::unique_ptr<EventLoopWork> work{w};
+          work->cleanup(false);
+          log::debug(cat, "work cleaned up");
         });
       }
     };
@@ -725,7 +760,7 @@ namespace llarp::io_uring
   void
   Loop::call_later(llarp_time_t delay_ms, std::function<void()> callback)
   {
-    call([self = shared_from_this(),
+    call([self = this,
           h = std::make_shared<Repeater>(*this, true),
           callback = std::move(callback),
           delay_ms]() {
@@ -738,7 +773,7 @@ namespace llarp::io_uring
   Loop::make_repeater()
   {
     auto h = std::make_shared<Repeater>(*this);
-    call([self = shared_from_this(), h]() {
+    call([self = this, h]() {
       self->m_Timers.emplace_back(h);
       self->m_Handles.emplace_back(std::move(h));
     });
@@ -748,15 +783,14 @@ namespace llarp::io_uring
   std::shared_ptr<EventLoopWakeup>
   Loop::make_waker(std::function<void()> callback)
   {
-    auto h = std::make_shared<Wakeup<false>>(*this, std::move(callback));
-    call([h, self = shared_from_this()]() { self->m_Handles.emplace_back(h); });
+    auto h = std::make_shared<Wakeup>(*this, std::move(callback));
+    call([h, self = this]() { self->m_Handles.emplace_back(h); });
     return h;
   }
 
   void
   Loop::flush_logic()
   {
-    log::debug(cat, "flush logic");
     while (not m_LogicCalls.empty())
     {
       auto job = m_LogicCalls.popFront();
@@ -771,18 +805,11 @@ namespace llarp::io_uring
     m_EventLoopThreadID = std::this_thread::get_id();
     llarp::util::SetThreadName("llarpd-mainloop");
 
-    m_TickWaker = std::make_shared<Wakeup<true>>(*this, [self = shared_from_this()]() {
-      log::debug(cat, "call tickers");
-      for (const auto& ticker : self->m_Tickers)
-        ticker();
-      self->flush_logic();
-    });
-
-    m_LogicWaker = std::make_shared<Wakeup<true>>(
-        *this, [self = shared_from_this()]() { self->flush_logic(); });
+    m_LogicWaker = std::make_shared<Wakeup>(*this, [self = this]() { self->flush_logic(); });
+    m_TickerWaker = std::make_shared<Wakeup>(*this, [self = this]() { self->io_wakeup(); });
 
     auto cleanup_handles = make_repeater();
-    cleanup_handles->start(1s, [self = shared_from_this()]() {
+    cleanup_handles->start(1s, [self = this]() {
       self->remove_handles_where([](auto h) {
         if (h)
           return h->done();
@@ -801,7 +828,8 @@ namespace llarp::io_uring
         [queue = &m_DiskCalls]() { run_thread_worker(queue, "llarpd-disk"); });
 
     m_LogicWaker->Trigger();
-
+    std::vector<std::shared_ptr<Wakeup>> wakeups;
+    std::array<io_uring_cqe*, 128> events{};
     do
     {
       auto timeout = as_timespec(100ms);
@@ -817,45 +845,80 @@ namespace llarp::io_uring
       m_Now = llarp::time_now_ms();
       if (cqe)
       {
-        auto resource = reinterpret_cast<Resource*>(io_uring_cqe_get_data(cqe))->shared_from_this();
-        log::debug(cat, "event loop pump at {} from {} res={}", m_Now, resource->name(), cqe->res);
-        if (resource->completed(cqe->res))
+        size_t num_events = io_uring_peek_batch_cqe(ring(), events.data(), events.size());
+        log::debug(cat, "got {} events", num_events);
+        for (size_t idx = 0; idx < num_events; ++idx)
         {
-          log::debug(cat, "event loop trigger ticker wakeup");
-          m_TickWaker->Trigger();
+          cqe = events[idx];
+          auto resource =
+              reinterpret_cast<Resource*>(io_uring_cqe_get_data(cqe))->shared_from_this();
+          log::debug(
+              cat, "event loop pump at {} from {} res={}", m_Now, resource->name(), cqe->res);
+
+          // trigger tickers.
+          if (resource->should_wake_tickers())
+          {
+            m_TickerWaker->Trigger();
+          }
+          // defer execution if this is a wakeup.
+          if (auto wakeup_ptr = std::dynamic_pointer_cast<Wakeup>(resource))
+          {
+            wakeups.emplace_back(std::move(wakeup_ptr));
+          }
+          else
+          {
+            resource->completed(cqe->res);
+          }
+          io_uring_cqe_seen(ring(), cqe);
+          if (resource->done())
+          {
+            remove_handles_where([resource](auto h) { return h.get() == resource.get(); });
+          }
         }
-        io_uring_cqe_seen(ring(), cqe);
-        if (resource->done())
+        // check for no more events to call wakeups.
+        if (io_uring_peek_batch_cqe(ring(), &cqe, 1) == 0)
         {
-          remove_handles_where([resource](auto h) { return h.get() == resource.get(); });
+          for (auto& waker : wakeups)
+            waker->completed(0);
+          wakeups.clear();
         }
       }
       flush_logic();
     } while (m_Run.load() and not m_Handles.empty());
 
     m_WorkCalls.disable();
-    for (auto worker : m_WorkerThreads)
+    for (auto& worker : m_WorkerThreads)
     {
-      worker->join();
+      if (worker)
+        worker->join();
     }
 
     m_WorkerThreads.clear();
 
     m_DiskCalls.disable();
-    m_DiskThread->join();
-
-    for (auto handle : m_Handles)
+    if (m_DiskThread)
     {
-      handle->shutdown();
+      m_DiskThread->join();
+      m_DiskThread = nullptr;
+    }
+
+    for (auto& handle : m_Handles)
+    {
+      if (handle)
+        handle->shutdown();
     }
     m_Handles.clear();
+    m_Tickers.clear();
+
+    m_LogicWaker = nullptr;
+    m_TickerWaker = nullptr;
   }
 
   std::shared_ptr<UDPHandle>
   Loop::make_udp(UDPReceiveFunc func)
   {
     auto h = std::make_shared<UDPSocket>(*this, func);
-    call([self = shared_from_this(), h]() { self->m_Handles.emplace_back(std::move(h)); });
+    call([self = this, h]() { self->m_Handles.emplace_back(std::move(h)); });
     return h;
   }
 
@@ -863,7 +926,7 @@ namespace llarp::io_uring
   Loop::add_poller(int fd, std::function<void()> callback)
   {
     auto h = std::make_shared<Poller>(*this, fd, std::move(callback));
-    call([self = shared_from_this(), h]() {
+    call([self = this, h]() {
       self->m_Handles.emplace_back(h);
       h->submit();
     });
@@ -875,15 +938,20 @@ namespace llarp::io_uring
       std::shared_ptr<llarp::vpn::NetworkInterface> netif,
       std::function<void(llarp::net::IPPacket)> handler)
   {
-    log::info(cat, "adding network interface fd={}", netif->PollFD());
-    auto poller = add_poller(netif->PollFD(), [netif, handler = std::move(handler)]() {
-      auto pkt = netif->ReadNextPacket();
-      if (pkt.empty())
-        return;
-      handler(std::move(pkt));
-      netif->MaybeWakeUpperLayers();
+    int fd = netif->PollFD();
+    log::info(cat, "adding network interface fd={}", fd);
+    auto& on_stop = netif->on_stop;
+    auto poller = add_poller(fd, [netif = std::move(netif), handler = std::move(handler)]() {
+      do
+      {
+        auto pkt = netif->ReadNextPacket();
+        if (pkt.empty())
+          return;
+        handler(std::move(pkt));
+        netif->MaybeWakeUpperLayers();
+      } while (true);
     });
-    netif->on_stop = [poller = std::move(poller)]() { poller->close(); };
+    on_stop = [poller = std::move(poller)]() { poller->close(); };
     return true;
   }
 
@@ -905,6 +973,6 @@ namespace llarp::io_uring
   size_t
   Loop::num_worker_threads() const
   {
-    return m_WorkerThreads.size();
+    return m_WorkerThreads.capacity();
   }
 }  // namespace llarp::io_uring

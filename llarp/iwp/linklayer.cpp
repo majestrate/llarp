@@ -7,6 +7,8 @@
 #include <memory>
 #include <unordered_set>
 
+#include <llarp/router/abstractrouter.hpp>
+
 namespace llarp::iwp
 {
   static auto logcat = log::Cat("iwp");
@@ -25,8 +27,7 @@ namespace llarp::iwp
       PumpDoneHandler pumpDone,
       WorkerFunc_t worker,
       bool allowInbound)
-      : ILinkLayer(
-          keyManager, getrc, h, sign, before, est, reneg, timeout, closed, pumpDone, worker)
+      : ILinkLayer{keyManager, ev, getrc, h, sign, before, est, reneg, timeout, closed, pumpDone, worker}
       , m_Wakeup{ev->make_waker([this]() { HandleWakeupPlaintext(); })}
       , m_HashingWakeup{ev->make_waker([this]() {
         for (auto& session : m_CollectHash)
@@ -42,6 +43,7 @@ namespace llarp::iwp
   void
   LinkLayer::HandleWorkerCompletion()
   {
+    log::debug(logcat, "handle worker completion");
     std::unordered_map<SockAddr, std::vector<OutboundMessage>> hashed;
     std::unordered_map<SockAddr, std::vector<uint64_t>> verified;
     std::unordered_map<SockAddr, std::vector<uint64_t>> drop;
@@ -186,6 +188,7 @@ namespace llarp::iwp
   LinkLayer::WakeupPlaintext()
   {
     m_Wakeup->Trigger();
+    log::debug(logcat, "wakeup plaintext");
   }
 
   size_t
@@ -200,6 +203,7 @@ namespace llarp::iwp
   {
     m_CollectHash.emplace(s);
     m_HashingWakeup->Trigger();
+    log::debug(logcat, "trigger hashing");
   }
 
   void
@@ -214,7 +218,6 @@ namespace llarp::iwp
       m_WakingUp.push_back(session.get());
     for (auto* session : m_WakingUp)
       session->HandlePlaintext();
-    PumpDone();
   }
 
 }  // namespace llarp::iwp

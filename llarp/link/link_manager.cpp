@@ -9,6 +9,8 @@
 
 namespace llarp
 {
+  static auto logcat = log::Cat("link-layer");
+
   LinkLayer_ptr
   LinkManager::GetCompatibleLink(const RouterContact& rc) const
   {
@@ -107,6 +109,7 @@ namespace llarp
   void
   LinkManager::PumpLinks()
   {
+    log::debug(logcat, "LinkManager::PumpLinks");
     for (const auto& link : inboundLinks)
     {
       link->Pump();

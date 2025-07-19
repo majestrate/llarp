@@ -22,7 +22,7 @@ namespace llarp::io_uring
     std::vector<std::shared_ptr<Resource>> m_Timers;
     llarp_time_t m_Now;
     std::shared_ptr<EventLoopWakeup> m_LogicWaker;
-    std::shared_ptr<EventLoopWakeup> m_TickWaker;
+    std::shared_ptr<EventLoopWakeup> m_TickerWaker;
     std::vector<std::function<void()>> m_Tickers;
     std::atomic<bool> m_Run;
 
@@ -91,6 +91,10 @@ namespace llarp::io_uring
 
     void
     wakeup() override;
+
+    /// called before doing io on wakeup.
+    void
+    io_wakeup() const;
 
     bool
     inEventLoop() const override;

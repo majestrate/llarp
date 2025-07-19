@@ -9,22 +9,28 @@
 
 namespace llarp::iwp
 {
-  void
-  Hasher::run_worker_thread()
+  static auto logcat = log::Cat("iwp");
+
+  template <typename InQueue_t, typename OutQueue_t, typename Waker_t>
+  static void
+  run_worker_thread(InQueue_t* in_q, OutQueue_t* out_q, Waker_t m_Waker)
   {
     llarp::util::SetThreadName("llarpd-iwp-work");
+    log::debug(logcat, "iwp work started");
     do
     {
-      auto maybe = m_VerifyHash.popFrontWithTimeout(50ms);
-      if (not maybe and not m_VerifyHash.enabled())
+      auto maybe = in_q->popFrontWithTimeout(50ms);
+      if (not maybe and not in_q->enabled())
         return;
       if (not maybe)
         continue;
-
-      auto result = VerifyResult{std::move(maybe->from), maybe->msg.msgid(), maybe->Verify()};
-      m_ProcessVerified.pushBack(std::move(result));
+      log::debug(logcat, "got iwp work");
+      Hasher::VerifyResult result{std::move(maybe->from), maybe->msg.msgid(), maybe->Verify()};
+      log::debug(logcat, "verify {} from {} result={}", result.msgid, result.from, result.result);
+      out_q->pushBack(std::move(result));
       m_Waker->Trigger();
     } while (true);
+    log::debug(logcat, "iwp work ended");
   }
 
   void
@@ -32,13 +38,17 @@ namespace llarp::iwp
   {
     if (is_running())
       return;
-    m_Hasher.start(N_workers, [waker]() { waker->Trigger(); });
+    log::debug(logcat, "starting hasher with {} threads", N_workers);
+    m_Waker = waker;
+    m_VerifyHash.enable();
+    m_Hasher.start(N_workers, [w = m_Waker]() { w->Trigger(); });
     while (N_workers > 0)
     {
-      m_Threads.emplace_back([this]() { run_worker_thread(); });
+      m_Threads.emplace_back(
+          [this]() { run_worker_thread(&m_VerifyHash, &m_ProcessVerified, m_Waker); });
       N_workers--;
+      log::debug(logcat, "started thread {}", N_workers);
     }
-    m_Waker = waker;
   }
 
   void

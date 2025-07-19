@@ -69,7 +69,7 @@ namespace llarp
     void
     Session::Send_LL(const byte_t* buf, size_t sz)
     {
-      LogTrace("send ", sz, " to ", m_RemoteAddr);
+      log::debug(logcat, "send {} bytes to {}", sz, m_RemoteAddr);
       const llarp_buffer_t pkt(buf, sz);
       m_Parent->SendTo_LL(m_RemoteAddr, pkt);
       m_LastTX = time_now_ms();
@@ -161,13 +161,16 @@ namespace llarp
     void
     Session::EncryptAndSend(ILinkSession::Packet_t data)
     {
+      if (m_State == State::LinkIntro or m_State == State::Ready)
+        log::debug(logcat, "Command {} to {}", int(data[PacketOverhead + 1]), m_RemoteAddr);
+
       m_EncryptNext.emplace_back(std::move(data));
-      TriggerPump();
       if (!IsEstablished())
       {
         EncryptWorker(std::move(m_EncryptNext));
         m_EncryptNext = CryptoQueue_t{};
       }
+      TriggerPump();
     }
 
     void
@@ -303,7 +306,7 @@ namespace llarp
         auto mack = CreatePacket(Command::eMACK, 1 + (numAcks * sizeof(uint64_t)));
         mack[PacketOverhead + CommandOverhead] = byte_t{static_cast<byte_t>(numAcks)};
         byte_t* ptr = mack.data() + 3 + PacketOverhead;
-        LogTrace("send ", numAcks, " macks to ", m_RemoteAddr);
+        log::debug(logcat, "Send {} macks to {}", numAcks, m_RemoteAddr);
         const auto& itr = m_SendMACKs.top();
         while (numAcks > 0)
         {
@@ -319,7 +322,7 @@ namespace llarp
     void
     Session::TriggerPump()
     {
-      m_Parent->Router()->TriggerPump();
+      m_Parent->TriggerPump();
     }
 
     void
@@ -337,22 +340,23 @@ namespace llarp
             msg.SendACKS(util::memFn(&Session::EncryptAndSend, this), now);
           }
         }
-        std::priority_queue<
-            OutboundMessage*,
-            std::vector<OutboundMessage*>,
-            ComparePtr<OutboundMessage*>>
-            to_resend;
-        for (auto& [id, msg] : m_TXMsgs)
-        {
-          if (msg.ShouldFlush(now))
-            to_resend.push(&msg);
-        }
-        if (not to_resend.empty())
-        {
-          for (auto& msg = to_resend.top(); not to_resend.empty(); to_resend.pop())
-            msg->FlushUnAcked(util::memFn(&Session::EncryptAndSend, this), now);
-        }
       }
+      std::priority_queue<
+          OutboundMessage*,
+          std::vector<OutboundMessage*>,
+          ComparePtr<OutboundMessage*>>
+          to_resend;
+      for (auto& [id, msg] : m_TXMsgs)
+      {
+        if (msg.ShouldFlush(now))
+          to_resend.push(&msg);
+      }
+      if (not to_resend.empty())
+      {
+        for (auto& msg = to_resend.top(); not to_resend.empty(); to_resend.pop())
+          msg->FlushUnAcked(util::memFn(&Session::EncryptAndSend, this), now);
+      }
+
       if (not m_EncryptNext.empty())
       {
         m_Parent->QueueWork(
@@ -735,7 +739,7 @@ namespace llarp
       {
         for (auto& result : *maybe_queue)
         {
-          LogTrace("Command ", int(result[PacketOverhead + 1]), " from ", m_RemoteAddr);
+          log::debug(logcat, "Command {} from {}", int(result[PacketOverhead + 1]), m_RemoteAddr);
           switch (result[PacketOverhead + 1])
           {
             case Command::eXMIT:
@@ -990,7 +994,12 @@ namespace llarp
     Session::Recv_LL(ILinkSession::Packet_t data)
     {
       m_RXRate += data.size();
-      LogDebug("iwp session from ", m_RemoteAddr, " got ", data.size(), " bytes");
+      log::debug(
+          logcat,
+          "session to {} got {} bytes state={}",
+          m_RemoteAddr,
+          data.size(),
+          StateToString(m_State));
       // TODO: differentiate between good and bad RX packets here
       m_Stats.totalPacketsRX++;
       switch (m_State)
@@ -1050,6 +1059,20 @@ namespace llarp
         default:
           return "Invalid";
       }
+    }
+
+    template <typename Iter_t>
+    void
+    Session::maybe_queue_verify(Iter_t itr)
+    {
+      if (itr->second.IsCompleted())
+      {
+        log::debug(logcat, "message {} is completed", itr->first);
+        m_PendingHash.emplace(itr->first);
+        m_Parent->hasher()->async_verify_hash(itr->second, m_RemoteAddr);
+      }
+      else
+        log::debug(logcat, "message {} is not completed", itr->first);
     }
   }  // namespace iwp
 }  // namespace llarp

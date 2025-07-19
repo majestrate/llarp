@@ -396,12 +396,12 @@ namespace llarp
       if (lastGoodSend > 0s and now >= timeout + (sendTimeout / 2))
       {
         // send a keep alive to keep this session alive
-        KeepAlive();
         if (markedBad)
         {
           LogWarn(Name(), " keepalive timeout hit");
           return true;
         }
+        KeepAlive();
       }
 
       // check for half open state where we can send but we get nothing back

@@ -15,6 +15,7 @@
 
 namespace llarp
 {
+  static auto logcat = log::Cat("evloop");
 
   EventLoop_ptr
   EventLoop::create(size_t threads, size_t queueLength)

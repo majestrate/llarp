@@ -15,8 +15,12 @@ static constexpr auto LINK_LAYER_TICK_INTERVAL = 100ms;
 
 namespace llarp
 {
+
+  static auto logcat = log::Cat("link-layer");
+
   ILinkLayer::ILinkLayer(
       std::shared_ptr<KeyManager> keyManager,
+      EventLoop_ptr evloop,
       GetRCFunc getrc,
       LinkMessageHandler handler,
       SignBufferFunc signbuf,
@@ -39,7 +43,15 @@ namespace llarp
       , QueueWork(std::move(work))
       , m_RouterEncSecret(keyManager->encryptionKey)
       , m_SecretKey(keyManager->transportKey)
-  {}
+  {
+    m_Pumper = evloop->make_waker([this]() { Pump(); });
+  }
+
+  void
+  ILinkLayer::TriggerPump()
+  {
+    m_Pumper->Trigger();
+  }
 
   llarp_time_t
   ILinkLayer::Now() const
@@ -319,6 +331,7 @@ namespace llarp
   void
   ILinkLayer::Tick(const llarp_time_t now)
   {
+    log::debug(logcat, "link layer tick at {}", now);
     {
       Lock_t l(m_AuthedLinksMutex);
       for (const auto& [routerid, link] : m_AuthedLinks)

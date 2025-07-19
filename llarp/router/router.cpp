@@ -82,8 +82,9 @@ namespace llarp
   Router::PumpLL()
   {
     llarp::LogTrace("Router::PumpLL() start");
-    if (_stopping.load())
+    if (_stopping)
       return;
+    log::debug(logcat, "PumpLL");
     paths.PumpDownstream();
     paths.PumpUpstream();
     _hiddenServiceContext.Pump();
@@ -182,6 +183,7 @@ namespace llarp
   void
   Router::TriggerPump()
   {
+    log::debug(logcat, "trigger PumpLL");
     m_Pump->Trigger();
   }
 
@@ -1186,6 +1188,7 @@ namespace llarp
         }
       });
     }
+    _loop->add_ticker([self = this]() { self->PumpLL(); });
     llarp::sys::service_manager->ready();
     return _running;
   }

@@ -224,14 +224,7 @@ namespace llarp
 
       template <typename Iter_t>
       void
-      maybe_queue_verify(Iter_t itr)
-      {
-        if (itr->second.IsCompleted())
-        {
-          m_PendingHash.emplace(itr->first);
-          m_Parent->hasher()->async_verify_hash(itr->second, m_RemoteAddr);
-        }
-      }
+      maybe_queue_verify(Iter_t itr);
 
       void
       HandleGeneratedHash(const OutboundMessage&);
