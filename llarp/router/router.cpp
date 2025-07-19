@@ -183,8 +183,10 @@ namespace llarp
   void
   Router::TriggerPump()
   {
+#ifndef USE_IO_URING
     log::debug(logcat, "trigger PumpLL");
     m_Pump->Trigger();
+#endif
   }
 
   bool

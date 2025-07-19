@@ -17,6 +17,7 @@
 #include "udp_handle.hpp"
 
 #include <memory_resource>
+#include <new>
 #include <queue>
 #include <stdexcept>
 
@@ -335,12 +336,23 @@ namespace llarp::io_uring
         return false;
       }
 
-      void
+      bool
       sendmsg(const SockAddr& to, const llarp_buffer_t& pkt)
       {
+        if (m_Stop)
+          return false;
         auto& m_FD = m_Sock.m_FD;
         log::debug(cat, "sendmsg fd={} to={} sz={}", m_FD, to, pkt.sz);
-        m_SendQueue.emplace_back(to, pkt.base, pkt.sz);
+        try
+        {
+          m_SendQueue.emplace_back(to, pkt.base, pkt.sz);
+        }
+        catch (std::bad_alloc&)
+        {
+          log::warning(cat, "std::bad_alloc while doing UDPSocket::sendmsg()");
+          return false;
+        }
+        return true;
       }
     };
     std::shared_ptr<UDPSender> m_Sender;
@@ -388,14 +400,15 @@ namespace llarp::io_uring
       // in event loop thread, no need to make copy of buf.
       if (m_Loop.inEventLoop())
       {
-        m_Sender->sendmsg(dest, buf);
+        if (not m_Sender->sendmsg(dest, buf))
+          return false;
         m_SendWaker->Trigger();
         return true;
       }
       // outside event loop thread, we have to copy buf.
       m_Loop.call([this, dest = SockAddr{dest}, buf = buf.copy()] {
-        m_Sender->sendmsg(dest, buf);
-        m_SendWaker->Trigger();
+        if (m_Sender->sendmsg(dest, buf))
+          m_SendWaker->Trigger();
       });
       return true;
     }
@@ -429,12 +442,18 @@ namespace llarp::io_uring
         close();
         return;
       }
-      m_Loop.io_wakeup();
       auto* vec = m_RecvMsg->recv_hdr()->msg_iov;
       auto addr = m_RecvMsg->addr();
       log::debug(cat, "udp socket recvmsg fd={} from={} result={}", m_FD, addr, result);
-      OwnedBuffer pkt{reinterpret_cast<const byte_t*>(vec->iov_base), size_t(result), &m_Mem};
-      on_recv(*this, std::move(addr), std::move(pkt));
+      try
+      {
+        OwnedBuffer _pkt{reinterpret_cast<const byte_t*>(vec->iov_base), size_t(result), &m_Mem};
+        on_recv(*this, std::move(addr), std::move(_pkt));
+      }
+      catch (std::bad_alloc&)
+      {
+        log::warning(cat, "std::bad_alloc while doing UDPSocket::recvfrom()");
+      }
       submit();
     };
 
@@ -486,9 +505,11 @@ namespace llarp::io_uring
     std::array<int, 2> m_Pipe;
     std::function<void()> m_Callback;
     std::atomic_flag m_Flag;
+    const bool m_Ticker;
 
    public:
-    Wakeup(Loop& loop, std::function<void(void)> func) : Resource{loop}, m_Callback{std::move(func)}
+    Wakeup(Loop& loop, std::function<void(void)> func, bool is_ticker)
+        : Resource{loop}, m_Callback{std::move(func)}, m_Ticker{is_ticker}
     {
       pipe(m_Pipe.data());
       m_Flag.clear();
@@ -516,7 +537,7 @@ namespace llarp::io_uring
     bool
     should_wake_tickers() const override
     {
-      return false;
+      return not m_Ticker;
     }
 
     std::string_view
@@ -637,7 +658,7 @@ namespace llarp::io_uring
     bool
     should_wake_tickers() const override
     {
-      return false;
+      return true;
     }
 
     void
@@ -793,7 +814,7 @@ namespace llarp::io_uring
   std::shared_ptr<EventLoopWakeup>
   Loop::make_waker(std::function<void()> callback)
   {
-    auto h = std::make_shared<Wakeup>(*this, std::move(callback));
+    auto h = std::make_shared<Wakeup>(*this, std::move(callback), false);
     call([h, self = this]() { self->m_Handles.emplace_back(h); });
     return h;
   }
@@ -815,8 +836,10 @@ namespace llarp::io_uring
     m_EventLoopThreadID = std::this_thread::get_id();
     llarp::util::SetThreadName("llarpd-mainloop");
 
-    m_LogicWaker = std::make_shared<Wakeup>(*this, [self = this]() { self->flush_logic(); });
-    m_TickerWaker = std::make_shared<Wakeup>(*this, [self = this]() { self->io_wakeup(); });
+    m_LogicWaker = std::make_shared<Wakeup>(
+        *this, [self = this]() { self->flush_logic(); }, false);
+    m_TickerWaker = std::make_shared<Wakeup>(
+        *this, [self = this]() { self->io_wakeup(); }, true);
 
     auto cleanup_handles = make_repeater();
     cleanup_handles->start(1s, [self = this]() {
@@ -862,8 +885,7 @@ namespace llarp::io_uring
           cqe = events[idx];
           auto resource =
               reinterpret_cast<Resource*>(io_uring_cqe_get_data(cqe))->shared_from_this();
-          log::debug(
-              cat, "event loop pump at {} from {} res={}", m_Now, resource->name(), cqe->res);
+          log::debug(cat, "event loop pump from {} res={}", resource->name(), cqe->res);
 
           // trigger tickers.
           if (resource->should_wake_tickers())
@@ -888,9 +910,19 @@ namespace llarp::io_uring
         // check for no more events to call wakeups.
         if (io_uring_peek_batch_cqe(ring(), &cqe, 1) == 0)
         {
+          std::shared_ptr<Wakeup> ticker{nullptr};
           for (auto& waker : wakeups)
-            waker->completed(0);
+          {
+            // if this is a normal waker call its completion handler otherwise defer calling it.
+            if (waker->should_wake_tickers())
+              waker->completed(1);
+            else
+              ticker = std::move(waker);
+          }
           wakeups.clear();
+          // call ticker wakeup last.
+          if (ticker)
+            ticker->completed(1);
         }
       }
       flush_logic();
