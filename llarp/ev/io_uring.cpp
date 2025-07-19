@@ -287,15 +287,18 @@ namespace llarp::io_uring
 
     struct UDPSender : public Resource
     {
-      std::unique_ptr<send_buffer_t> m_SendBuf;
       UDPSocket& m_Sock;
+      std::pmr::deque<send_buffer_t> m_SendQueue;
       bool m_Stop{false};
-      UDPSender(UDPSocket& sock, Loop& loop) : Resource{loop}, m_Sock{sock} {};
+      UDPSender(UDPSocket& sock, Loop& loop)
+          : Resource{loop}, m_Sock{sock}, m_SendQueue{&m_Sock.m_Mem} {};
 
       void
       completed(int st) override
       {
         log::debug(cat, "udp send completion: fd={} result={}", m_Sock.m_FD, st);
+        m_SendQueue.pop_front();
+        submit();
       };
 
       std::string_view
@@ -307,8 +310,11 @@ namespace llarp::io_uring
       void
       submit() override
       {
+        if (m_SendQueue.empty())
+          return;
         Submission sub{m_Loop, this};
-        sub.sendmsg(m_Sock.m_FD, m_SendBuf->send_hdr(), 0);
+        auto& front = m_SendQueue.front();
+        sub.sendmsg(m_Sock.m_FD, front.send_hdr(), 0);
       }
 
       void
@@ -334,14 +340,7 @@ namespace llarp::io_uring
       {
         auto& m_FD = m_Sock.m_FD;
         log::debug(cat, "sendmsg fd={} to={} sz={}", m_FD, to, pkt.sz);
-        if (m_SendBuf)
-        {
-          m_SendBuf->set_addr(to);
-          m_SendBuf->copy_buffer(pkt);
-        }
-        else
-          m_SendBuf = std::make_unique<send_buffer_t>(to, pkt.base, pkt.sz);
-        submit();
+        m_SendQueue.emplace_back(to, pkt.base, pkt.sz);
       }
     };
     std::shared_ptr<UDPSender> m_Sender;
@@ -349,10 +348,10 @@ namespace llarp::io_uring
     SockAddr m_LocalAddr;
     std::unique_ptr<recv_buffer_t> m_RecvMsg{new recv_buffer_t{}};
     using buf_t = std::array<uint8_t, max_packets * recv_buffer_t::buffer_size>;
-    std::unique_ptr<buf_t> m_RecvBuf{new buf_t{}};
-    std::pmr::monotonic_buffer_resource m_RecvMemBuf{m_RecvBuf->data(), m_RecvBuf->size()};
-    std::pmr::unsynchronized_pool_resource m_RecvMem{
-        std::pmr::pool_options{1, recv_buffer_t::buffer_size}, &m_RecvMemBuf};
+    std::unique_ptr<buf_t> m_Buf{new buf_t{}};
+    std::pmr::monotonic_buffer_resource m_MemBuf{m_Buf->data(), m_Buf->size()};
+    std::pmr::unsynchronized_pool_resource m_Mem{
+        std::pmr::pool_options{1, recv_buffer_t::buffer_size}, &m_MemBuf};
     int m_FD{-1};
     bool m_Done{false};
 
@@ -386,7 +385,18 @@ namespace llarp::io_uring
     bool
     send(const SockAddr& dest, const llarp_buffer_t& buf) override
     {
-      m_Sender->sendmsg(dest, buf);
+      // in event loop thread, no need to make copy of buf.
+      if (m_Loop.inEventLoop())
+      {
+        m_Sender->sendmsg(dest, buf);
+        m_SendWaker->Trigger();
+        return true;
+      }
+      // outside event loop thread, we have to copy buf.
+      m_Loop.call([this, dest = SockAddr{dest}, buf = buf.copy()] {
+        m_Sender->sendmsg(dest, buf);
+        m_SendWaker->Trigger();
+      });
       return true;
     }
 
@@ -423,7 +433,7 @@ namespace llarp::io_uring
       auto* vec = m_RecvMsg->recv_hdr()->msg_iov;
       auto addr = m_RecvMsg->addr();
       log::debug(cat, "udp socket recvmsg fd={} from={} result={}", m_FD, addr, result);
-      OwnedBuffer pkt{reinterpret_cast<const byte_t*>(vec->iov_base), size_t(result), &m_RecvMem};
+      OwnedBuffer pkt{reinterpret_cast<const byte_t*>(vec->iov_base), size_t(result), &m_Mem};
       on_recv(*this, std::move(addr), std::move(pkt));
       submit();
     };

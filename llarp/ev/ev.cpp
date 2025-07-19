@@ -41,6 +41,7 @@ namespace llarp
   {
     for (const auto& work : _pure_work)
       work();
+    log::debug(logcat, "work done");
   }
 
   void
