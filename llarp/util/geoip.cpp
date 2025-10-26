@@ -10,8 +10,11 @@ struct GeoIP
 {};
 struct GeoIPLookup
 {};
+
+#define GEOIP_STANDARD (0)
+
 GeoIP*
-GeoIP_Open(const char*, int)
+GeoIP_new(int)
 {
   return nullptr;
 }
