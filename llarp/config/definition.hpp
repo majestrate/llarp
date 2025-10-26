@@ -83,10 +83,7 @@ namespace llarp
       template <typename GetEnv>
       constexpr Env(std::string_view _varname, const GetEnv& _get_env) : varname{_varname}
       {
-        get_env = [&_get_env](auto val) -> auto
-        {
-          return _get_env(val);
-        };
+        get_env = [&_get_env](auto val) -> auto { return _get_env(val); };
       }
 
       std::optional<std::string_view>

@@ -15,16 +15,17 @@ add_library(lokinet-util
   util/buffer.cpp
   util/fd.cpp
   util/file.cpp
+  util/geoip.cpp
   util/logging.cpp
   util/logging/buffer.cpp
-  util/easter_eggs.cpp
   util/ioctl.cpp
   util/mem.cpp
   util/non_blocking.cpp
   util/str.cpp
   util/thread/queue_manager.cpp
   util/thread/threading.cpp
-  util/time.cpp)
+  util/time.cpp
+)
 
 
 string(REGEX REPLACE "([\\\"])" "\\\\\\1" path_escaped "${PROJECT_SOURCE_DIR}")
@@ -33,6 +34,7 @@ target_compile_definitions(lokinet-util PUBLIC
   LOGGING_SOURCE_ROOT="${path_escaped}"
 )
 add_dependencies(lokinet-util genversion)
+target_link_libraries(lokinet-util PRIVATE GeoIP)
 
 # lokinet-platform holds all platform specific code
 add_library(lokinet-platform

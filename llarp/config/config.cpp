@@ -7,15 +7,13 @@
 #include <llarp/constants/platform.hpp>
 #include <llarp/constants/version.hpp>
 #include <llarp/net/net.hpp>
-#include <llarp/net/ip.hpp>
 #include <llarp/router_contact.hpp>
 #include <stdexcept>
 #include <llarp/util/file.hpp>
 #include <llarp/util/formattable.hpp>
+#include <llarp/util/geoip.hpp>
 #include <llarp/util/logging.hpp>
-#include <llarp/util/mem.hpp>
 #include <llarp/util/str.hpp>
-
 #include <llarp/service/name.hpp>
 
 #include <chrono>
@@ -1344,13 +1342,13 @@ namespace llarp
             "of the given size.",
             "E.g. 16 ensures that all routers are using IPs from distinct /16 IP ranges."});
 
-#ifdef WITH_GEOIP
     conf.defineOption<std::string>(
         "paths",
         "exclude-country",
         ClientOnly,
         MultiValue,
-        [=](std::string arg) {
+        Env{"LLARP_EXCLUDE_COUNTRIES", get_env},
+        [this](std::string arg) {
           m_ExcludeCountries.emplace(lowercase_ascii_string(std::move(arg)));
         },
         Comment{
@@ -1359,7 +1357,6 @@ namespace llarp
             "    exclude-country=DE",
             "would avoid building paths through routers with IPs in Germany.",
             "This option can be specified multiple times to exclude multiple countries"});
-#endif
   }
 
   bool
@@ -1380,6 +1377,18 @@ namespace llarp
         }
       }
     }
+
+    // do geoip lookup.
+    auto geoip = llarp::util::GeoIPHelperInstance();
+    for (const auto& hop : rcs)
+    {
+      for (const auto& addr : hop.addrs)
+      {
+        if (geoip->address_in_country_code_set(addr, m_ExcludeCountries))
+          return false;
+      }
+    }
+    geoip->maybe_decay_cache();
     return true;
   }
 
