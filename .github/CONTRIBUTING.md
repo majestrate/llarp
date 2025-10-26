@@ -1,4 +1,3 @@
 
-* RUN `make format && make lint -j8` BEFORE COMMITING ALWAYS.
-
-* no tabs
+* RUN `./contrib/format.sh` before commit.
+* no tabs.
