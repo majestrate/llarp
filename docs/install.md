@@ -27,6 +27,7 @@ Build requirements:
 * libsodium >= 1.0.18
 * libsystemd
 * libunbound
+* libgeoip (optional)
 
 ## Linux <span id="linux-install" />
 
@@ -34,7 +35,7 @@ The current most supported platform is Linux. Currently you can compile from sou
 
 For Debian, install the following packages:
 
-    $ sudo apt install build-essential cmake git pkg-config automake libtool libuv1-dev libsodium-dev libsystemd-dev nettle-dev libevent-dev libunbound-dev
+    $ sudo apt install build-essential cmake git pkg-config automake libtool libuv1-dev libsodium-dev libsystemd-dev nettle-dev libevent-dev libunbound-dev libgeoip-dev
 
 Clone the git repo:
 
@@ -47,6 +48,8 @@ Clone the git repo:
 To install the binary and service files:
 
     $ sudo make install
+
+An example systemd unit can be found at `contrib/systemd/llarp.service`
 
 ## FreeBSD <span id="freebsd-install" />
 
@@ -72,17 +75,12 @@ The Android APK build is in need of a maintainer.
 
 ## Distro Packaging <span id="mom-cancel-my-meetings-arch-linux-broke-again" />
 
-We do not provide any distro specific packaging at this time. If you encountered an issue from that, file an issue with the package maintainer.
+If you would like to maintain a package for your distro please let us know by opening up a github issue.
 
+We have an [IRC network](ircs://irc.lokinet.io/llarp) if you plan on packaging this software please
+idle there as well.
 
-<!--
-# Join the network
+Currently, we do not have any distro packaging.
 
-Bootstrap into the network, this will prompt the user and guide through this setup.
-
-    $ sudo llarp-opennet-setup --interactive
-
-For automated bootstrap see:
-
-    $ llarp-opennet-setup --help
--->
+If you encountered an issue from someone packaging this software,
+file an issue with that package maintainer and redirect them to our github issues.
