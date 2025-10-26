@@ -55,9 +55,12 @@ namespace llarp
     SockAddr&
     operator=(const in6_addr& addr);
 
-    explicit operator const sockaddr*() const;
-    explicit operator const sockaddr_in*() const;
-    explicit operator const sockaddr_in6*() const;
+    explicit
+    operator const sockaddr*() const;
+    explicit
+    operator const sockaddr_in*() const;
+    explicit
+    operator const sockaddr_in6*() const;
 
     size_t
     sockaddr_len() const;

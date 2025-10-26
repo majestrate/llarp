@@ -13,7 +13,8 @@ namespace llarp::util
 
     ~FD();
 
-    inline explicit operator int() const
+    inline explicit
+    operator int() const
     {
       return fd();
     }
