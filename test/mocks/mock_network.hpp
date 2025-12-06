@@ -38,23 +38,26 @@ namespace mocks
     close() override{};
   };
 
-  class Network : public llarp::net::Platform, public llarp::uv::Loop
+  class Network : public llarp::net::Platform, public llarp::EventLoop
   {
     std::unordered_multimap<std::string, llarp::IPRange> _network_interfaces;
     bool _snode;
 
     const Platform* const m_Default{Platform::Default_ptr()};
+    llarp::EventLoop_ptr m_EventLoop;
 
    public:
     Network(
         std::unordered_multimap<std::string, llarp::IPRange> network_interfaces, bool snode = true)
         : llarp::net::Platform{}
-        , llarp::uv::Loop{1024}
         , _network_interfaces{std::move(network_interfaces)}
         , _snode{snode}
+        , m_EventLoop{llarp::EventLoop::create(1, 1024)}
     {}
 
-      const llarp::net::Platform*
+    ~Network() override = default;
+
+    const llarp::net::Platform*
     Net_ptr() const override
     {
       return this;
@@ -63,12 +66,97 @@ namespace mocks
     void
     run() override
     {
-      m_EventLoopThreadID = std::this_thread::get_id();
-      m_Impl->run<uvw::Loop::Mode::ONCE>();
-      m_Impl->close();
-      // reset the event loop for reuse
-      m_Impl = uvw::Loop::create();
+      m_EventLoop->run();
     };
+
+    size_t
+    num_worker_threads() const override
+    {
+      return m_EventLoop->num_worker_threads();
+    }
+
+    void
+    queue_slow_work(std::unique_ptr<llarp::EventLoopWork> work) override
+    {
+      m_EventLoop->queue_slow_work(std::move(work));
+    }
+
+    void
+    queue_work(std::unique_ptr<llarp::EventLoopWork> work) override
+    {
+      m_EventLoop->queue_work(std::move(work));
+    }
+
+    void wakeup() override
+    {
+      m_EventLoop->wakeup();
+    }
+
+    bool
+    inEventLoop() const override
+    {
+      return m_EventLoop->inEventLoop();
+    }
+
+    std::shared_ptr<llarp::EventLoopRepeater>
+    make_repeater() override
+    {
+      return m_EventLoop->make_repeater();
+    }
+
+    std::shared_ptr<llarp::EventLoopWakeup>
+    make_waker(std::function<void()> callback) override
+    {
+      return m_EventLoop->make_waker(std::move(callback));
+    }
+
+    bool
+    add_ticker(std::function<void()> ticker) override
+    {
+      return m_EventLoop->add_ticker(std::move(ticker));
+    }
+
+    bool
+    add_network_interface(std::shared_ptr<llarp::vpn::NetworkInterface> netif, std::function<void(llarp::net::IPPacket)> packetHandler) override
+    {
+      return m_EventLoop->add_network_interface(std::move(netif), std::move(packetHandler));
+    }
+
+    std::shared_ptr<llarp::EventLoopPoller>
+    add_poller(int fd, std::function<void()> callback) override
+    {
+      return m_EventLoop->add_poller(fd, std::move(callback));
+    }
+
+    void
+    call_later(llarp_time_t delay_ms, std::function<void()> callback) override
+    {
+      m_EventLoop->call_later(delay_ms, std::move(callback));
+    }
+
+    void
+    call_soon(std::function<void()> f) override
+    {
+      m_EventLoop->call_soon(std::move(f));
+    }
+
+    llarp_time_t
+    time_now() const override
+    {
+      return m_EventLoop->time_now();
+    }
+
+    bool
+    running() const override
+    {
+      return m_EventLoop->running();
+    }
+
+    void
+    stop() override
+    {
+      m_EventLoop->stop();
+    }
 
     llarp::RuntimeOptions
     Opts() const
@@ -110,7 +198,7 @@ namespace mocks
     HasInterfaceAddress(llarp::net::ipaddr_t ip) const override
     {
       for (const auto& item : _network_interfaces)
-        if (var::visit([range = item.second](auto&& ip) { return range.Contains(ToHost(ip)); }, ip))
+        if (item.second.Contains(ip))
           return true;
       // check for wildcard
       return IsWildcardAddress(ip);
@@ -167,7 +255,7 @@ namespace mocks
     LoopbackInterfaceName() const override
     {
       for (const auto& [name, range] : _network_interfaces)
-        if (IsLoopbackAddress(ToNet(range.addr)))
+        if (IsLoopbackAddress(range.addr))
           return name;
       throw std::runtime_error{"no loopback interface?"};
     }

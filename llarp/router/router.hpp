@@ -117,6 +117,9 @@ namespace llarp
     }
 
     void
+    TearDown() override;
+
+    void
     ModifyOurRC(std::function<std::optional<RouterContact>(RouterContact)> modify) override;
 
     void

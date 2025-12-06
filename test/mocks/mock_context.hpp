@@ -9,12 +9,12 @@ namespace mocks
 {
   class MockContext : public llarp::Context
   {
-    const Network& _net;
+    const Network* const _net;
 
    public:
-    MockContext(const Network& net) : llarp::Context{}, _net{net}
+    MockContext(const Network* net) : llarp::Context{}, _net{net}
     {
-      loop = std::shared_ptr<llarp::EventLoop>{const_cast<Network*>(&_net), [](Network*) {}};
+      loop = std::shared_ptr<llarp::EventLoop>{const_cast<Network*>(_net), [](Network*) {}};
     }
 
     std::shared_ptr<llarp::AbstractRouter>

@@ -38,18 +38,16 @@ make_config_for_test(const mocks::Network* env, std::string_view ini_str = "")
 {
   auto conf = std::make_shared<UnitTestConfig>(env);
   conf->LoadString(ini_str, true);
-  conf->lokid.whitelistRouters = false;
   conf->bootstrap.seednode = true;
   conf->bootstrap.files.clear();
   return conf;
 }
 
 std::shared_ptr<UnitTestConfig>
-make_config(mocks::Network env, std::string_view ini_str = "")
+make_config(const mocks::Network env, std::string_view ini_str = "")
 {
   auto conf = std::make_shared<UnitTestConfig>(&env);
   conf->LoadString(ini_str, true);
-  conf->lokid.whitelistRouters = false;
   conf->bootstrap.seednode = true;
   conf->bootstrap.files.clear();
   return conf;
@@ -60,7 +58,7 @@ run_config_test(mocks::Network env, std::string_view ini_str)
 {
   auto conf = make_config_for_test(&env, ini_str);
   const auto opts = env.Opts();
-  auto context = std::make_shared<mocks::MockContext>(env);
+  auto context = std::make_shared<mocks::MockContext>(&env);
 
   context->Configure(conf);
   context->Setup(opts);
@@ -71,11 +69,16 @@ run_config_test(mocks::Network env, std::string_view ini_str)
   context->router->linkManager().ForEachOutboundLink([&ob_links](auto) { ob_links++; });
   REQUIRE(ib_links == 1);
   REQUIRE(ob_links == 1);
-  if (context->Run(opts))
+  env.call_soon([context]() {
+    REQUIRE(context->router->IsRunning());
+    context->router->TearDown();
+  });
+  bool non_zero = context->Run(opts);
+  if (non_zero)
     throw std::runtime_error{"non zero return"};
 }
 
-const std::string ini_minimal = "[lokid]\nrpc=ipc://dummy\n";
+const std::string ini_minimal = "\n";
 
 TEST_CASE("service node bind section on valid network", "[config]")
 {
@@ -92,6 +95,7 @@ TEST_CASE("service node bind section on valid network", "[config]")
     REQUIRE(maybe_addr != std::nullopt);
     REQUIRE(maybe_addr->hostString() == "1.1.1.1");
     REQUIRE(not mock_net.IsBogon(*maybe_addr));
+    mock_net.stop();
   }
 
   SECTION("minimal config")

@@ -25,6 +25,7 @@ namespace llarp::uv
     using Callback = std::function<void()>;
 
     Loop(size_t queue_size, size_t worker_num_threads);
+    ~Loop() override;
 
     virtual void
     run() override;

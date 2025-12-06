@@ -144,8 +144,6 @@ TEST_CASE_METHOD(KeyManagerTest, "Initialize detects bad rc file")
   llarp::Config conf{fs::current_path()};
   conf.Load();
 
-  conf.lokid.whitelistRouters = false;
-
   std::fstream f;
   f.open(our_rc_filename, std::ios::out);
   f << "bad_rc_file";
@@ -163,14 +161,14 @@ TEST_CASE_METHOD(KeyManagerTest, "Initialize detects bad rc file")
   SecretKey key;
 
   key.Zero();
-  REQUIRE(key.LoadFromFile(our_enc_key_filename));
+  REQUIRE(key.LoadFromFile(fs::path{our_enc_key_filename}));
   REQUIRE_FALSE(key.IsZero());
 
   key.Zero();
-  REQUIRE(key.LoadFromFile(our_transport_key_filename));
+  REQUIRE(key.LoadFromFile(fs::path{our_transport_key_filename}));
   REQUIRE_FALSE(key.IsZero());
 
   key.Zero();
-  REQUIRE(key.LoadFromFile(our_identity_filename));
+  REQUIRE(key.LoadFromFile(fs::path{our_identity_filename}));
   REQUIRE_FALSE(key.IsZero());
 }

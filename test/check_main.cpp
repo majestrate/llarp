@@ -8,7 +8,7 @@ int
 main(int argc, char* argv[])
 {
   llarp::sys::service_manager->disable();
-  llarp::log::reset_level(llarp::log::Level::off);
+  llarp::log::set_log_level("off");
   int result = Catch::Session().run(argc, argv);
   return result;
 }

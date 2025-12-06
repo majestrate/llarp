@@ -40,10 +40,10 @@ namespace mocks
 
   class MockVPN : public llarp::vpn::Platform, public llarp::vpn::IRouteManager
   {
-    const Network& _net;
+    const Network* _net;
 
    public:
-    MockVPN(const Network& net) : llarp::vpn::Platform{}, llarp::vpn::IRouteManager{}, _net{net}
+    MockVPN(const Network* net) : llarp::vpn::Platform{}, llarp::vpn::IRouteManager{}, _net{net}
     {}
 
     virtual std::shared_ptr<llarp::vpn::NetworkInterface>
@@ -55,7 +55,7 @@ namespace mocks
     const llarp::net::Platform*
     Net_ptr() const override
     {
-      return &_net;
+      return _net;
     };
 
     void AddRoute(llarp::net::ipaddr_t, llarp::net::ipaddr_t) override{};

@@ -220,6 +220,10 @@ namespace llarp
     virtual bool
     IsBootstrapNode(RouterID r) const = 0;
 
+    /// Issue immediate teardown of all resources.
+    virtual void
+    TearDown() = 0;
+
     virtual const byte_t*
     pubkey() const = 0;
 

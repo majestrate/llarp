@@ -1,7 +1,6 @@
 #include <catch2/catch.hpp>
 #include <llarp/util/logging.hpp>
 #include <llarp/config/config.hpp>
-#include <oxen/log/level.hpp>
 
 using TestString = std::string;
 
@@ -19,19 +18,19 @@ std::vector<TestParseLog> testParseLog{// bad cases
                                        {"infogarbage", {}},
                                        {"notcritical", {}},
                                        // good cases
-                                       {"info", llarp::log::Level::info},
-                                       {"infO", llarp::log::Level::info},
-                                       {"iNfO", llarp::log::Level::info},
-                                       {"InfO", llarp::log::Level::info},
-                                       {"INFO", llarp::log::Level::info},
-                                       {"trace", llarp::log::Level::trace},
-                                       {"debug", llarp::log::Level::debug},
-                                       {"warn", llarp::log::Level::warn},
-                                       {"warning", llarp::log::Level::warn},
-                                       {"error", llarp::log::Level::err},
-                                       {"err", llarp::log::Level::err},
-                                       {"Critical", llarp::log::Level::critical},
+                                       {"info", llarp::log::Level::lvl_info},
+                                       {"infO", llarp::log::Level::lvl_info},
+                                       {"iNfO", llarp::log::Level::lvl_info},
+                                       {"InfO", llarp::log::Level::lvl_info},
+                                       {"INFO", llarp::log::Level::lvl_info},
+                                       {"trace", llarp::log::Level::lvl_trace},
+                                       {"debug", llarp::log::Level::lvl_debug},
+                                       {"warn", llarp::log::Level::lvl_warning},
+                                       {"warning", llarp::log::Level::lvl_warning},
+                                       {"error", llarp::log::Level::lvl_error},
+                                       {"err", llarp::log::Level::lvl_error},
                                        {"off", llarp::log::Level::off},
+                                       {"false", llarp::log::Level::off},
                                        {"none", llarp::log::Level::off}};
 
 TEST_CASE("parseLevel")
@@ -50,11 +49,10 @@ TEST_CASE("parseLevel")
 
 TEST_CASE("TestLogLevelToString")
 {
-  CHECK("trace" == llarp::log::to_string(llarp::log::Level::trace));
-  CHECK("debug" == llarp::log::to_string(llarp::log::Level::debug));
-  CHECK("info" == llarp::log::to_string(llarp::log::Level::info));
-  CHECK("warning" == llarp::log::to_string(llarp::log::Level::warn));
-  CHECK("error" == llarp::log::to_string(llarp::log::Level::err));
-  CHECK("critical" == llarp::log::to_string(llarp::log::Level::critical));
+  CHECK("trace" == llarp::log::to_string(llarp::log::Level::lvl_trace));
+  CHECK("debug" == llarp::log::to_string(llarp::log::Level::lvl_debug));
+  CHECK("info" == llarp::log::to_string(llarp::log::Level::lvl_info));
+  CHECK("warning" == llarp::log::to_string(llarp::log::Level::lvl_warning));
+  CHECK("error" == llarp::log::to_string(llarp::log::Level::lvl_error));
   CHECK("off" == llarp::log::to_string(llarp::log::Level::off));
 }

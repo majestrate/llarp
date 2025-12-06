@@ -34,7 +34,7 @@ namespace llarp::log
   Level
   level_from_string(std::string_view str)
   {
-    if (llarp::IsFalseValue(str))
+    if (llarp::IsFalseValue(str) or llarp::string_iequal(str, "off"))
       return Level::off;
     if (llarp::string_iequal(str, "trace"))
       return Level::lvl_trace;
@@ -48,6 +48,27 @@ namespace llarp::log
       return Level::lvl_error;
     throw std::invalid_argument{fmt::format("invalid log level: {}", str)};
   }
+
+  std::string
+  to_string(Level lvl)
+  {
+    switch (lvl)
+    {
+      case Level::off:
+        return "off";
+        case Level::lvl_trace:
+        return "trace";
+        case Level::lvl_debug:
+        return "debug";
+        case Level::lvl_info:
+        return "info";
+        case Level::lvl_warning:
+        return "warning";
+        case Level::lvl_error:
+        return "error";
+    }
+  }
+
 
   auto
   to_spdlog_level(Level lvl)

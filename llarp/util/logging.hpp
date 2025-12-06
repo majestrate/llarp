@@ -7,6 +7,7 @@
 #include <array>
 #include <fmt/format.h>
 #include "source_location.hpp"
+#include "str.hpp"
 #include "time.hpp"
 #include <memory>
 
@@ -25,6 +26,9 @@ namespace llarp::log
 
   Level
   level_from_string(std::string_view str);
+
+  std::string
+  to_string(Level lvl);
 
   class CategoryLogger
   {
@@ -163,6 +167,12 @@ namespace llarp::log
 
   void
   set_log_level(Level lvl);
+
+  inline void
+  set_log_level(std::string lvl)
+  {
+    set_log_level(level_from_string(lowercase_ascii_string(std::move(lvl))));
+  }
 }  // namespace llarp::log
 
 // Not ready to pollute these deprecation warnings everywhere yet

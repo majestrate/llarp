@@ -153,11 +153,12 @@ namespace llarp::uv
     m_WakeUp->on<uvw::AsyncEvent>([this](const auto&, auto&) { tick_event_loop(); });
     m_DiskThread =
         std::make_unique<std::thread>([queue = &m_DiskCalls]() { run_disk_thread(queue); });
-    do
+
+    while (worker_threads > 0)
     {
       m_WorkThreads.emplace_back([queue = &m_WorkCalls]() { run_worker_thread(queue); });
       worker_threads--;
-    } while (worker_threads > 0);
+    }
   }
 
   bool
@@ -174,7 +175,16 @@ namespace llarp::uv
     m_Impl->run();
     m_Impl->close();
     m_DiskCalls.disable();
-    m_DiskThread->join();
+    if (m_DiskThread and m_DiskThread->joinable())
+      m_DiskThread->join();
+    m_DiskThread.reset();
+    m_WorkCalls.disable();
+    for (auto & t : m_WorkThreads)
+    {
+      if (t.joinable())
+        t.join();
+    }
+    m_WorkThreads.clear();
     m_Impl.reset();
     llarp::LogInfo("we have stopped");
   }
@@ -228,31 +238,46 @@ namespace llarp::uv
     }
   }
 
+  Loop::~Loop()
+  {
+    llarp::EventLoop::~EventLoop();
+  }
+
   void
   Loop::stop()
   {
-    if (m_Run)
+    if (!m_Run)
+      return;
+
+    if (not inEventLoop())
+      return call_soon([this] { stop(); });
+
+    llarp::LogInfo("stopping event loop");
+    m_Impl->walk([](auto&& handle) {
+      if constexpr (!std::is_pointer_v<std::remove_reference_t<decltype(handle)>>)
+        handle.close();
+    });
+    llarp::LogDebug("Closed all handles, stopping the loop");
+    m_Impl->stop();
+
+    m_WorkCalls.disable();
+
+    for (auto& t : m_WorkThreads)
     {
-      if (not inEventLoop())
-        return call_soon([this] { stop(); });
-
-      llarp::LogInfo("stopping event loop");
-      m_Impl->walk([](auto&& handle) {
-        if constexpr (!std::is_pointer_v<std::remove_reference_t<decltype(handle)>>)
-          handle.close();
-      });
-      llarp::LogDebug("Closed all handles, stopping the loop");
-      m_Impl->stop();
-
-      m_Run.store(false);
-
-      m_WorkCalls.disable();
-
-      for (auto& t : m_WorkThreads)
+      if (t.joinable())
         t.join();
-
-      m_WorkThreads.clear();
     }
+    m_WorkThreads.clear();
+
+    if (m_DiskThread)
+    {
+      m_DiskCalls.disable();
+      if (m_DiskThread->joinable())
+        m_DiskThread->join();
+      m_DiskThread.reset();
+    }
+
+    m_Run.store(false);
   }
 
   bool

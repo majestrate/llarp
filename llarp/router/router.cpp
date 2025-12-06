@@ -331,6 +331,13 @@ namespace llarp
     _running.store(false);
   }
 
+  void
+  Router::TearDown()
+  {
+    StopLinks();
+    Close();
+  }
+
   bool
   Router::ParseRoutingMessageBuffer(
       const llarp_buffer_t& buf, routing::IMessageHandler* h, const PathID_t& rxid)

@@ -91,7 +91,7 @@ TEST_CASE("Test Get Subdomains" , "[dns]")
 TEST_CASE("Test PTR records", "[dns]")
 {
   llarp::huint128_t expected =
-      llarp::net::ExpandV4(llarp::ipaddr_ipv4_bits(10, 10, 10, 1));
+      llarp::ToHost(llarp::net::ExpandV4(llarp::net::ipaddr_ipv4_bits(10, 10, 10, 1)));
   auto ip = llarp::dns::DecodePTR("1.10.10.10.in-addr.arpa.");
   CHECK(ip);
   CHECK(*ip == expected);

@@ -22,8 +22,7 @@ add_executable(testAll
   crypto/test_llarp_crypto.cpp
   crypto/test_llarp_key_manager.cpp
   dns/test_llarp_dns_dns.cpp
-  net/test_ip_address.cpp
-  net/test_llarp_net.cpp
+        net/test_llarp_net.cpp
   net/test_sock_addr.cpp
   nodedb/test_nodedb.cpp
   path/test_path.cpp

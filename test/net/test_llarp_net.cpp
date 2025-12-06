@@ -56,19 +56,19 @@ TEST_CASE("Range")
   SECTION("Contains 8")
   {
     REQUIRE(
-        llarp::IPRange::FromIPv4(10, 0, 0, 1, 8).Contains(llarp::ipaddr_ipv4_bits(10, 40, 11, 6)));
+        llarp::IPRange::FromIPv4(10, 0, 0, 1, 8).Contains(llarp::net::ipaddr_ipv4_bits(10, 40, 11, 6)));
   }
 
   SECTION("Contains 24")
   {
     REQUIRE(llarp::IPRange::FromIPv4(10, 200, 0, 1, 24)
-                .Contains(llarp::ipaddr_ipv4_bits(10, 200, 0, 253)));
+                .Contains(llarp::net::ipaddr_ipv4_bits(10, 200, 0, 253)));
   }
 
   SECTION("Contains fail")
   {
     REQUIRE(!llarp::IPRange::FromIPv4(192, 168, 0, 1, 24)
-                 .Contains(llarp::ipaddr_ipv4_bits(10, 200, 0, 253)));
+                 .Contains(llarp::net::ipaddr_ipv4_bits(10, 200, 0, 253)));
   }
   SECTION("Intersecting networks")
   {
@@ -85,38 +85,38 @@ TEST_CASE("Range")
 
 TEST_CASE("IPv4 netmask")
 {
-  REQUIRE(llarp::netmask_ipv4_bits(8) == llarp::huint32_t{0xFF000000});
-  REQUIRE(llarp::netmask_ipv4_bits(24) == llarp::huint32_t{0xFFFFFF00});
+  REQUIRE(llarp::net::detail::netmask_ipv4_bits(8) == llarp::huint32_t{0xFF000000});
+  REQUIRE(llarp::net::detail::netmask_ipv4_bits(24) == llarp::huint32_t{0xFFFFFF00});
 }
 
 TEST_CASE("Bogon")
 {
   SECTION("Bogon_10_8")
   {
-    REQUIRE(IsBogon(llarp::ipaddr_ipv4_bits(10, 40, 11, 6)));
+    REQUIRE(IsBogon(llarp::net::ipaddr_ipv4_bits(10, 40, 11, 6)));
   }
 
   SECTION("Bogon_192_168_16")
   {
-    REQUIRE(IsBogon(llarp::ipaddr_ipv4_bits(192, 168, 1, 111)));
+    REQUIRE(IsBogon(llarp::net::ipaddr_ipv4_bits(192, 168, 1, 111)));
   }
 
   SECTION("Bogon_127_8")
   {
-    REQUIRE(IsBogon(llarp::ipaddr_ipv4_bits(127, 0, 0, 1)));
+    REQUIRE(IsBogon(llarp::net::ipaddr_ipv4_bits(127, 0, 0, 1)));
   }
 
   SECTION("Bogon_0_8")
   {
-    REQUIRE(IsBogon(llarp::ipaddr_ipv4_bits(0, 0, 0, 0)));
+    REQUIRE(IsBogon(llarp::net::ipaddr_ipv4_bits(0, 0, 0, 0)));
   }
 
   SECTION("Non-bogon")
   {
-    REQUIRE_FALSE(IsBogon(llarp::ipaddr_ipv4_bits(1, 1, 1, 1)));
-    REQUIRE_FALSE(IsBogon(llarp::ipaddr_ipv4_bits(8, 8, 6, 6)));
-    REQUIRE_FALSE(IsBogon(llarp::ipaddr_ipv4_bits(141, 55, 12, 99)));
-    REQUIRE_FALSE(IsBogon(llarp::ipaddr_ipv4_bits(79, 12, 3, 4)));
+    REQUIRE_FALSE(IsBogon(llarp::net::ipaddr_ipv4_bits(1, 1, 1, 1)));
+    REQUIRE_FALSE(IsBogon(llarp::net::ipaddr_ipv4_bits(8, 8, 6, 6)));
+    REQUIRE_FALSE(IsBogon(llarp::net::ipaddr_ipv4_bits(141, 55, 12, 99)));
+    REQUIRE_FALSE(IsBogon(llarp::net::ipaddr_ipv4_bits(79, 12, 3, 4)));
   }
 }
 

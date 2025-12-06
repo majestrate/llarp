@@ -71,7 +71,7 @@ TEST_CASE_METHOD(TestCryptoTypesSecret, "secret_key_from_file_missing")
   REQUIRE_FALSE(fs::exists(fs::status(p)));
 
   llarp::SecretKey key;
-  REQUIRE_FALSE(key.LoadFromFile(filename.c_str()));
+  REQUIRE_FALSE(key.LoadFromFile(p));
 
   // Verify we didn't create a file
   REQUIRE_FALSE(fs::exists(fs::status(p)));
@@ -90,7 +90,7 @@ TEST_CASE_METHOD(TestCryptoTypesSecret, "secret_key_from_file_empty")
   llarp::test::FileGuard guard(p);
 
   llarp::SecretKey key;
-  REQUIRE_FALSE(key.LoadFromFile(filename.c_str()));
+  REQUIRE_FALSE(key.LoadFromFile(p));
 
   // Verify we didn't delete the file
   REQUIRE(fs::exists(fs::status(fs::path(filename))));
@@ -110,7 +110,7 @@ TEST_CASE_METHOD(TestCryptoTypesSecret, "secret_key_from_file_smaller")
   llarp::test::FileGuard guard(p);
 
   llarp::SecretKey key;
-  REQUIRE_FALSE(key.LoadFromFile(filename.c_str()));
+  REQUIRE_FALSE(key.LoadFromFile(p));
 
   // Verify we didn't delete the file
   REQUIRE(fs::exists(fs::status(fs::path(filename))));
@@ -131,7 +131,7 @@ TEST_CASE_METHOD(TestCryptoTypesSecret, "secret_key_from_file_smaller_bencode")
   llarp::test::FileGuard guard(p);
 
   llarp::SecretKey key;
-  REQUIRE_FALSE(key.LoadFromFile(filename.c_str()));
+  REQUIRE_FALSE(key.LoadFromFile(p));
 
   // Verify we didn't delete the file
   REQUIRE(fs::exists(fs::status(fs::path(filename))));
@@ -152,7 +152,7 @@ TEST_CASE_METHOD(TestCryptoTypesSecret, "secret_key_from_file_smaller_corrupt_be
   llarp::test::FileGuard guard(p);
 
   llarp::SecretKey key;
-  REQUIRE_FALSE(key.LoadFromFile(filename.c_str()));
+  REQUIRE_FALSE(key.LoadFromFile(p));
 
   // Verify we didn't delete the file
   REQUIRE(fs::exists(fs::status(fs::path(filename))));
@@ -172,7 +172,7 @@ TEST_CASE_METHOD(TestCryptoTypesSecret, "secret_key_from_file_larger")
   llarp::test::FileGuard guard(p);
 
   llarp::SecretKey key;
-  REQUIRE_FALSE(key.LoadFromFile(filename.c_str()));
+  REQUIRE_FALSE(key.LoadFromFile(p));
 
   // Verify we didn't delete the file
   REQUIRE(fs::exists(fs::status(fs::path(filename))));
@@ -193,7 +193,7 @@ TEST_CASE_METHOD(TestCryptoTypesSecret, "secret_key_from_file_larger_bencode")
   llarp::test::FileGuard guard(p);
 
   llarp::SecretKey key;
-  REQUIRE_FALSE(key.LoadFromFile(filename.c_str()));
+  REQUIRE_FALSE(key.LoadFromFile(p));
 
   // Verify we didn't delete the file
   REQUIRE(fs::exists(fs::status(fs::path(filename))));
@@ -213,7 +213,7 @@ TEST_CASE_METHOD(TestCryptoTypesSecret, "secret_key_from_file_happy_raw")
   llarp::test::FileGuard guard(p);
 
   llarp::SecretKey key;
-  REQUIRE(key.LoadFromFile(filename.c_str()));
+  REQUIRE(key.LoadFromFile(p));
 
   // Verify we didn't delete the file
   REQUIRE(fs::exists(fs::status(fs::path(filename))));
@@ -234,7 +234,7 @@ TEST_CASE_METHOD(TestCryptoTypesSecret, "secret_key_from_file_happy_bencode")
   llarp::test::FileGuard guard(p);
 
   llarp::SecretKey key;
-  REQUIRE(key.LoadFromFile(filename.c_str()));
+  REQUIRE(key.LoadFromFile(p));
 
   // Verify we didn't delete the file
   REQUIRE(fs::exists(fs::status(fs::path(filename))));
@@ -261,7 +261,7 @@ TEST_CASE_METHOD(TestCryptoTypesSecret, "secret_key_to_missing_file")
   llarp::test::FileGuard guard(p);
 
   llarp::SecretKey key;
-  REQUIRE_FALSE(key.SaveToFile(filename.c_str()));
+  REQUIRE_FALSE(key.SaveToFile(p));
 
   // Verify we didn't create the file
   REQUIRE_FALSE(fs::exists(fs::status(fs::path(filename))));
@@ -275,13 +275,13 @@ TEST_CASE_METHOD(TestCryptoTypesSecret, "secret_key_to_file")
 
   llarp::SecretKey key;
   key.Randomize();
-  REQUIRE(key.SaveToFile(filename.c_str()));
+  REQUIRE(key.SaveToFile(p));
 
   // Verify we created the file
   REQUIRE(fs::exists(fs::status(fs::path(filename))));
 
   llarp::SecretKey other;
-  other.LoadFromFile(filename.c_str());
+  other.LoadFromFile(p);
 
   REQUIRE(other == key);
 }
