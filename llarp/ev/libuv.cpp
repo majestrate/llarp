@@ -179,7 +179,7 @@ namespace llarp::uv
       m_DiskThread->join();
     m_DiskThread.reset();
     m_WorkCalls.disable();
-    for (auto & t : m_WorkThreads)
+    for (auto& t : m_WorkThreads)
     {
       if (t.joinable())
         t.join();

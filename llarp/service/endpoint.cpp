@@ -369,7 +369,7 @@ namespace llarp
     void
     Endpoint::Tick(llarp_time_t)
     {
-      const auto now = m_router->loop()->time_now();
+      const auto now = Now();
       path::Builder::Tick(now);
       // publish descriptors
       if (ShouldPublishDescriptors(now))
@@ -796,6 +796,7 @@ namespace llarp
           new PublishIntroSetJob(this, GenTXID(), introset, relayOrder, PublishIntrosetTimeout);
       if (job->SendRequestViaPath(path, r))
       {
+        log::info(logcat, "Publish Introset for {} via endpoint {}", Name(), path->Endpoint());
         m_state->m_LastPublishAttempt = Now();
         return true;
       }
@@ -821,11 +822,15 @@ namespace llarp
       if (not m_PublishIntroSet)
         return false;
 
-      const auto lastEventAt = std::max(m_state->m_LastPublishAttempt, m_state->m_LastPublish);
+      // wait for all pending builds to settle before republishing introset.
+      if (NumInStatus(path::ePathBuilding) > 0)
+        return false;
+
+      const auto& lastEventAt = m_state->m_LastPublishAttempt;
       const auto next_pub = lastEventAt
           + (m_state->m_IntroSet.HasStaleIntros(now, path::intro_stale_threshold)
                  ? IntrosetPublishRetryCooldown
-                 : IntrosetPublishInterval);
+                 : 60s);
 
       return now >= next_pub;
     }

@@ -56,19 +56,18 @@ namespace llarp::log
     {
       case Level::off:
         return "off";
-        case Level::lvl_trace:
+      case Level::lvl_trace:
         return "trace";
-        case Level::lvl_debug:
+      case Level::lvl_debug:
         return "debug";
-        case Level::lvl_info:
+      case Level::lvl_info:
         return "info";
-        case Level::lvl_warning:
+      case Level::lvl_warning:
         return "warning";
-        case Level::lvl_error:
+      case Level::lvl_error:
         return "error";
     }
   }
-
 
   auto
   to_spdlog_level(Level lvl)
