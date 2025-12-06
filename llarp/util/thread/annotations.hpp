@@ -1,5 +1,4 @@
 #pragma once
-#include <ciso646>
 
 // Clang thread safety analysis macros.  Does nothing under non-clang compilers.
 
