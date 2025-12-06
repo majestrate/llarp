@@ -207,14 +207,14 @@ namespace llarp
         net::IPPacket pkt;
 
         bool
-        operator>(const WritePacket& other) const
+        operator<(const WritePacket& other) const
         {
-          return seqno > other.seqno;
+          return seqno < other.seqno;
         }
       };
 
       /// queue for sending packets to user from network
-      util::ascending_priority_queue<WritePacket> m_NetworkToUserPktQueue;
+      std::priority_queue<WritePacket> m_NetworkToUserPktQueue;
 
       void
       Pump(llarp_time_t now) override;
