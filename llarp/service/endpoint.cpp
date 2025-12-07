@@ -1195,6 +1195,7 @@ namespace llarp
         auto& ev = *maybe;
         ProtocolMessage::ProcessAsync(ev.fromPath, ev.pathid, ev.msg);
       }
+      Pump(Now());
     }
 
     void
@@ -1217,7 +1218,7 @@ namespace llarp
       }
       PutReplyIntroFor(msg->tag, intro);
       ConvoTagRX(msg->tag);
-      return ProcessDataMessage(msg);
+      return ProcessDataMessage(std::move(msg));
     }
 
     bool
@@ -1272,7 +1273,6 @@ namespace llarp
           || msg->proto == ProtocolType::TrafficV4 || msg->proto == ProtocolType::TrafficV6)
       {
         m_InboundTrafficQueue.tryPushBack(std::move(msg));
-        Router()->TriggerPump();
         return true;
       }
       if (msg->proto == ProtocolType::Control)
@@ -1729,11 +1729,6 @@ namespace llarp
     void
     Endpoint::Pump(llarp_time_t now)
     {
-      FlushRecvData();
-      // send downstream packets to user for snode
-      for (const auto& [router, session] : m_state->m_SNodeSessions)
-        session->FlushDownstream();
-
       // handle inbound traffic sorted
       std::priority_queue<ProtocolMessage> queue;
       while (not m_InboundTrafficQueue.empty())
@@ -1763,20 +1758,24 @@ namespace llarp
         queue.pop();
       }
 
-      auto router = Router();
       // TODO: locking on this container
       for (auto itr = m_state->m_RemoteSessions.begin(); itr != m_state->m_RemoteSessions.end();)
       {
-        itr->second->FlushUpstream();
         if (itr->second->Pump(now))
         {
           m_state->m_DeadSessions.emplace(itr->first, itr->second);
           itr = m_state->m_RemoteSessions.erase(itr);
         }
         else
+        {
+          itr->second->FlushUpstream();
           ++itr;
+        }
       }
-      // TODO: locking on this container
+      // send downstream packets to user for snode, writes on TUN.
+      for (const auto& [router, session] : m_state->m_SNodeSessions)
+        session->FlushDownstream();
+      // send upstream traffic to snode from what is currently queued.
       for (const auto& [router, session] : m_state->m_SNodeSessions)
         session->FlushUpstream();
 
@@ -1785,11 +1784,11 @@ namespace llarp
       {
         SendEvent_t item = m_SendQueue.popFront();
         item.first->S = item.second->NextSeqNo();
-        if (item.second->SendRoutingMessage(*item.first, router))
+        if (item.second->SendRoutingMessage(*item.first, Router()))
           ConvoTagTX(item.first->T.T);
       }
 
-      UpstreamFlush(router);
+      UpstreamFlush(Router());
     }
 
     std::optional<ConvoTag>

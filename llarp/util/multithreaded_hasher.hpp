@@ -4,6 +4,7 @@
 #include <llarp/util/thread/queue.hpp>
 #include <vector>
 #include <functional>
+#include <llarp/util/priority_queue.hpp>
 
 namespace llarp::util
 {
@@ -61,13 +62,15 @@ namespace llarp::util
     poll_hashed_data()
     {
       std::vector<T> hashed;
-      do
-      {
-        auto maybe = m_HashedData.tryPopFront();
-        if (not maybe)
-          break;
-        hashed.emplace_back(std::move(*maybe));
-      } while (true);
+      with_inplace_priority_queue<T>(hashed, [self = this](auto& queue) {
+        do
+        {
+          auto maybe = self->m_HashedData.tryPopFront();
+          if (not maybe)
+            break;
+          queue.emplace(std::move(*maybe));
+        } while (true);
+      });
       return hashed;
     }
 

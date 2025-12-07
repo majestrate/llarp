@@ -5,7 +5,8 @@
 #include <llarp/ev/ev.hpp>
 #include <llarp/iwp/message_buffer.hpp>
 #include <llarp/net/sock_addr.hpp>
-#include "llarp/crypto/crypto.hpp"
+#include <llarp/crypto/crypto.hpp>
+#include <llarp/util/priority_queue.hpp>
 
 namespace llarp::iwp
 {
@@ -78,14 +79,16 @@ namespace llarp::iwp
   Hasher::poll_verified()
   {
     std::vector<VerifyResult> verified;
-    do
-    {
-      auto maybe = m_ProcessVerified.tryPopFront();
-      if (not maybe)
-        break;
+    llarp::util::with_inplace_priority_queue<VerifyResult>(verified, [self = this](auto& queue) {
+      do
+      {
+        auto maybe = self->m_ProcessVerified.tryPopFront();
+        if (not maybe)
+          break;
+        queue.emplace(std::move(*maybe));
+      } while (true);
+    });
 
-      verified.emplace_back(std::move(*maybe));
-    } while (true);
     return verified;
   }
 

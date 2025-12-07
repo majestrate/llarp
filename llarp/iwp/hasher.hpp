@@ -26,6 +26,11 @@ namespace llarp::iwp
       SockAddr from;
       uint64_t msgid;
       bool result;
+      inline bool
+      operator<(const VerifyResult& other) const
+      {
+        return msgid < other.msgid;
+      }
     };
 
     struct HashedMessage
@@ -41,6 +46,12 @@ namespace llarp::iwp
       size() const
       {
         return msg.size();
+      }
+
+      inline bool
+      operator<(const HashedMessage& other) const
+      {
+        return msg.m_MsgID < other.msg.m_MsgID;
       }
     };
 
