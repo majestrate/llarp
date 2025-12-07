@@ -4,7 +4,6 @@
 #include "endpoint_util.hpp"
 #include "hidden_service_address_lookup.hpp"
 #include "auth.hpp"
-#include "llarp/util/logging.hpp"
 #include "outbound_context.hpp"
 #include "protocol.hpp"
 #include "info.hpp"
@@ -27,7 +26,8 @@
 #include <llarp/router/route_poker.hpp>
 #include <llarp/routing/dht_message.hpp>
 #include <llarp/routing/path_transfer_message.hpp>
-
+#include <llarp/path/pathset.hpp>
+#include <llarp/util/logging.hpp>
 #include <llarp/util/str.hpp>
 #include <llarp/util/buffer.hpp>
 #include <llarp/util/meta/memfn.hpp>
@@ -1735,7 +1735,7 @@ namespace llarp
         session->FlushDownstream();
 
       // handle inbound traffic sorted
-      util::ascending_priority_queue<ProtocolMessage> queue;
+      std::priority_queue<ProtocolMessage> queue;
       while (not m_InboundTrafficQueue.empty())
       {
         // succ it out

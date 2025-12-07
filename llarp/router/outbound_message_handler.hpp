@@ -82,7 +82,7 @@ namespace llarp
       PathID_t pathid;
       RouterID router;
 
-      bool
+      inline bool
       operator>(const MessageQueueEntry& other) const
       {
         return priority > other.priority;
@@ -100,7 +100,7 @@ namespace llarp
       uint32_t numTicks = 0;
     };
 
-    using MessageQueue = util::ascending_priority_queue<MessageQueueEntry>;
+    using MessageQueue = util::descending_priority_queue<MessageQueueEntry>;
 
     /* If a session is not yet created with the destination router for a message,
      * a special queue is created for that router and an attempt is made to

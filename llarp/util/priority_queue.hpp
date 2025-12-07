@@ -5,9 +5,9 @@
 
 namespace llarp::util
 {
-  /// priority queue that uses operator > instead of operator <
+  /// priority queue that sorts in descending order, basically a normal priority queue in reverse.
   template <typename T, typename Container = std::vector<T>>
-  using ascending_priority_queue =
+  using descending_priority_queue =
       std::priority_queue<T, Container, std::greater<typename Container::value_type>>;
 
 }  // namespace llarp::util
