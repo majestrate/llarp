@@ -10,17 +10,9 @@ namespace llarp::util
   using descending_priority_queue =
       std::priority_queue<T, Container, std::greater<typename Container::value_type>>;
 
-  template <
-      typename T,
-      typename Visit_t,
-      typename Queue_t = std::priority_queue<T>,
-      typename Container_t = std::vector<T>>
-  inline auto
-  with_inplace_priority_queue(
-      Container_t& vec,
-      Visit_t&& visit,
-      const typename Queue_t::value_compare& compare = typename Queue_t::value_compare{})
+  namespace
   {
+    template <typename Container_t>
     struct Wrapper
     {
       using container_type = Container_t;
@@ -66,10 +58,24 @@ namespace llarp::util
         return vector.front();
       }
     };
+  }  // namespace
 
-    const Wrapper wrapper{vec};
-    using inner_queue_t =
-        std::priority_queue<typename Queue_t::value_type, Wrapper, typename Queue_t::value_compare>;
+  template <
+      typename T,
+      typename Visit_t,
+      typename Queue_t = std::priority_queue<T>,
+      typename Container_t = std::vector<T>>
+  inline auto
+  with_inplace_priority_queue(
+      Container_t& vec,
+      Visit_t&& visit,
+      const typename Queue_t::value_compare& compare = typename Queue_t::value_compare{})
+  {
+    const Wrapper<Container_t> wrapper{vec};
+    using inner_queue_t = std::priority_queue<
+        typename Queue_t::value_type,
+        Wrapper<Container_t>,
+        typename Queue_t::value_compare>;
     inner_queue_t queue{compare, wrapper};
     return visit(static_cast<inner_queue_t&>(queue));
   }
