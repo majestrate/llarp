@@ -725,7 +725,10 @@ namespace llarp
         }
         ++itr;
       }
-      m_PlaintextRecv.tryPushBack(std::move(msgs));
+
+      if (not msgs.empty())
+        m_PlaintextRecv.tryPushBack(std::move(msgs));
+
       m_PlaintextEmpty.clear();
       m_Parent->WakeupPlaintext();
     }
@@ -744,24 +747,31 @@ namespace llarp
           {
             case Command::eXMIT:
               HandleXMIT(std::move(result));
+              m_LastRX = m_Parent->Now();
               break;
             case Command::eDATA:
               HandleDATA(std::move(result));
+              m_LastRX = m_Parent->Now();
               break;
             case Command::eACKS:
               HandleACKS(std::move(result));
+              m_LastRX = m_Parent->Now();
               break;
             case Command::ePING:
               HandlePING(std::move(result));
+              m_LastRX = m_Parent->Now();
               break;
             case Command::eNACK:
               HandleNACK(std::move(result));
+              m_LastRX = m_Parent->Now();
               break;
             case Command::eCLOS:
               HandleCLOS(std::move(result));
+              m_LastRX = m_Parent->Now();
               break;
             case Command::eMACK:
               HandleMACK(std::move(result));
+              m_LastRX = m_Parent->Now();
               break;
             default:
               LogError("invalid command ", int(result[PacketOverhead + 1]), " from ", m_RemoteAddr);
@@ -824,7 +834,6 @@ namespace llarp
       {
         EncryptAndSend(itr->second.XMIT());
       }
-      m_LastRX = m_Parent->Now();
     }
 
     void
@@ -846,7 +855,6 @@ namespace llarp
       auto p2 = pos + ShortHash::SIZE;
       assert(p2 == data.data() + XMITOverhead);
       LogTrace("rxid=", rxid, " sz=", sz, " h=", oxenc::to_hex(pos, p2), " from ", m_RemoteAddr);
-      m_LastRX = m_Parent->Now();
       {
         // check for replay
         auto itr = m_ReplayFilter.find(rxid);
@@ -887,7 +895,6 @@ namespace llarp
         LogError("short DATA from ", m_RemoteAddr, " ", data.size());
         return;
       }
-      m_LastRX = m_Parent->Now();
       auto sz = oxenc::load_big_to_host<uint16_t>(data.data() + CommandOverhead + PacketOverhead);
       auto rxid = oxenc::load_big_to_host<uint64_t>(
           data.data() + CommandOverhead + sizeof(uint16_t) + PacketOverhead);
@@ -938,7 +945,6 @@ namespace llarp
         return;
       }
       const auto now = m_Parent->Now();
-      m_LastRX = now;
       auto txid = oxenc::load_big_to_host<uint64_t>(data.data() + 2 + PacketOverhead);
       auto itr = m_TXMsgs.find(txid);
       if (itr == m_TXMsgs.end())
@@ -969,9 +975,7 @@ namespace llarp
 
     void
     Session::HandlePING(Packet_t)
-    {
-      m_LastRX = m_Parent->Now();
-    }
+    {}
 
     bool
     Session::SendKeepAlive()
