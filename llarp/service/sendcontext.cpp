@@ -92,6 +92,7 @@ namespace llarp
       {
         LogWarn(
             m_PathSet->Name(), " could not send, has no cached session key on session T=", f->T);
+        markedBad = true;
         return;
       }
 
