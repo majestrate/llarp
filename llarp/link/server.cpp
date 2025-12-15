@@ -224,8 +224,12 @@ namespace llarp
     for (const auto& pending : closedPending)
     {
       if (pending->IsInbound())
-        continue;
-      HandleTimeout(pending.get());
+      {
+        pending->Close();
+        pending->Pump();
+      }
+      else
+        HandleTimeout(pending.get());
     }
   }
 

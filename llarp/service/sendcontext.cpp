@@ -83,8 +83,8 @@ namespace llarp
       auto path = m_PathSet->GetPathByRouter(remoteIntro.router);
       if (!path)
       {
-        ShiftIntroRouter(remoteIntro.router);
         LogWarn(m_PathSet->Name(), " cannot encrypt and send: no path for intro ", remoteIntro);
+        markedBad = true;
         return;
       }
 
