@@ -1,4 +1,4 @@
-name: Build and publish a Docker image.
+name: Run CI pipeline.
 
 on:
   push:
