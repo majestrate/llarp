@@ -5,5 +5,5 @@
     "mainPageInRoot": true,
     "mainPageName": "index",
     "linkLowercase": false,
-    "foldersToGenerate": ["files", "classes", "namespaces"]
+    "foldersToGenerate": ["files", "classes", "namespaces", "pages"]
 }

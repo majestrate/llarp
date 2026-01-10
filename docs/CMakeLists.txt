@@ -45,6 +45,24 @@ if(NOT DOXYBOOK2)
   set(doxybook_localbin ${DOXYBOOK2})
 endif()
 
+
+set(doc_src
+        dns-overview.md
+        exit-setup.md
+        high-level-overview.md
+        ideal-ux.md
+        install.md
+        net-comparisons.md
+        project-structure.md
+        readme.md
+        we-cannot-make-sandwiches.md
+        doxygen.md
+)
+
+foreach (file ${doc_src})
+    configure_file(${file} pages/${file} COPYONLY)
+endforeach ()
+
 add_custom_command(
     OUTPUT gen
     COMMAND ${DOXYBOOK2} --input ${CMAKE_CURRENT_BINARY_DIR}/doxyxml --output ${CMAKE_CURRENT_BINARY_DIR}/gen --config config.json
@@ -56,6 +74,7 @@ add_custom_command(
 
 add_custom_target(clean_html COMMAND ${CMAKE_COMMAND} -E rm -rf html)
 
+
 add_custom_command(
   OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/markdown
   COMMAND find ${CMAKE_CURRENT_BINARY_DIR}/gen/ -type f -name '*.md' -exec ${CMAKE_CURRENT_SOURCE_DIR}/fix-markdown.sh {} "\;" && ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_BINARY_DIR}/gen ${CMAKE_CURRENT_BINARY_DIR}/markdown
@@ -63,11 +82,16 @@ add_custom_command(
 )
 
 add_custom_command(
+        OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/markdown/pages
+        COMMAND find ${CMAKE_CURRENT_BINARY_DIR}/pages/ -type f -name '*.md' -exec ${CMAKE_CURRENT_SOURCE_DIR}/fix-markdown.sh {} "\;" && ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_BINARY_DIR}/pages ${CMAKE_CURRENT_BINARY_DIR}/markdown/Pages
+        DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/pages/ ${CMAKE_CURRENT_BINARY_DIR}/markdown
+)
+
+add_custom_command(
   OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/html
   COMMAND ${MKDOCS} build && find ${CMAKE_CURRENT_BINARY_DIR}/html -type f -name '*.html' -exec ${CMAKE_CURRENT_SOURCE_DIR}/fix-html.sh {} "\;" 
   DEPENDS
-  clean_html
-  ${CMAKE_CURRENT_BINARY_DIR}/markdown)
+  clean_html ${CMAKE_CURRENT_BINARY_DIR}/markdown ${CMAKE_CURRENT_BINARY_DIR}/markdown/pages)
 
 add_custom_target(doc DEPENDS html)
 
