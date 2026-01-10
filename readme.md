@@ -2,7 +2,7 @@
 
 The stakeless open-net implementation of LLARP (low latency anonymous routing protocol), a layer 3 onion routing protocol.
 
-### Installation instructions can be found [here](docs/install.md).
+### Documentation is hosted on github pages and can be found [here](https://majestrate.github.io/llarp/).
 
 #### You can learn more about the high level, how to use it and the internals of the protocol [here](docs/readme.md)
 

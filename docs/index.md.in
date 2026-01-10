@@ -1,7 +1,7 @@
 # LLARP @llarp_VERSION@ (git rev: @GIT_VERSION@)
 
-summary goes here
-
 ## Overview
 
-[code internals](index_namespaces.md)
+[End User Documentation](Pages/)
+
+[Developer Internals](index_namespaces.md)

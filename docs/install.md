@@ -11,7 +11,7 @@ Tier 2:
 
 We will not port to these platforms:
 
-* [Windows](#win32-install)
+* [Windows](#windows-install)
 * [MacOS](#macos-install)
 * iPhone
 * Homebrew
@@ -67,7 +67,7 @@ install (root):
 
     # make install
 
-## Windows / MacOS / Android <span id="windows-install" />  <span id="macos-install" />
+## Windows / MacOS / Android <span id="windows-install" />  <span id="macos-install" /> <span id="apk-install" />
 
 We do not provide official builds for windows or macos as support for these platforms have been discontinued.
 
