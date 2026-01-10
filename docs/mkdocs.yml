@@ -1,4 +1,4 @@
-site_name: Lokinet
+site_name: LLARP
 theme:
   name: 'readthedocs'
 docs_dir: markdown

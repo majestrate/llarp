@@ -1,5 +1,5 @@
 
-to configure lokinet to be an exit add into `lokinet.ini`:
+to configure LLARP to be an exit add into `llarpd.ini`:
 
     [router]
     min-connections=8
@@ -7,7 +7,7 @@ to configure lokinet to be an exit add into `lokinet.ini`:
 
     [network]
     exit=true
-    keyfile=/var/lib/lokinet/exit.private
+    keyfile=/var/lib/llarpd/exit.private
     reachable=1
     ifaddr=10.0.0.1/16
     hops=2

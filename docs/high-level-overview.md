@@ -2,7 +2,7 @@
 
 <!-- todo: how is traffic transported (encryption, onion etc.) for somebody knowing nothing about LLARP) -->
 
-<!-- todo: are there any techniques available to circumvent blocking of Lokinet traffic? (not at the moment) -->
+<!-- todo: are there any techniques available to circumvent blocking of LLARP traffic? (not at the moment) -->
 
 <!-- todo: how does path multiplexing work? -->
 

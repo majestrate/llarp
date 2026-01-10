@@ -10,8 +10,8 @@ if (NOT MKDOCS)
     return()
 endif()
 
-set(lokinet_doc_sources "${DOCS_SRC}")
-string(REPLACE ";" " " lokinet_doc_sources_spaced "${lokinet_doc_sources}")
+set(LLARP_doc_sources "${DOCS_SRC}")
+string(REPLACE ";" " " LLARP_doc_sources_spaced "${LLARP_doc_sources}")
 
 add_custom_target(clean_xml COMMAND ${CMAKE_COMMAND} -E rm -rf doxyxml)
 add_custom_target(clean_markdown COMMAND ${CMAKE_COMMAND} -E rm -rf markdown)
@@ -22,7 +22,7 @@ add_custom_command(
     DEPENDS
     clean_xml
         ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile
-        ${lokinet_doc_sources}
+        ${LLARP_doc_sources}
 )
 
 # find doxybook2

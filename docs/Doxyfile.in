@@ -1,5 +1,5 @@
-PROJECT_NAME           = "Lokinet"
-PROJECT_NUMBER         = v@lokinet_VERSION@
+PROJECT_NAME           = "LLARP"
+PROJECT_NUMBER         = v@LLARP_VERSION@
 PROJECT_BRIEF          = "Anonymous, decentralized and IP based overlay network for the internet."
 OUTPUT_DIRECTORY       = @CMAKE_CURRENT_BINARY_DIR@
 STRIP_FROM_PATH        = @PROJECT_SOURCE_DIR@ @PROJECT_BINARY_DIR@
@@ -7,7 +7,7 @@ JAVADOC_AUTOBRIEF      = YES
 ALIASES                = "rst=\verbatim embed:rst"
 ALIASES               += "endrst=\endverbatim"
 BUILTIN_STL_SUPPORT    = YES
-INPUT                  = @lokinet_doc_sources_spaced@
+INPUT                  = @LLARP_doc_sources_spaced@
 INCLUDE_PATH           = @PROJECT_SOURCE_DIR@/include @PROJECT_SOURCE_DIR@/llarp @PROJECT_SOURCE_DIR@/crypto/libntrup/include @PROJECT_SOURCE_DIR@/external/ghc-filesystem/include/
 RECURSIVE              = YES
 CLANG_ASSISTED_PARSING = NO

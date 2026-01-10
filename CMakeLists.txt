@@ -5,7 +5,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # Has to be set before `project()`, and ignored on non-macos:
 set(CMAKE_OSX_DEPLOYMENT_TARGET 10.15 CACHE STRING "macOS deployment target (Apple clang only)")
 
-option(BUILD_DAEMON "build lokinet daemon and associated utils" ON)
+option(BUILD_DAEMON "build daemon and associated utils" ON)
 
 
 set(LANGS C CXX)
@@ -36,7 +36,6 @@ set(DEFAULT_IOURING OFF)
 option(USE_AVX2 "enable avx2 code" OFF)
 option(USE_NETNS "enable networking namespace support. Linux only" OFF)
 option(NATIVE_BUILD "optimise for host system and FPU" ON)
-option(WITH_EMBEDDED_LOKINET "build liblokinet.so for embedded lokinet" OFF)
 option(XSAN "use sanitiser, if your system has it (requires -DCMAKE_BUILD_TYPE=Debug)" OFF)
 option(USE_JEMALLOC "Link to jemalloc for memory allocations, if found" ON)
 option(TESTNET "testnet build" OFF)
@@ -291,10 +290,6 @@ if(ANDROID)
   target_link_libraries(base_libs INTERFACE log)
   target_compile_definitions(base_libs INTERFACE ANDROID)
   set(ANDROID_PLATFORM_SRC android/ifaddrs.c)
-endif()
-
-if(WITH_HIVE)
-  add_definitions(-DLOKINET_HIVE)
 endif()
 
 add_subdirectory(crypto)
