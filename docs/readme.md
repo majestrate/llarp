@@ -1,6 +1,6 @@
 # LLARP Docs
 
-This is where LLARP documentation lives.
+This is where LLARP user documentation lives.
 
 [How Do I install LLARP?](install.md)
 
