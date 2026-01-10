@@ -1,6 +1,6 @@
 # LLARP @llarp_VERSION@ (git rev: @GIT_VERSION@)
 
-summary goes here
+[user guide](pages/)
 
 ## Overview
 

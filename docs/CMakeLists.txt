@@ -54,11 +54,10 @@ set(doc_src
         install.md
         net-comparisons.md
         project-structure.md
-        readme.md
         we-cannot-make-sandwiches.md
         doxygen.md
 )
-
+configure_file(readme.md pages/index.md COPYONLY)
 foreach (file ${doc_src})
     configure_file(${file} pages/${file} COPYONLY)
 endforeach ()
