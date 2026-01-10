@@ -1,5 +1,5 @@
 {
-    "baseUrl": "/",
+    "baseUrl": "/llarp/",
     "indexInFolders": false,
     "linkSuffix": "",
     "mainPageInRoot": true,
