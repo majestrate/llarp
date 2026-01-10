@@ -14,7 +14,7 @@ the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.
 
 ```
-Copyright © 2018-2025 Jeff Becker
+Copyright © 2018-2026 Jeff Becker
 Copyright © 2018-2023 The Oxen Project
 Copyright © 2018-2020 Rick V. (Historical Windows NT port and portions)
 ```
