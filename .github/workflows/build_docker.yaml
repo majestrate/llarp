@@ -59,8 +59,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Install deps
+        run: apt update && apt install build-essential cmake git pkg-config automake libtool libuv1-dev libsodium-dev libsystemd-dev nettle-dev libevent-dev libunbound-dev libgeoip-dev
       - name: Build docs
-        run: mkdir -p build && cmake -B build && make doc
+        run: mkdir -p build && cmake -B build && make -C build doc
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - name: Upload artifact
