@@ -148,6 +148,8 @@ namespace llarp
     void
     TransitWorker::Gather()
     {
+      auto* r = m_PathContext.Router();
+
       std::unordered_map<TransitHopInfo, std::vector<RelayUpstreamMessage>> upstream;
       while (auto maybe = m_UpstreamGather.tryPopFront())
       {
@@ -160,7 +162,7 @@ namespace llarp
       for (auto& [info, msgs] : upstream)
         if (auto maybe_transit_hop = m_PathContext.TransitHopByInfo(info))
           if (auto ptr = maybe_transit_hop.value().lock())
-            ptr->HandleAllUpstream(msgs, m_PathContext.Router());
+            ptr->HandleAllUpstream(msgs, r);
 
       upstream.clear();
 
@@ -176,9 +178,11 @@ namespace llarp
       for (auto& [info, msgs] : downstream)
         if (auto maybe_transit_hop = m_PathContext.TransitHopByInfo(info))
           if (auto ptr = maybe_transit_hop.value().lock())
-            ptr->HandleAllDownstream(msgs, m_PathContext.Router());
+            ptr->HandleAllDownstream(msgs, r);
 
       downstream.clear();
+
+      r->TriggerPump();
     }
 
     void
@@ -275,7 +279,6 @@ namespace llarp
             info.downstream);
         r->SendToOrQueue(info.downstream, msg);
       }
-      r->TriggerPump();
     }
 
     void
