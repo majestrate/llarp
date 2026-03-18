@@ -6,19 +6,16 @@
 #include "router_lookup_job.hpp"
 #include "session.hpp"
 #include "endpoint_types.hpp"
-#include <llarp/util/compare_ptr.hpp>
 #include <llarp/util/decaying_hashtable.hpp>
 #include "lns_tracker.hpp"
 
 #include <memory>
-#include <queue>
 #include <set>
 #include <unordered_map>
 
-#include <oxenc/variant.h>
-
 namespace llarp
 {
+  struct NetworkConfig;
   namespace service
   {
     struct EndpointState

@@ -33,16 +33,8 @@ namespace llarp
           downstream);
     }
 
-    TransitHop::TransitHop()
-        : IHopHandler{}
-        , m_UpstreamGather{transit_hop_queue_size}
-        , m_DownstreamGather{transit_hop_queue_size}
-    {
-      m_UpstreamGather.enable();
-      m_DownstreamGather.enable();
-      m_UpstreamWorkCounter = 0;
-      m_DownstreamWorkCounter = 0;
-    }
+    TransitHop::TransitHop() : IHopHandler{}
+    {}
 
     bool
     TransitHop::Expired(llarp_time_t now) const
@@ -103,69 +95,140 @@ namespace llarp
         buf.sz += dlt;
       }
       buf.cur = buf.base;
+      r->pathContext().FlushDownstreamLater(weak_from_this());
       return HandleDownstream(buf, N, r);
     }
 
     void
-    TransitHop::DownstreamWork(TrafficQueue_t msgs, AbstractRouter* r)
+    TransitWorker::RunDownstream()
     {
-      auto flushIt = [self = shared_from_this(), r]() {
-        std::vector<RelayDownstreamMessage> msgs;
-        while (auto maybe = self->m_DownstreamGather.tryPopFront())
-        {
-          msgs.push_back(*maybe);
-        }
-        self->HandleAllDownstream(std::move(msgs), r);
-      };
-      for (auto& ev : msgs)
+      llarp::util::SetThreadName("llarp-transit-down");
+      while (m_DownstreamSubmit.enabled())
       {
+        auto maybe = m_DownstreamSubmit.popFrontWithTimeout(1s);
+        if (not maybe)
+          continue;
+        auto& ev = maybe->second;
+        auto transit_hop_ptr = maybe->first.lock();
         RelayDownstreamMessage msg;
         const llarp_buffer_t buf(ev.first);
-        msg.pathid = info.rxID;
-        msg.Y = ev.second ^ nonceXOR;
-        CryptoManager::instance()->xchacha20(buf, pathKey, ev.second);
+        msg.pathid = transit_hop_ptr->info.rxID;
+        msg.Y = ev.second ^ transit_hop_ptr->nonceXOR;
+        CryptoManager::instance()->xchacha20(buf, transit_hop_ptr->pathKey, ev.second);
         msg.X = buf;
-        llarp::LogDebug(
-            "relay ",
-            msg.X.size(),
-            " bytes downstream from ",
-            info.upstream,
-            " to ",
-            info.downstream);
-        if (m_DownstreamGather.full())
-        {
-          r->loop()->call(flushIt);
-        }
-        if (m_DownstreamGather.enabled())
-          m_DownstreamGather.pushBack(msg);
+        if (m_DownstreamGather.tryPushBack(std::make_pair(maybe->first, msg))
+            == thread::QueueReturn::Success)
+          m_Wakeup->Trigger();
       }
-      r->loop()->call(flushIt);
     }
 
     void
-    TransitHop::UpstreamWork(TrafficQueue_t msgs, AbstractRouter* r)
+    TransitWorker::RunUpstream()
     {
-      for (auto& ev : msgs)
+      llarp::util::SetThreadName("llarp-transit-up");
+      while (m_UpstreamSubmit.enabled())
       {
+        auto maybe = m_UpstreamSubmit.popFrontWithTimeout(1s);
+        if (not maybe)
+          continue;
+        auto transit_hop_ptr = maybe->first.lock();
+        auto& ev = maybe->second;
         const llarp_buffer_t buf(ev.first);
         RelayUpstreamMessage msg;
-        CryptoManager::instance()->xchacha20(buf, pathKey, ev.second);
-        msg.pathid = info.txID;
-        msg.Y = ev.second ^ nonceXOR;
+        CryptoManager::instance()->xchacha20(buf, transit_hop_ptr->pathKey, ev.second);
+        msg.pathid = transit_hop_ptr->info.txID;
+        msg.Y = ev.second ^ transit_hop_ptr->nonceXOR;
         msg.X = buf;
-        if (m_UpstreamGather.tryPushBack(msg) != thread::QueueReturn::Success)
-          break;
+        if (m_UpstreamGather.tryPushBack(std::make_pair(maybe->first, msg))
+            == thread::QueueReturn::Success)
+          m_Wakeup->Trigger();
+      }
+    }
+
+    void
+    TransitWorker::Gather()
+    {
+      std::unordered_map<TransitHopInfo, std::vector<RelayUpstreamMessage>> upstream;
+      while (auto maybe = m_UpstreamGather.tryPopFront())
+      {
+        if (auto transit_hop = maybe->first.lock())
+        {
+          upstream[transit_hop->info].emplace_back(std::move(maybe->second));
+        }
       }
 
-      // Flush it:
-      r->loop()->call([self = shared_from_this(), r] {
-        std::vector<RelayUpstreamMessage> msgs;
-        while (auto maybe = self->m_UpstreamGather.tryPopFront())
+      for (auto& [info, msgs] : upstream)
+        if (auto maybe_transit_hop = m_PathContext.TransitHopByInfo(info))
+          if (auto ptr = maybe_transit_hop.value().lock())
+            ptr->HandleAllUpstream(msgs, m_PathContext.Router());
+
+      upstream.clear();
+
+      std::unordered_map<TransitHopInfo, std::vector<RelayDownstreamMessage>> downstream;
+      while (auto maybe = m_DownstreamGather.tryPopFront())
+      {
+        if (auto transit_hop = maybe->first.lock())
         {
-          msgs.push_back(*maybe);
+          downstream[transit_hop->info].emplace_back(std::move(maybe->second));
         }
-        self->HandleAllUpstream(std::move(msgs), r);
-      });
+      }
+
+      for (auto& [info, msgs] : downstream)
+        if (auto maybe_transit_hop = m_PathContext.TransitHopByInfo(info))
+          if (auto ptr = maybe_transit_hop.value().lock())
+            ptr->HandleAllDownstream(msgs, m_PathContext.Router());
+
+      downstream.clear();
+    }
+
+    void
+    TransitWorker::SubmitDownstream(std::weak_ptr<TransitHop> hop, IHopHandler::TrafficEvent_t ev)
+    {
+      m_DownstreamSubmit.tryPushBack(std::make_pair(hop, ev));
+    }
+
+    void
+    TransitWorker::SubmitUpstream(std::weak_ptr<TransitHop> hop, IHopHandler::TrafficEvent_t ev)
+    {
+      m_UpstreamSubmit.tryPushBack(std::make_pair(hop, ev));
+    }
+
+    void
+    TransitWorker::Start(size_t upstream_threads, size_t downstream_threads)
+    {
+      if (upstream_threads == 0)
+        upstream_threads = 1;
+      if (downstream_threads == 0)
+        downstream_threads = 1;
+
+      while (upstream_threads > 0)
+      {
+        m_Threads.emplace_back([self = this]() { self->RunUpstream(); });
+        upstream_threads--;
+      }
+      while (downstream_threads > 0)
+      {
+        m_Threads.emplace_back([self = this]() { self->RunDownstream(); });
+        downstream_threads--;
+      }
+    }
+
+    TransitWorker::TransitWorker(PathContext& ctx, const EventLoop_ptr& loop)
+        : m_UpstreamSubmit{queue_length}
+        , m_UpstreamGather{queue_length}
+        , m_DownstreamSubmit{queue_length}
+        , m_DownstreamGather{queue_length}
+        , m_PathContext{ctx}
+    {
+      m_Wakeup = loop->make_waker([this]() { Gather(); });
+    }
+
+    TransitWorker::~TransitWorker()
+    {
+      m_UpstreamSubmit.disable();
+      m_DownstreamSubmit.disable();
+      for (auto& th : m_Threads)
+        th.join();
     }
 
     void
@@ -182,28 +245,20 @@ namespace llarp
           }
           m_LastActivity = r->Now();
         }
-        FlushDownstream(r);
-        for (const auto& other : m_FlushOthers)
-        {
-          other->FlushDownstream(r);
-        }
-        m_FlushOthers.clear();
+        r->pathContext().FlushDownstreamLater(weak_from_this());
+        return;
       }
-      else
+      for (const auto& msg : msgs)
       {
-        for (const auto& msg : msgs)
-        {
-          llarp::LogDebug(
-              "relay ",
-              msg.X.size(),
-              " bytes upstream from ",
-              info.downstream,
-              " to ",
-              info.upstream);
-          r->SendToOrQueue(info.upstream, msg);
-        }
+        llarp::LogDebug(
+            "relay ",
+            msg.X.size(),
+            " bytes upstream from ",
+            info.downstream,
+            " to ",
+            info.upstream);
+        r->SendToOrQueue(info.upstream, msg);
       }
-      r->TriggerPump();
     }
 
     void
@@ -226,23 +281,27 @@ namespace llarp
     void
     TransitHop::FlushUpstream(AbstractRouter* r)
     {
-      if (not m_UpstreamQueue.empty())
-      {
-        r->QueueWork([self = shared_from_this(),
-                      data = std::exchange(m_UpstreamQueue, {}),
-                      r]() mutable { self->UpstreamWork(std::move(data), r); });
-      }
+      if (m_UpstreamQueue.empty())
+        return;
+      auto self = weak_from_this();
+      for (auto& ev : m_UpstreamQueue)
+        r->transitWorker().SubmitUpstream(self, std::move(ev));
+
+      m_UpstreamQueue.clear();
+      m_UpstreamQueue.reserve(2);
     }
 
     void
     TransitHop::FlushDownstream(AbstractRouter* r)
     {
-      if (not m_DownstreamQueue.empty())
-      {
-        r->QueueWork([self = shared_from_this(),
-                      data = std::exchange(m_DownstreamQueue, {}),
-                      r]() mutable { self->DownstreamWork(std::move(data), r); });
-      }
+      if (m_DownstreamQueue.empty())
+        return;
+      auto self = weak_from_this();
+      for (auto& ev : m_DownstreamQueue)
+        r->transitWorker().SubmitDownstream(self, std::move(ev));
+
+      m_DownstreamQueue.clear();
+      m_DownstreamQueue.reserve(2);
     }
 
     /// this is where a DHT message is handled at the end of a path, that is,
@@ -426,7 +485,6 @@ namespace llarp
       // send routing message
       if (path->SendRoutingMessage(msg.T, r))
       {
-        m_FlushOthers.emplace(path);
         return true;
       }
       return SendRoutingMessage(discarded, r);
@@ -441,10 +499,7 @@ namespace llarp
 
     void
     TransitHop::Stop()
-    {
-      m_UpstreamGather.disable();
-      m_DownstreamGather.disable();
-    }
+    {}
 
     void
     TransitHop::SetSelfDestruct()

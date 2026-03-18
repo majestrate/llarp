@@ -14,6 +14,20 @@
 #include <memory>
 #include <unordered_map>
 
+namespace std
+{
+  bool
+  operator<(
+      const std::shared_ptr<llarp::path::TransitHop>& lhs,
+      const std::shared_ptr<llarp::path::TransitHop>& rhs);
+  bool
+  operator<(const llarp::PathID_t& lhs, const llarp::PathID_t& rhs);
+  bool
+  operator<(const std::shared_ptr<llarp::path::TransitHop>& hop, const llarp::PathID_t& txid);
+  bool
+  operator<(const llarp::PathID_t& txid, const std::shared_ptr<llarp::path::TransitHop>& hop);
+}  // namespace std
+
 namespace llarp
 {
   struct AbstractRouter;
@@ -28,6 +42,33 @@ namespace llarp
     struct TransitHopInfo;
 
     using TransitHop_ptr = std::shared_ptr<TransitHop>;
+
+    struct CompareTransitHop
+    {
+      bool
+      operator()(const TransitHop_ptr& lhs, const TransitHop_ptr& rhs) const
+      {
+        return compare(lhs->info.txID, rhs->info.txID);
+      }
+      bool
+      operator()(const TransitHop_ptr& hop, const PathID_t& id) const
+      {
+        return compare(hop->info.txID, id);
+      }
+      bool
+      operator()(const PathID_t& id, const TransitHop_ptr& hop) const
+      {
+        return compare(id, hop->info.txID);
+      }
+      bool
+      operator()(const PathID_t& lhs, const PathID_t& rhs) const
+      {
+        return compare(lhs, rhs);
+      }
+
+      bool
+      compare(const PathID_t&, const PathID_t&) const;
+    };
 
     struct PathContext
     {
@@ -48,6 +89,12 @@ namespace llarp
 
       void
       RejectTransit();
+
+      void
+      FlushDownstreamLater(std::weak_ptr<IHopHandler> hop);
+
+      void
+      FlushUpstreamLater(std::weak_ptr<IHopHandler> hop);
 
       bool
       CheckPathLimitHitByAddr(const SockAddr& addr);
@@ -114,8 +161,7 @@ namespace llarp
       void
       RemovePathSet(PathSet_ptr set);
 
-      using TransitHopsMap_t = std::unordered_multimap<PathID_t, TransitHop_ptr>;
-
+      using TransitHopsMap_t = std::multiset<TransitHop_ptr, std::less<>>;
       struct SyncTransitMap_t
       {
         using Mutex_t = util::NullMutex;
@@ -132,7 +178,7 @@ namespace llarp
         {
           Lock_t lock(first);
           for (const auto& item : second)
-            visit(item.second);
+            visit(item);
         }
       };
 
@@ -182,6 +228,11 @@ namespace llarp
       SyncOwnedPathsMap_t m_OurPaths;
       bool m_AllowTransit;
       util::DecayingHashSet<net::ipaddr_t> m_PathLimits;
+      std::vector<std::weak_ptr<IHopHandler>> m_FlushDownstreamQueue, m_FlushUpstreamQueue;
+      std::shared_ptr<EventLoopWakeup> m_FlushLater;
+
+      void
+      FlushDeferred();
     };
   }  // namespace path
 }  // namespace llarp

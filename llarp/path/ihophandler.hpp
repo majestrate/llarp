@@ -25,15 +25,14 @@ namespace llarp
     struct IHopHandler
     {
       using TrafficEvent_t = std::pair<std::vector<byte_t>, TunnelNonce>;
-      using TrafficQueue_t = std::list<TrafficEvent_t>;
+      using TrafficQueue_t = std::vector<TrafficEvent_t>;
 
       virtual ~IHopHandler() = default;
 
       virtual PathID_t
       RXID() const = 0;
 
-      void
-      DecayFilters(llarp_time_t now);
+      virtual void DecayFilters(llarp_time_t){};
 
       virtual bool
       Expired(llarp_time_t now) const = 0;
@@ -75,14 +74,6 @@ namespace llarp
       uint64_t m_SequenceNum = 0;
       TrafficQueue_t m_UpstreamQueue;
       TrafficQueue_t m_DownstreamQueue;
-      util::DecayingHashSet<TunnelNonce> m_UpstreamReplayFilter;
-      util::DecayingHashSet<TunnelNonce> m_DownstreamReplayFilter;
-
-      virtual void
-      UpstreamWork(TrafficQueue_t queue, AbstractRouter* r) = 0;
-
-      virtual void
-      DownstreamWork(TrafficQueue_t queue, AbstractRouter* r) = 0;
 
       virtual void
       HandleAllUpstream(std::vector<RelayUpstreamMessage> msgs, AbstractRouter* r) = 0;

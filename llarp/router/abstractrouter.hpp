@@ -42,6 +42,7 @@ namespace llarp
   struct ILinkManager;
   struct I_RCLookupHandler;
   struct RoutePoker;
+  struct KeyManager;
 
   namespace dns
   {
@@ -61,7 +62,10 @@ namespace llarp
   namespace path
   {
     struct PathContext;
-  }
+    class TransitWorker;
+    class PathWorker;
+    struct BuildLimiter;
+  }  // namespace path
 
   namespace routing
   {
@@ -93,6 +97,11 @@ namespace llarp
 
     virtual bool
     HandleRecvLinkMessageBuffer(ILinkSession* from, const llarp_buffer_t& msg) = 0;
+
+    virtual path::TransitWorker&
+    transitWorker() = 0;
+    virtual path::PathWorker&
+    pathWorker() = 0;
 
     virtual const net::Platform&
     Net() const = 0;

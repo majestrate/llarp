@@ -1,18 +1,14 @@
 #pragma once
 
-#include <cstdint>
-#include <llarp/constants/link_layer.hpp>
-#include <llarp/crypto/crypto.hpp>
 #include <llarp/crypto/encrypted.hpp>
-#include <llarp/crypto/types.hpp>
 #include <llarp/link/server.hpp>
 #include <llarp/config/key_manager.hpp>
-
-#include <memory>
-
 #include <llarp/ev/ev.hpp>
 
 #include "hasher.hpp"
+
+#include <memory>
+#include <unordered_set>
 
 namespace llarp::iwp
 {

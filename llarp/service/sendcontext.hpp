@@ -2,13 +2,12 @@
 
 #include <llarp/path/pathset.hpp>
 #include <llarp/routing/path_transfer_message.hpp>
+#include "auth.hpp"
 #include "intro.hpp"
 #include "protocol.hpp"
 #include <llarp/util/buffer.hpp>
 #include <llarp/util/types.hpp>
 #include <llarp/util/thread/queue.hpp>
-
-#include <deque>
 
 namespace llarp
 {

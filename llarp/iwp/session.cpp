@@ -1,11 +1,12 @@
 #include <llarp/util/alloc.h>
 #include "session.hpp"
 
-#include <cstdint>
 #include <llarp/messages/link_intro.hpp>
 #include <llarp/messages/discard.hpp>
 #include <llarp/util/meta/memfn.hpp>
+#include <llarp/util/compare_ptr.hpp>
 #include <llarp/router/abstractrouter.hpp>
+#include <llarp/crypto/crypto.hpp>
 
 #include <queue>
 

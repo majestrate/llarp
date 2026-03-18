@@ -80,6 +80,18 @@ namespace llarp
       return m_PathBuildLimiter;
     }
 
+    path::TransitWorker&
+    transitWorker() override
+    {
+      return m_TransitWorker;
+    }
+
+    path::PathWorker&
+    pathWorker() override
+    {
+      return m_PathWorker;
+    }
+
     const llarp::net::Platform&
     Net() const override;
 
@@ -206,6 +218,8 @@ namespace llarp
     EventLoop_ptr _loop;
     std::shared_ptr<vpn::Platform> _vpnPlatform;
     path::PathContext paths;
+    path::TransitWorker m_TransitWorker;
+    path::PathWorker m_PathWorker;
     exit::Context _exitContext;
     SecretKey _identity;
     SecretKey _encryption;

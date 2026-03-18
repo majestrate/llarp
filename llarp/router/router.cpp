@@ -6,25 +6,21 @@
 #include <llarp/constants/proto.hpp>
 #include <llarp/constants/files.hpp>
 #include <llarp/constants/time.hpp>
-#include <llarp/crypto/crypto_libsodium.hpp>
 #include <llarp/crypto/crypto.hpp>
 #include <llarp/dht/context.hpp>
 #include <llarp/dht/node.hpp>
 #include <llarp/iwp/iwp.hpp>
 #include <llarp/link/server.hpp>
-#include <llarp/messages/link_message.hpp>
 #include <llarp/net/net.hpp>
 #include <stdexcept>
 #include <llarp/util/buffer.hpp>
 #include <llarp/util/logging.hpp>
 #include <llarp/util/meta/memfn.hpp>
-#include <llarp/util/str.hpp>
 #include <llarp/ev/ev.hpp>
 #include <llarp/tooling/peer_stats_event.hpp>
 
 #include <llarp/tooling/router_event.hpp>
 
-#include <fstream>
 #include <cstdlib>
 #include <iterator>
 #include <unordered_map>
@@ -51,6 +47,8 @@ namespace llarp
       , _loop{std::move(loop)}
       , _vpnPlatform{std::move(vpnPlatform)}
       , paths{this}
+      , m_TransitWorker{paths, _loop}
+      , m_PathWorker{paths, _loop}
       , _exitContext{this}
       , _dht{llarp_dht_context_new(this)}
       , inbound_link_msg_parser{this}
@@ -1104,7 +1102,16 @@ namespace llarp
         return false;
       }
     }
-
+    {
+      size_t num_threads = m_Config->router.m_workerThreads;
+      if (num_threads <= 0)
+        num_threads = 1;
+      if (num_threads > 128)
+        num_threads = 128;
+      m_PathWorker.Start(num_threads, num_threads);
+      if (IsServiceNode())
+        m_TransitWorker.Start(num_threads, num_threads);
+    }
     LogInfo("starting hidden service context...");
     if (!hiddenServiceContext().StartAll())
     {

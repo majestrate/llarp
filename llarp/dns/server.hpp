@@ -5,7 +5,7 @@
 #include <llarp/config/config.hpp>
 #include <llarp/ev/ev.hpp>
 #include <llarp/net/net.hpp>
-#include <llarp/util/fs.hpp>
+#include <llarp/util/compare_ptr.hpp>
 #include <set>
 
 namespace llarp::dns

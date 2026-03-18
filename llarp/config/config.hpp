@@ -5,10 +5,8 @@
 #include <chrono>
 
 #include <llarp/bootstrap.hpp>
-#include <llarp/crypto/types.hpp>
 #include <llarp/router_contact.hpp>
 #include <llarp/util/fs.hpp>
-#include <llarp/util/str.hpp>
 #include <llarp/util/logging.hpp>
 #include <llarp/constants/files.hpp>
 #include <llarp/net/net_int.hpp>
@@ -16,15 +14,12 @@
 #include <llarp/service/address.hpp>
 #include <llarp/service/auth.hpp>
 #include <llarp/dns/srv_data.hpp>
-#include <llarp/router_contact.hpp>
 
 #include <cstdlib>
-#include <functional>
 #include <optional>
-#include <stdexcept>
 #include <string>
-#include <utility>
 #include <vector>
+#include <unordered_map>
 #include <unordered_set>
 
 namespace llarp

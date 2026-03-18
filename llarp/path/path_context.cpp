@@ -7,6 +7,36 @@
 #include <llarp/router/abstractrouter.hpp>
 #include <llarp/router/i_outbound_message_handler.hpp>
 
+namespace std
+{
+  auto
+  operator<(
+      const std::shared_ptr<llarp::path::TransitHop>& lhs,
+      const std::shared_ptr<llarp::path::TransitHop>& rhs) -> bool
+  {
+    return lhs->info.txID.as_array() < rhs->info.txID.as_array();
+  }
+
+  auto
+  operator<(const llarp::PathID_t& lhs, const llarp::PathID_t& rhs) -> bool
+  {
+    return lhs.as_array() < rhs.as_array();
+  }
+
+  auto
+  operator<(const std::shared_ptr<llarp::path::TransitHop>& hop, const llarp::PathID_t& txid)
+      -> bool
+  {
+    return hop->info.txID < txid;
+  }
+
+  auto
+  operator<(const llarp::PathID_t& txid, const std::shared_ptr<llarp::path::TransitHop>& hop)
+      -> bool
+  {
+    return txid < hop->info.txID;
+  }
+}  // namespace std
 namespace llarp
 {
   namespace path
@@ -15,7 +45,31 @@ namespace llarp
 
     PathContext::PathContext(AbstractRouter* router)
         : m_Router(router), m_AllowTransit(false), m_PathLimits(DefaultPathBuildLimit)
-    {}
+    {
+      m_FlushLater = loop()->make_waker([this]() { FlushDeferred(); });
+    }
+
+    void
+    PathContext::FlushDeferred()
+    {
+      for (const auto& h : m_FlushUpstreamQueue)
+      {
+        if (auto ptr = h.lock())
+        {
+          ptr->FlushUpstream(m_Router);
+        }
+      }
+      m_FlushUpstreamQueue.clear();
+
+      for (const auto& h : m_FlushDownstreamQueue)
+      {
+        if (auto ptr = h.lock())
+        {
+          ptr->FlushDownstream(m_Router);
+        }
+      }
+      m_FlushUpstreamQueue.clear();
+    }
 
     void
     PathContext::AllowTransit()
@@ -164,51 +218,50 @@ namespace llarp
     }
 
     bool
+    CompareTransitHop::compare(const PathID_t& lhs, const PathID_t& rhs) const
+    {
+      return lhs < rhs;
+    }
+
+    bool
     PathContext::HasTransitHop(const TransitHopInfo& info)
     {
-      return MapHas<SyncTransitMap_t::Lock_t>(
-          m_TransitPaths, info.txID, [info](const std::shared_ptr<TransitHop>& hop) -> bool {
-            return info == hop->info;
-          });
+      SyncTransitMap_t::Lock_t lock(m_TransitPaths.first);
+      auto [begin, end] = m_TransitPaths.second.equal_range(info.txID);
+      while (begin != end)
+      {
+        if ((*begin)->info == info)
+          return true;
+        ++begin;
+      }
+      return false;
     }
 
     std::optional<std::weak_ptr<TransitHop>>
     PathContext::TransitHopByInfo(const TransitHopInfo& info)
     {
-      // this is ugly as sin
-      auto own = MapGet<
-          SyncTransitMap_t::Lock_t,
-          decltype(m_TransitPaths),
-          PathID_t,
-          std::function<bool(const std::shared_ptr<TransitHop>&)>,
-          std::function<TransitHop*(const std::shared_ptr<TransitHop>&)>,
-          TransitHop*>(
-          m_TransitPaths,
-          info.txID,
-          [info](const auto& hop) -> bool { return hop->info == info; },
-          [](const auto& hop) -> TransitHop* { return hop.get(); });
-      if (own)
-        return own->weak_from_this();
+      SyncTransitMap_t::Lock_t lock(m_TransitPaths.first);
+      auto [begin, end] = m_TransitPaths.second.equal_range(info.txID);
+      while (begin != end)
+      {
+        if ((*begin)->info == info)
+          return (*begin)->weak_from_this();
+        ++begin;
+      }
       return std::nullopt;
     }
 
     std::optional<std::weak_ptr<TransitHop>>
     PathContext::TransitHopByUpstream(const RouterID& upstream, const PathID_t& id)
     {
-      // this is ugly as sin as well
-      auto own = MapGet<
-          SyncTransitMap_t::Lock_t,
-          decltype(m_TransitPaths),
-          PathID_t,
-          std::function<bool(const std::shared_ptr<TransitHop>&)>,
-          std::function<TransitHop*(const std::shared_ptr<TransitHop>&)>,
-          TransitHop*>(
-          m_TransitPaths,
-          id,
-          [upstream](const auto& hop) -> bool { return hop->info.upstream == upstream; },
-          [](const auto& hop) -> TransitHop* { return hop.get(); });
-      if (own)
-        return own->weak_from_this();
+      SyncTransitMap_t::Lock_t lock(m_TransitPaths.first);
+      auto [begin, end] = m_TransitPaths.second.equal_range(id);
+      while (begin != end)
+      {
+        if ((*begin)->info.upstream == upstream)
+          return (*begin)->weak_from_this();
+        ++begin;
+      }
       return std::nullopt;
     }
 
@@ -226,35 +279,37 @@ namespace llarp
       if (own)
         return own;
 
-      return MapGet<SyncTransitMap_t::Lock_t>(
-          m_TransitPaths,
-          id,
-          [remote](const std::shared_ptr<TransitHop>& hop) -> bool {
-            return hop->info.upstream == remote;
-          },
-          [](const std::shared_ptr<TransitHop>& h) -> HopHandler_ptr { return h; });
+      if (auto maybe = TransitHopByUpstream(remote, id))
+        return maybe->lock();
+      return nullptr;
     }
 
     bool
     PathContext::TransitHopPreviousIsRouter(const PathID_t& path, const RouterID& otherRouter)
     {
       SyncTransitMap_t::Lock_t lock(m_TransitPaths.first);
-      auto itr = m_TransitPaths.second.find(path);
-      if (itr == m_TransitPaths.second.end())
-        return false;
-      return itr->second->info.downstream == otherRouter;
+      auto [begin, end] = m_TransitPaths.second.equal_range(path);
+      while (begin != end)
+      {
+        if ((*begin)->info.downstream == otherRouter)
+          return true;
+        ++begin;
+      }
+      return false;
     }
 
     HopHandler_ptr
     PathContext::GetByDownstream(const RouterID& remote, const PathID_t& id)
     {
-      return MapGet<SyncTransitMap_t::Lock_t>(
-          m_TransitPaths,
-          id,
-          [remote](const std::shared_ptr<TransitHop>& hop) -> bool {
-            return hop->info.downstream == remote;
-          },
-          [](const std::shared_ptr<TransitHop>& h) -> HopHandler_ptr { return h; });
+      SyncTransitMap_t::Lock_t lock(m_TransitPaths.first);
+      auto [begin, end] = m_TransitPaths.second.equal_range(id);
+      while (begin != end)
+      {
+        if ((*begin)->info.downstream == remote)
+          return *begin;
+        ++begin;
+      }
+      return nullptr;
     }
 
     PathSet_ptr
@@ -293,8 +348,8 @@ namespace llarp
         auto range = map.second.equal_range(id);
         for (auto i = range.first; i != range.second; ++i)
         {
-          if (i->second->info.upstream == us)
-            return i->second;
+          if ((*i)->info.upstream == us)
+            return *i;
         }
       }
       return nullptr;
@@ -337,10 +392,24 @@ namespace llarp
     }
 
     void
+    PathContext::FlushUpstreamLater(std::weak_ptr<IHopHandler> hop)
+    {
+      m_FlushUpstreamQueue.emplace_back(std::move(hop));
+      m_FlushLater->Trigger();
+    }
+
+    void
+    PathContext::FlushDownstreamLater(std::weak_ptr<IHopHandler> hop)
+    {
+      m_FlushDownstreamQueue.emplace_back(std::move(hop));
+      m_FlushLater->Trigger();
+    }
+
+    void
     PathContext::PutTransitHop(std::shared_ptr<TransitHop> hop)
     {
-      MapPut<SyncTransitMap_t::Lock_t>(m_TransitPaths, hop->info.txID, hop);
-      MapPut<SyncTransitMap_t::Lock_t>(m_TransitPaths, hop->info.rxID, hop);
+      SyncTransitMap_t::Lock_t lock(m_TransitPaths.first);
+      m_TransitPaths.second.emplace(hop);
     }
 
     void
@@ -355,14 +424,15 @@ namespace llarp
         auto itr = map.begin();
         while (itr != map.end())
         {
-          if (itr->second->Expired(now))
+          (*itr)->DecayFilters(now);
+          if ((*itr)->Expired(now))
           {
-            m_Router->outboundMessageHandler().RemovePath(itr->first);
+            m_Router->outboundMessageHandler().RemovePath((*itr)->info.txID);
+            m_Router->outboundMessageHandler().RemovePath((*itr)->info.rxID);
             itr = map.erase(itr);
           }
           else
           {
-            itr->second->DecayFilters(now);
             ++itr;
           }
         }
@@ -373,13 +443,13 @@ namespace llarp
         auto itr = map.begin();
         while (itr != map.end())
         {
+          itr->second->DecayFilters(now);
           if (itr->second->Expired(now))
           {
             itr = map.erase(itr);
           }
           else
           {
-            itr->second->DecayFilters(now);
             ++itr;
           }
         }
@@ -404,8 +474,8 @@ namespace llarp
         auto range = map.second.equal_range(id);
         for (auto i = range.first; i != range.second; ++i)
         {
-          if (i->second->info.upstream == us)
-            return i->second;
+          if ((*i)->info.upstream == us)
+            return *i;
         }
       }
       return nullptr;

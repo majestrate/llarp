@@ -1,6 +1,8 @@
 #include <llarp/util/alloc.h>
 #include "path.hpp"
 
+#include "path_context.hpp"
+
 #include <llarp/exit/exit_messages.hpp>
 #include <llarp/link/i_link_manager.hpp>
 #include <llarp/messages/discard.hpp>
@@ -8,6 +10,7 @@
 #include <llarp/messages/relay_status.hpp>
 #include "pathbuilder.hpp"
 #include "transit_hop.hpp"
+
 #include <llarp/nodedb.hpp>
 #include <llarp/profiling.hpp>
 #include <llarp/router/abstractrouter.hpp>
@@ -436,50 +439,118 @@ namespace llarp
     }
 
     void
-    Path::UpstreamWork(TrafficQueue_t msgs, AbstractRouter* r)
+    PathWorker::UpstreamWork()
     {
-      std::vector<RelayUpstreamMessage> sendmsgs(msgs.size());
-      size_t idx = 0;
-      for (auto& ev : msgs)
+      while (m_UpstreamSubmit.enabled())
       {
+        auto maybe = m_UpstreamSubmit.popFrontWithTimeout(1s);
+        if (not maybe)
+          continue;
+        auto& ev = maybe->second;
+        auto path = maybe->first.lock();
+        if (not path)
+          continue;
+
         const llarp_buffer_t buf(ev.first);
         TunnelNonce n = ev.second;
-        for (const auto& hop : hops)
+        for (const auto& hop : path->hops)
         {
           CryptoManager::instance()->xchacha20(buf, hop.shared, n);
           n ^= hop.nonceXOR;
         }
-        auto& msg = sendmsgs[idx];
+        RelayUpstreamMessage msg;
         msg.X = buf;
         msg.Y = ev.second;
-        msg.pathid = TXID();
-        ++idx;
+        msg.pathid = path->TXID();
+        if (m_UpstreamGather.tryPushBack(std::make_pair(maybe->first, msg))
+            == thread::QueueReturn::Success)
+          m_Wakeup->Trigger();
       }
-      r->loop()->call([self = shared_from_this(), data = std::move(sendmsgs), r]() mutable {
-        self->HandleAllUpstream(std::move(data), r);
-      });
+    }
+
+    void
+    PathWorker::SubmitUpstream(std::weak_ptr<Path> path, IHopHandler::TrafficEvent_t ev)
+    {
+      m_UpstreamSubmit.tryPushBack(std::make_pair(path, ev));
+    }
+
+    void
+    PathWorker::SubmitDownstream(std::weak_ptr<Path> path, IHopHandler::TrafficEvent_t ev)
+    {
+      m_DownstreamSubmit.tryPushBack(std::make_pair(path, ev));
+    }
+
+    PathWorker::PathWorker(PathContext& ctx, const EventLoop_ptr& loop)
+        : m_UpstreamSubmit{queue_size}
+        , m_UpstreamGather{queue_size}
+        , m_DownstreamSubmit{queue_size}
+        , m_DownstreamGather{queue_size}
+        , m_PathContext{ctx}
+    {
+      m_Wakeup = loop->make_waker([self = this]() { self->Wakeup(); });
+    }
+
+    PathWorker::~PathWorker()
+    {
+      m_UpstreamSubmit.disable();
+      m_DownstreamSubmit.disable();
+      for (auto& th : m_Workers)
+        th.join();
+    }
+
+    void
+    PathWorker::Start(size_t upstream_threads, size_t downstream_threads)
+    {
+      if (upstream_threads == 0)
+        upstream_threads = 1;
+      if (downstream_threads == 0)
+        downstream_threads = 1;
+
+      while (upstream_threads > 0)
+      {
+        m_Workers.emplace_back([self = this]() {
+          llarp::util::SetThreadName("llarp-upstream");
+          self->UpstreamWork();
+        });
+        upstream_threads--;
+      }
+      while (downstream_threads > 0)
+      {
+        m_Workers.emplace_back([self = this]() {
+          llarp::util::SetThreadName("llarp-downstream");
+          self->DownstreamWork();
+        });
+        downstream_threads--;
+      }
+    }
+
+    void
+    Path::DecayFilters(llarp_time_t now)
+    {
+      m_UpstreamReplayFilter.Decay(now);
+      m_DownstreamReplayFilter.Decay(now);
     }
 
     void
     Path::FlushUpstream(AbstractRouter* r)
     {
-      if (not m_UpstreamQueue.empty())
-      {
-        r->QueueWork([self = shared_from_this(),
-                      data = std::exchange(m_UpstreamQueue, {}),
-                      r]() mutable { self->UpstreamWork(std::move(data), r); });
-      }
+      for (auto& ev : m_UpstreamQueue)
+        r->pathWorker().SubmitUpstream(weak_from_this(), std::move(ev));
+      if (m_UpstreamQueue.empty())
+        return;
+      m_UpstreamQueue.clear();
+      m_UpstreamQueue.reserve(2);
     }
 
     void
     Path::FlushDownstream(AbstractRouter* r)
     {
-      if (not m_DownstreamQueue.empty())
-      {
-        r->QueueWork([self = shared_from_this(),
-                      data = std::exchange(m_DownstreamQueue, {}),
-                      r]() mutable { self->DownstreamWork(std::move(data), r); });
-      }
+      for (auto& ev : m_DownstreamQueue)
+        r->pathWorker().SubmitDownstream(weak_from_this(), std::move(ev));
+      if (m_DownstreamQueue.empty())
+        return;
+      m_DownstreamQueue.clear();
+      m_DownstreamQueue.reserve(2);
     }
 
     /// how long we wait for a path to become active again after it times out
@@ -510,25 +581,63 @@ namespace llarp
     }
 
     void
-    Path::DownstreamWork(TrafficQueue_t msgs, AbstractRouter* r)
+    PathWorker::DownstreamWork()
     {
-      std::vector<RelayDownstreamMessage> sendMsgs(msgs.size());
-      size_t idx = 0;
-      for (auto& ev : msgs)
+      while (m_DownstreamSubmit.enabled())
       {
+        auto maybe = m_DownstreamSubmit.popFrontWithTimeout(1s);
+        if (not maybe)
+          continue;
+
+        auto& ev = maybe->second;
+        auto path = maybe->first.lock();
+        if (not path)
+          continue;
+
         const llarp_buffer_t buf(ev.first);
-        sendMsgs[idx].Y = ev.second;
-        for (const auto& hop : hops)
+
+        auto pair = std::make_pair(std::move(maybe->first), RelayDownstreamMessage{});
+        auto& msg = pair.second;
+        msg.Y = ev.second;
+        for (const auto& hop : path->hops)
         {
-          sendMsgs[idx].Y ^= hop.nonceXOR;
-          CryptoManager::instance()->xchacha20(buf, hop.shared, sendMsgs[idx].Y);
+          msg.Y ^= hop.nonceXOR;
+          CryptoManager::instance()->xchacha20(buf, hop.shared, msg.Y);
         }
-        sendMsgs[idx].X = buf;
-        ++idx;
+        msg.X = buf;
+        if (m_DownstreamGather.tryPushBack(pair) == thread::QueueReturn::Success)
+          m_Wakeup->Trigger();
       }
-      r->loop()->call([self = shared_from_this(), msgs = std::move(sendMsgs), r]() mutable {
-        self->HandleAllDownstream(std::move(msgs), r);
-      });
+    }
+
+    void
+    PathWorker::Wakeup()
+    {
+      std::unordered_map<Path_ptr, std::vector<RelayUpstreamMessage>> upstreams;
+      while (auto maybe = m_UpstreamGather.tryPopFront())
+      {
+        if (auto ptr = maybe->first.lock())
+        {
+          upstreams[ptr].emplace_back(std::move(maybe->second));
+        }
+      }
+      std::unordered_map<Path_ptr, std::vector<RelayDownstreamMessage>> downstreams;
+      while (auto maybe = m_DownstreamGather.tryPopFront())
+      {
+        if (auto ptr = maybe->first.lock())
+        {
+          downstreams[ptr].emplace_back(std::move(maybe->second));
+        }
+      }
+
+      for (auto& [path, msgs] : upstreams)
+      {
+        path->HandleAllUpstream(std::move(msgs), m_PathContext.Router());
+      }
+      for (auto& [path, msgs] : downstreams)
+      {
+        path->HandleAllDownstream(std::move(msgs), m_PathContext.Router());
+      }
     }
 
     void

@@ -4,6 +4,7 @@
 #include <functional>
 #include "address.hpp"
 #include "handler.hpp"
+#include "convotag.hpp"
 #include <llarp/crypto/types.hpp>
 
 namespace llarp::service
@@ -41,6 +42,8 @@ namespace llarp::service
   /// maybe get auth result from string
   std::optional<AuthResultCode>
   ParseAuthResultCode(std::string data);
+
+  struct ProtocolMessage;
 
   struct IAuthPolicy
   {
