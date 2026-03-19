@@ -150,38 +150,28 @@ namespace llarp
     {
       auto* r = m_PathContext.Router();
 
-      std::unordered_map<TransitHopInfo, std::vector<RelayUpstreamMessage>> upstream;
+      std::unordered_map<TransitHop_ptr, std::vector<RelayUpstreamMessage>> upstream;
       while (auto maybe = m_UpstreamGather.tryPopFront())
       {
         if (auto transit_hop = maybe->first.lock())
         {
-          upstream[transit_hop->info].emplace_back(std::move(maybe->second));
+          upstream[transit_hop].emplace_back(std::move(maybe->second));
         }
       }
 
-      for (auto& [info, msgs] : upstream)
-        if (auto maybe_transit_hop = m_PathContext.TransitHopByInfo(info))
-          if (auto ptr = maybe_transit_hop.value().lock())
-            ptr->HandleAllUpstream(msgs, r);
+      for (auto& [ptr, msgs] : upstream)
+        ptr->HandleAllUpstream(msgs, r);
 
-      upstream.clear();
-
-      std::unordered_map<TransitHopInfo, std::vector<RelayDownstreamMessage>> downstream;
+      std::unordered_map<TransitHop_ptr, std::vector<RelayDownstreamMessage>> downstream;
       while (auto maybe = m_DownstreamGather.tryPopFront())
       {
         if (auto transit_hop = maybe->first.lock())
         {
-          downstream[transit_hop->info].emplace_back(std::move(maybe->second));
+          downstream[transit_hop].emplace_back(std::move(maybe->second));
         }
       }
-
-      for (auto& [info, msgs] : downstream)
-        if (auto maybe_transit_hop = m_PathContext.TransitHopByInfo(info))
-          if (auto ptr = maybe_transit_hop.value().lock())
-            ptr->HandleAllDownstream(msgs, r);
-
-      downstream.clear();
-
+      for (auto& [ptr, msgs] : downstream)
+        ptr->HandleAllDownstream(msgs, r);
       r->TriggerPump();
     }
 
