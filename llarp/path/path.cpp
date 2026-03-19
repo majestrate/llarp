@@ -509,7 +509,7 @@ namespace llarp
       while (upstream_threads > 0)
       {
         m_Workers.emplace_back([self = this]() {
-          llarp::util::SetThreadName("llarp-upstream");
+          util::SetThreadName("llarp-up");
           self->UpstreamWork();
         });
         upstream_threads--;
@@ -517,7 +517,7 @@ namespace llarp
       while (downstream_threads > 0)
       {
         m_Workers.emplace_back([self = this]() {
-          llarp::util::SetThreadName("llarp-downstream");
+          util::SetThreadName("llarp-down");
           self->DownstreamWork();
         });
         downstream_threads--;
@@ -539,7 +539,6 @@ namespace llarp
       if (m_UpstreamQueue.empty())
         return;
       m_UpstreamQueue.clear();
-      m_UpstreamQueue.reserve(2);
     }
 
     void
@@ -550,7 +549,6 @@ namespace llarp
       if (m_DownstreamQueue.empty())
         return;
       m_DownstreamQueue.clear();
-      m_DownstreamQueue.reserve(2);
     }
 
     /// how long we wait for a path to become active again after it times out

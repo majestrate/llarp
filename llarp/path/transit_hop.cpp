@@ -102,7 +102,7 @@ namespace llarp
     void
     TransitWorker::RunDownstream()
     {
-      llarp::util::SetThreadName("llarp-transit-down");
+      util::SetThreadName("llarp-down");
       while (m_DownstreamSubmit.enabled())
       {
         auto maybe = m_DownstreamSubmit.popFrontWithTimeout(1s);
@@ -125,7 +125,7 @@ namespace llarp
     void
     TransitWorker::RunUpstream()
     {
-      llarp::util::SetThreadName("llarp-transit-up");
+      util::SetThreadName("llarp-up");
       while (m_UpstreamSubmit.enabled())
       {
         auto maybe = m_UpstreamSubmit.popFrontWithTimeout(1s);
@@ -291,7 +291,6 @@ namespace llarp
         r->transitWorker().SubmitUpstream(self, std::move(ev));
 
       m_UpstreamQueue.clear();
-      m_UpstreamQueue.reserve(2);
     }
 
     void
@@ -304,7 +303,6 @@ namespace llarp
         r->transitWorker().SubmitDownstream(self, std::move(ev));
 
       m_DownstreamQueue.clear();
-      m_DownstreamQueue.reserve(2);
     }
 
     /// this is where a DHT message is handled at the end of a path, that is,
