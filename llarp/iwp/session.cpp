@@ -1,8 +1,9 @@
 #include <llarp/util/alloc.h>
 #include "session.hpp"
-
+#include "linklayer.hpp"
+#include "worker.hpp"
 #include <llarp/messages/link_intro.hpp>
-#include <llarp/messages/discard.hpp>
+
 #include <llarp/util/meta/memfn.hpp>
 #include <llarp/util/compare_ptr.hpp>
 #include <llarp/router/abstractrouter.hpp>
@@ -168,29 +169,11 @@ namespace llarp
       m_EncryptNext.emplace_back(std::move(data));
       if (!IsEstablished())
       {
-        EncryptWorker(std::move(m_EncryptNext));
+        for (auto& pkt : m_EncryptNext)
+          EncryptWorker::EncryptPacket(this, std::move(pkt));
         m_EncryptNext = CryptoQueue_t{};
       }
       TriggerPump();
-    }
-
-    void
-    Session::EncryptWorker(CryptoQueue_t msgs)
-    {
-      LogTrace("encrypt worker ", msgs.size(), " messages");
-      for (auto& pkt : msgs)
-      {
-        llarp_buffer_t pktbuf{pkt};
-        const TunnelNonce nonce_ptr{pkt.data() + HMACSIZE};
-        pktbuf.base += PacketOverhead;
-        pktbuf.cur = pktbuf.base;
-        pktbuf.sz -= PacketOverhead;
-        CryptoManager::instance()->xchacha20(pktbuf, m_SessionKey, nonce_ptr);
-        pktbuf.base = pkt.data() + HMACSIZE;
-        pktbuf.sz = pkt.size() - HMACSIZE;
-        CryptoManager::instance()->hmac(pkt.data(), pktbuf, m_SessionKey);
-        Send_LL(pkt.data(), pkt.size());
-      }
     }
 
     void
@@ -225,6 +208,12 @@ namespace llarp
       m_ToHash.emplace(msgid);
       m_Parent->TriggerHashing(shared_from_this());
       return true;
+    }
+
+    ILinkLayer*
+    Session::GetLinkLayer() const
+    {
+      return m_Parent;
     }
 
     void
@@ -360,15 +349,17 @@ namespace llarp
 
       if (not m_EncryptNext.empty())
       {
-        m_Parent->QueueWork(
-            [self = shared_from_this(), data = m_EncryptNext] { self->EncryptWorker(data); });
+        auto self = weak_from_this();
+        for (auto& msg : m_EncryptNext)
+          m_Parent->Router()->linkWorker()->Encrypt(self, std::move(msg));
         m_EncryptNext.clear();
       }
 
       if (not m_DecryptNext.empty())
       {
-        m_Parent->QueueWork(
-            [self = shared_from_this(), data = m_DecryptNext] { self->DecryptWorker(data); });
+        auto self = weak_from_this();
+        for (auto& msg : m_DecryptNext)
+          m_Parent->Router()->linkWorker()->Decrypt(self, std::move(msg));
         m_DecryptNext.clear();
       }
     }
@@ -702,81 +693,46 @@ namespace llarp
     }
 
     void
-    Session::DecryptWorker(CryptoQueue_t msgs)
-    {
-      auto itr = msgs.begin();
-      while (itr != msgs.end())
-      {
-        auto& pkt = *itr;
-        if (not DecryptMessageInPlace(pkt))
-        {
-          itr = msgs.erase(itr);
-          LogError("failed to decrypt session data from ", m_RemoteAddr);
-          continue;
-        }
-        if (pkt[PacketOverhead] != llarp::constants::proto_version)
-        {
-          LogError(
-              "protocol version mismatch ",
-              int(pkt[PacketOverhead]),
-              " != ",
-              llarp::constants::proto_version);
-          itr = msgs.erase(itr);
-          continue;
-        }
-        ++itr;
-      }
-
-      if (not msgs.empty())
-        m_PlaintextRecv.tryPushBack(std::move(msgs));
-
-      m_PlaintextEmpty.clear();
-      m_Parent->WakeupPlaintext();
-    }
-
-    void
     Session::HandlePlaintext()
     {
       if (m_PlaintextEmpty.test_and_set())
         return;
-      while (auto maybe_queue = m_PlaintextRecv.tryPopFront())
+      while (auto maybe = m_PlaintextRecv.tryPopFront())
       {
-        for (auto& result : *maybe_queue)
+        auto& result = *maybe;
+        log::debug(logcat, "Command {} from {}", int(result[PacketOverhead + 1]), m_RemoteAddr);
+        switch (result[PacketOverhead + 1])
         {
-          log::debug(logcat, "Command {} from {}", int(result[PacketOverhead + 1]), m_RemoteAddr);
-          switch (result[PacketOverhead + 1])
-          {
-            case Command::eXMIT:
-              HandleXMIT(std::move(result));
-              m_LastRX = m_Parent->Now();
-              break;
-            case Command::eDATA:
-              HandleDATA(std::move(result));
-              m_LastRX = m_Parent->Now();
-              break;
-            case Command::eACKS:
-              HandleACKS(std::move(result));
-              m_LastRX = m_Parent->Now();
-              break;
-            case Command::ePING:
-              HandlePING(std::move(result));
-              m_LastRX = m_Parent->Now();
-              break;
-            case Command::eNACK:
-              HandleNACK(std::move(result));
-              m_LastRX = m_Parent->Now();
-              break;
-            case Command::eCLOS:
-              HandleCLOS(std::move(result));
-              m_LastRX = m_Parent->Now();
-              break;
-            case Command::eMACK:
-              HandleMACK(std::move(result));
-              m_LastRX = m_Parent->Now();
-              break;
-            default:
-              LogError("invalid command ", int(result[PacketOverhead + 1]), " from ", m_RemoteAddr);
-          }
+          case Command::eXMIT:
+            HandleXMIT(std::move(result));
+            m_LastRX = m_Parent->Now();
+            break;
+          case Command::eDATA:
+            HandleDATA(std::move(result));
+            m_LastRX = m_Parent->Now();
+            break;
+          case Command::eACKS:
+            HandleACKS(std::move(result));
+            m_LastRX = m_Parent->Now();
+            break;
+          case Command::ePING:
+            HandlePING(std::move(result));
+            m_LastRX = m_Parent->Now();
+            break;
+          case Command::eNACK:
+            HandleNACK(std::move(result));
+            m_LastRX = m_Parent->Now();
+            break;
+          case Command::eCLOS:
+            HandleCLOS(std::move(result));
+            m_LastRX = m_Parent->Now();
+            break;
+          case Command::eMACK:
+            HandleMACK(std::move(result));
+            m_LastRX = m_Parent->Now();
+            break;
+          default:
+            LogError("invalid command ", int(result[PacketOverhead + 1]), " from ", m_RemoteAddr);
         }
       }
       SendMACK();

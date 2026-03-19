@@ -59,6 +59,11 @@ namespace llarp
     struct Context;
   }
 
+  namespace iwp
+  {
+    class Worker;
+  }
+
   namespace path
   {
     struct PathContext;
@@ -120,6 +125,9 @@ namespace llarp
 
     virtual path::PathContext&
     pathContext() = 0;
+
+    virtual const std::unique_ptr<iwp::Worker>&
+    linkWorker() const = 0;
 
     virtual const RouterContact&
     rc() const = 0;

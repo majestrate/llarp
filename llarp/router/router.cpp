@@ -17,8 +17,8 @@
 #include <llarp/util/logging.hpp>
 #include <llarp/util/meta/memfn.hpp>
 #include <llarp/ev/ev.hpp>
+#include <llarp/util/service_manager.hpp>
 #include <llarp/tooling/peer_stats_event.hpp>
-
 #include <llarp/tooling/router_event.hpp>
 
 #include <cstdlib>
@@ -1111,6 +1111,9 @@ namespace llarp
       m_PathWorker.Start(num_threads, num_threads);
       if (IsServiceNode())
         m_TransitWorker.Start(num_threads, num_threads);
+
+      if (m_LinkWorker)
+        m_LinkWorker->Start(num_threads);
     }
     LogInfo("starting hidden service context...");
     if (!hiddenServiceContext().StartAll())
@@ -1447,6 +1450,8 @@ namespace llarp
 
       server->Bind(this, bind_addr);
       _linkManager.AddLink(std::move(server), true);
+      if (m_LinkWorker == nullptr)
+        m_LinkWorker.reset(new iwp::Worker{});
     }
   }
 
@@ -1500,6 +1505,8 @@ namespace llarp
         m_OutboundUDPSocket = link->GetUDPFD().value_or(-1);
 
       _linkManager.AddLink(std::move(link), false);
+      if (m_LinkWorker == nullptr)
+        m_LinkWorker.reset(new iwp::Worker{});
     }
   }
 

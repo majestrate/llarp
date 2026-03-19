@@ -6,8 +6,10 @@
 #include <llarp/ev/ev.hpp>
 
 #include "hasher.hpp"
+#include "session.hpp"
 
 #include <memory>
+#include <optional>
 #include <unordered_set>
 
 namespace llarp::iwp

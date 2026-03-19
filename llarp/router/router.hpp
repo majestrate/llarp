@@ -5,7 +5,6 @@
 #include <llarp/bootstrap.hpp>
 #include <llarp/config/config.hpp>
 #include <llarp/config/key_manager.hpp>
-#include <llarp/constants/link_layer.hpp>
 #include <llarp/crypto/types.hpp>
 #include <llarp/ev/ev.hpp>
 #include <llarp/exit/context.hpp>
@@ -22,27 +21,19 @@
 #include "rc_gossiper.hpp"
 #include "rc_lookup_handler.hpp"
 #include "route_poker.hpp"
-#include <llarp/routing/handler.hpp>
 #include <llarp/routing/message_parser.hpp>
 #include <llarp/service/context.hpp>
-#include <stdexcept>
 #include <llarp/util/buffer.hpp>
 #include <llarp/util/fs.hpp>
-#include <llarp/util/mem.hpp>
-#include <llarp/util/str.hpp>
 #include <llarp/util/time.hpp>
-#include <llarp/util/service_manager.hpp>
-
+#include <llarp/iwp/worker.hpp>
 #include <functional>
-#include <list>
-#include <map>
 #include <memory>
-#include <set>
-#include <unordered_map>
 #include <vector>
 
 namespace llarp
 {
+
   struct Router : public AbstractRouter
   {
     llarp_time_t _lastPump = 0s;
@@ -73,6 +64,13 @@ namespace llarp
 
     std::unique_ptr<EventLoopWork> m_CurrentEvLoopWork;
     std::shared_ptr<EventLoopWakeup> m_LoopWorkPumper;
+    std::unique_ptr<iwp::Worker> m_LinkWorker;
+
+    const std::unique_ptr<iwp::Worker>&
+    linkWorker() const override
+    {
+      return m_LinkWorker;
+    }
 
     path::BuildLimiter&
     pathBuildLimiter() override

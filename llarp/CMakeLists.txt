@@ -205,6 +205,7 @@ add_library(lokinet-layer-wire
   iwp/linklayer.cpp
   iwp/message_buffer.cpp
   iwp/session.cpp
+  iwp/worker.cpp
 )
 
 # lokinet-layer-link is for our layer 2 analog which splits up layer 2 frames into
