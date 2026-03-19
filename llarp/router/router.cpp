@@ -1105,7 +1105,7 @@ namespace llarp
     {
       size_t num_threads = m_Config->router.m_workerThreads;
       if (num_threads <= 0)
-        num_threads = 1;
+        num_threads = std::thread::hardware_concurrency();
       if (num_threads > 128)
         num_threads = 128;
       m_PathWorker.Start(num_threads, num_threads);
