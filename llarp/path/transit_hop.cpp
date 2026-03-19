@@ -75,7 +75,7 @@ namespace llarp
       if (!IsEndpoint(r->pubkey()))
         return false;
 
-      std::array<byte_t, MAX_LINK_MSG_SIZE - 128> tmp;
+      std::array<byte_t, MAX_LINK_MSG_SIZE - 128> tmp{};
       llarp_buffer_t buf(tmp);
       if (!msg.BEncode(&buf))
       {
@@ -110,7 +110,7 @@ namespace llarp
           continue;
         auto& ev = maybe->second;
         auto transit_hop_ptr = maybe->first.lock();
-        RelayDownstreamMessage msg;
+        RelayDownstreamMessage msg{};
         const llarp_buffer_t buf(ev.first);
         msg.pathid = transit_hop_ptr->info.rxID;
         msg.Y = ev.second ^ transit_hop_ptr->nonceXOR;
@@ -134,7 +134,7 @@ namespace llarp
         auto transit_hop_ptr = maybe->first.lock();
         auto& ev = maybe->second;
         const llarp_buffer_t buf(ev.first);
-        RelayUpstreamMessage msg;
+        RelayUpstreamMessage msg{};
         CryptoManager::instance()->xchacha20(buf, transit_hop_ptr->pathKey, ev.second);
         msg.pathid = transit_hop_ptr->info.txID;
         msg.Y = ev.second ^ transit_hop_ptr->nonceXOR;
@@ -476,6 +476,7 @@ namespace llarp
       // send routing message
       if (path->SendRoutingMessage(msg.T, r))
       {
+        r->pathContext().FlushDownstreamLater(path);
         return true;
       }
       return SendRoutingMessage(discarded, r);

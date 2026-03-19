@@ -14,20 +14,6 @@
 #include <memory>
 #include <unordered_map>
 
-namespace std
-{
-  bool
-  operator<(
-      const std::shared_ptr<llarp::path::TransitHop>& lhs,
-      const std::shared_ptr<llarp::path::TransitHop>& rhs);
-  bool
-  operator<(const llarp::PathID_t& lhs, const llarp::PathID_t& rhs);
-  bool
-  operator<(const std::shared_ptr<llarp::path::TransitHop>& hop, const llarp::PathID_t& txid);
-  bool
-  operator<(const llarp::PathID_t& txid, const std::shared_ptr<llarp::path::TransitHop>& hop);
-}  // namespace std
-
 namespace llarp
 {
   struct AbstractRouter;
@@ -161,7 +147,7 @@ namespace llarp
       void
       RemovePathSet(PathSet_ptr set);
 
-      using TransitHopsMap_t = std::multiset<TransitHop_ptr, std::less<>>;
+      using TransitHopsMap_t = std::unordered_multimap<PathID_t, TransitHop_ptr>;
       struct SyncTransitMap_t
       {
         using Mutex_t = util::NullMutex;
@@ -178,7 +164,7 @@ namespace llarp
         {
           Lock_t lock(first);
           for (const auto& item : second)
-            visit(item);
+            visit(item.second);
         }
       };
 
