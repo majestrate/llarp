@@ -15,9 +15,7 @@ namespace llarp
 
     PathContext::PathContext(AbstractRouter* router)
         : m_Router(router), m_AllowTransit(false), m_PathLimits(DefaultPathBuildLimit)
-    {
-      m_FlushLater = m_Router->loop()->make_waker([this]() { FlushDeferred(); });
-    }
+    {}
 
     void
     PathContext::AllowTransit()
@@ -302,20 +300,6 @@ namespace llarp
       return nullptr;
     }
 
-    void
-    PathContext::PumpUpstream()
-    {
-      m_TransitPaths.ForEach([&](auto& ptr) { ptr->FlushUpstream(m_Router); });
-      m_OurPaths.ForEach([&](auto& ptr) { ptr->FlushUpstream(m_Router); });
-    }
-
-    void
-    PathContext::PumpDownstream()
-    {
-      m_TransitPaths.ForEach([&](auto& ptr) { ptr->FlushDownstream(m_Router); });
-      m_OurPaths.ForEach([&](auto& ptr) { ptr->FlushDownstream(m_Router); });
-    }
-
     uint64_t
     PathContext::CurrentTransitPaths()
     {
@@ -417,36 +401,5 @@ namespace llarp
     PathContext::RemovePathSet(PathSet_ptr)
     {}
 
-    void
-    PathContext::FlushDeferred()
-    {
-      for (auto& weak : m_FlushUpstreamQueue)
-      {
-        if (auto ptr = weak.lock())
-          ptr->FlushUpstream(m_Router);
-      }
-      for (auto& weak : m_FlushDownstreamQueue)
-      {
-        if (auto ptr = weak.lock())
-          ptr->FlushDownstream(m_Router);
-      }
-
-      m_FlushUpstreamQueue.clear();
-      m_FlushDownstreamQueue.clear();
-    }
-
-    void
-    PathContext::FlushUpstreamLater(std::weak_ptr<IHopHandler> hop)
-    {
-      m_FlushUpstreamQueue.emplace_back(hop);
-      m_FlushLater->Trigger();
-    }
-
-    void
-    PathContext::FlushDownstreamLater(std::weak_ptr<IHopHandler> hop)
-    {
-      m_FlushDownstreamQueue.emplace_back(hop);
-      m_FlushLater->Trigger();
-    }
   }  // namespace path
 }  // namespace llarp

@@ -214,13 +214,12 @@ namespace llarp
       HandleDHTMessage(const dht::IMessage& msg, AbstractRouter* r) override;
 
       void
-      FlushUpstream(AbstractRouter* r) override;
-
-      void
-      FlushDownstream(AbstractRouter* r) override;
-
-      void
       QueueDestroySelf(AbstractRouter* r);
+
+      bool
+      HandleUpstream(const llarp_buffer_t& X, const TunnelNonce& Y, AbstractRouter* r) override;
+      bool
+      HandleDownstream(const llarp_buffer_t& X, const TunnelNonce& Y, AbstractRouter* r) override;
 
      protected:
       void

@@ -1787,8 +1787,6 @@ namespace llarp
         if (item.second->SendRoutingMessage(*item.first, Router()))
           ConvoTagTX(item.first->T.T);
       }
-
-      UpstreamFlush(Router());
     }
 
     std::optional<ConvoTag>

@@ -95,7 +95,6 @@ namespace llarp
         buf.sz += dlt;
       }
       buf.cur = buf.base;
-      r->pathContext().FlushDownstreamLater(weak_from_this());
       return HandleDownstream(buf, N, r);
     }
 
@@ -175,6 +174,31 @@ namespace llarp
       r->TriggerPump();
     }
 
+    // handle data in upstream direction
+    bool
+    TransitHop::HandleUpstream(const llarp_buffer_t& X, const TunnelNonce& Y, AbstractRouter* r)
+    {
+      TrafficEvent_t pkt{};
+      pkt.first.resize(X.sz);
+      std::copy_n(X.base, X.sz, pkt.first.begin());
+      pkt.second = Y;
+      r->transitWorker().SubmitUpstream(weak_from_this(), pkt);
+      return true;
+    }
+
+    // handle data in downstream direction
+    bool
+    TransitHop::HandleDownstream(const llarp_buffer_t& X, const TunnelNonce& Y, AbstractRouter* r)
+    {
+      TrafficEvent_t pkt{};
+      pkt.first.resize(X.sz);
+      std::copy_n(X.base, X.sz, pkt.first.begin());
+      pkt.second = Y;
+      pkt.second = Y;
+      r->transitWorker().SubmitDownstream(weak_from_this(), pkt);
+      return true;
+    }
+
     void
     TransitWorker::SubmitDownstream(std::weak_ptr<TransitHop> hop, IHopHandler::TrafficEvent_t ev)
     {
@@ -239,7 +263,6 @@ namespace llarp
           }
           m_LastActivity = r->Now();
         }
-        r->pathContext().FlushDownstreamLater(weak_from_this());
         return;
       }
       for (const auto& msg : msgs)
@@ -269,30 +292,6 @@ namespace llarp
             info.downstream);
         r->SendToOrQueue(info.downstream, msg);
       }
-    }
-
-    void
-    TransitHop::FlushUpstream(AbstractRouter* r)
-    {
-      if (m_UpstreamQueue.empty())
-        return;
-      auto self = weak_from_this();
-      for (auto& ev : m_UpstreamQueue)
-        r->transitWorker().SubmitUpstream(self, std::move(ev));
-
-      m_UpstreamQueue.clear();
-    }
-
-    void
-    TransitHop::FlushDownstream(AbstractRouter* r)
-    {
-      if (m_DownstreamQueue.empty())
-        return;
-      auto self = weak_from_this();
-      for (auto& ev : m_DownstreamQueue)
-        r->transitWorker().SubmitDownstream(self, std::move(ev));
-
-      m_DownstreamQueue.clear();
     }
 
     /// this is where a DHT message is handled at the end of a path, that is,
@@ -476,7 +475,6 @@ namespace llarp
       // send routing message
       if (path->SendRoutingMessage(msg.T, r))
       {
-        r->pathContext().FlushDownstreamLater(path);
         return true;
       }
       return SendRoutingMessage(discarded, r);

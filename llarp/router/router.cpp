@@ -83,8 +83,6 @@ namespace llarp
     if (_stopping)
       return;
     log::debug(logcat, "PumpLL");
-    paths.PumpDownstream();
-    paths.PumpUpstream();
     _hiddenServiceContext.Pump();
     _outboundMessageHandler.Pump();
     _linkManager.PumpLinks();
@@ -1293,7 +1291,6 @@ namespace llarp
     _exitContext.Stop();
     llarp::sys::service_manager->stopping();
     log::debug(logcat, "final upstream pump");
-    paths.PumpUpstream();
     llarp::sys::service_manager->stopping();
     log::debug(logcat, "final links pump");
     _linkManager.PumpLinks();

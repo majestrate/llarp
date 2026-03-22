@@ -70,22 +70,6 @@ namespace llarp
       m_BuiltHook = func;
     }
 
-    bool
-    Path::HandleUpstream(const llarp_buffer_t& X, const TunnelNonce& Y, AbstractRouter* r)
-    {
-      if (not m_UpstreamReplayFilter.Insert(Y))
-        return false;
-      return IHopHandler::HandleUpstream(X, Y, r);
-    }
-
-    bool
-    Path::HandleDownstream(const llarp_buffer_t& X, const TunnelNonce& Y, AbstractRouter* r)
-    {
-      if (not m_DownstreamReplayFilter.Insert(Y))
-        return false;
-      return IHopHandler::HandleDownstream(X, Y, r);
-    }
-
     RouterID
     Path::Endpoint() const
     {
@@ -358,10 +342,7 @@ namespace llarp
       m_LastLatencyTestID = latency.T;
       m_LastLatencyTestTime = now;
       LogDebug(Name(), " send latency test id=", latency.T);
-      if (not SendRoutingMessage(latency, r))
-        return false;
-      FlushUpstream(r);
-      return true;
+      return SendRoutingMessage(latency, r);
     }
 
     void
@@ -531,24 +512,31 @@ namespace llarp
       m_DownstreamReplayFilter.Decay(now);
     }
 
-    void
-    Path::FlushUpstream(AbstractRouter* r)
+    bool
+    Path::HandleUpstream(const llarp_buffer_t& X, const TunnelNonce& Y, AbstractRouter* r)
     {
-      for (auto& ev : m_UpstreamQueue)
-        r->pathWorker().SubmitUpstream(weak_from_this(), std::move(ev));
-      if (m_UpstreamQueue.empty())
-        return;
-      m_UpstreamQueue.clear();
+      if (not m_UpstreamReplayFilter.Insert(Y))
+        return false;
+      TrafficEvent_t pkt{};
+      pkt.first.resize(X.sz);
+      std::copy_n(X.base, X.sz, pkt.first.begin());
+      pkt.second = Y;
+      r->pathWorker().SubmitUpstream(weak_from_this(), pkt);
+      return true;
     }
 
-    void
-    Path::FlushDownstream(AbstractRouter* r)
+    // handle data in downstream direction
+    bool
+    Path::HandleDownstream(const llarp_buffer_t& X, const TunnelNonce& Y, AbstractRouter* r)
     {
-      for (auto& ev : m_DownstreamQueue)
-        r->pathWorker().SubmitDownstream(weak_from_this(), std::move(ev));
-      if (m_DownstreamQueue.empty())
-        return;
-      m_DownstreamQueue.clear();
+      if (not m_DownstreamReplayFilter.Insert(Y))
+        return false;
+      TrafficEvent_t pkt{};
+      pkt.first.resize(X.sz);
+      std::copy_n(X.base, X.sz, pkt.first.begin());
+      pkt.second = Y;
+      r->pathWorker().SubmitDownstream(weak_from_this(), pkt);
+      return true;
     }
 
     /// how long we wait for a path to become active again after it times out

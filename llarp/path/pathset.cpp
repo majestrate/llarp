@@ -442,17 +442,5 @@ namespace llarp
       return chosen;
     }
 
-    void
-    PathSet::UpstreamFlush(AbstractRouter* r)
-    {
-      ForEachPath([r](const Path_ptr& p) { p->FlushUpstream(r); });
-    }
-
-    void
-    PathSet::DownstreamFlush(AbstractRouter* r)
-    {
-      ForEachPath([r](const Path_ptr& p) { p->FlushDownstream(r); });
-    }
-
   }  // namespace path
 }  // namespace llarp

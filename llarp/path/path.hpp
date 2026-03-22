@@ -405,12 +405,6 @@ namespace llarp
       SendExitClose(const routing::CloseExitMessage& msg, AbstractRouter* r);
 
       void
-      FlushUpstream(AbstractRouter* r) override;
-
-      void
-      FlushDownstream(AbstractRouter* r) override;
-
-      void
       DecayFilters(llarp_time_t now) override;
 
      protected:

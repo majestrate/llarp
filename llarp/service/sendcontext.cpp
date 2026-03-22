@@ -43,8 +43,8 @@ namespace llarp
     SendContext::FlushUpstream()
     {
       auto r = m_Endpoint->Router();
-      std::unordered_set<path::Path_ptr, path::Path::Ptr_Hash> flushpaths;
       auto rttRMS = 0ms;
+      size_t num{};
       while (auto maybe = m_SendQueue.tryPopFront())
       {
         auto& [msg, path] = *maybe;
@@ -52,21 +52,15 @@ namespace llarp
         if (path->SendRoutingMessage(*msg, r))
         {
           lastGoodSend = r->Now();
-          flushpaths.emplace(path);
           m_Endpoint->ConvoTagTX(msg->T.T);
           const auto rtt = (path->intro.latency + remoteIntro.latency) * 2;
           rttRMS += rtt * rtt.count();
+          ++num;
         }
       }
-      // flush the select path's upstream
-      for (const auto& path : flushpaths)
-      {
-        path->FlushUpstream(r);
-      }
-      if (flushpaths.empty())
-        return;
-      estimatedRTT = std::chrono::milliseconds{
-          static_cast<int64_t>(std::sqrt(rttRMS.count() / flushpaths.size()))};
+      if (num > 0)
+        estimatedRTT =
+            std::chrono::milliseconds{static_cast<int64_t>(std::sqrt(rttRMS.count() / num))};
     }
 
     /// send on an established convo tag

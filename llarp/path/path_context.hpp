@@ -65,22 +65,10 @@ namespace llarp
       ExpirePaths(llarp_time_t now);
 
       void
-      PumpUpstream();
-
-      void
-      PumpDownstream();
-
-      void
       AllowTransit();
 
       void
       RejectTransit();
-
-      void
-      FlushDownstreamLater(std::weak_ptr<IHopHandler> hop);
-
-      void
-      FlushUpstreamLater(std::weak_ptr<IHopHandler> hop);
 
       bool
       CheckPathLimitHitByAddr(const SockAddr& addr);
@@ -214,11 +202,6 @@ namespace llarp
       SyncOwnedPathsMap_t m_OurPaths;
       bool m_AllowTransit;
       util::DecayingHashSet<net::ipaddr_t> m_PathLimits;
-      std::vector<std::weak_ptr<IHopHandler>> m_FlushDownstreamQueue, m_FlushUpstreamQueue;
-      std::shared_ptr<EventLoopWakeup> m_FlushLater;
-
-      void
-      FlushDeferred();
     };
   }  // namespace path
 }  // namespace llarp
