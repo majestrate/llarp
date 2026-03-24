@@ -940,7 +940,7 @@ namespace llarp
   }
 
   bool
-  Router::ConnectionEstablished(ILinkSession* session, bool inbound)
+  Router::ConnectionEstablished(ILinkSession* session, bool)
   {
     RouterID id{session->GetPubKey()};
     return _outboundSessionMaker.OnSessionEstablished(session);
