@@ -3,7 +3,6 @@
 
 #include <llarp/dht/context.hpp>
 #include "gotintro.hpp"
-#include <llarp/messages/dht_immediate.hpp>
 #include <llarp/router/abstractrouter.hpp>
 #include <llarp/routing/dht_message.hpp>
 #include <llarp/nodedb.hpp>
@@ -59,14 +58,6 @@ namespace llarp
     {
       const auto now = ctx->impl->Now();
       const llarp::dht::Key_t addr{introset.derivedSigningKey.data()};
-
-      auto router = ctx->impl->GetRouter();
-      router->NotifyRouterEvent<tooling::PubIntroReceivedEvent>(
-          router->pubkey(),
-          Key_t(relayed ? router->pubkey() : From.data()),
-          addr,
-          txID,
-          relayOrder);
 
       auto& dht = *ctx->impl;
       if (!introset.Verify(now))

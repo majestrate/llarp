@@ -14,7 +14,7 @@ TEST_CASE("FindClosestTo returns correct number of elements", "[nodedb][dht]")
   for (uint64_t i = 0; i < numRCs; ++i)
   {
     llarp::RouterContact rc;
-    rc.pubkey[0] = i;
+    rc.pubkey.data()[0] = i;
     nodeDB.Put(rc);
   }
 
@@ -34,15 +34,15 @@ TEST_CASE("FindClosestTo returns properly ordered set", "[nodedb][dht]")
 
   // insert some RCs: a < b < c
   llarp::RouterContact a;
-  a.pubkey[0] = 1;
+  a.pubkey.data()[0] = 1;
   nodeDB.Put(a);
 
   llarp::RouterContact b;
-  b.pubkey[0] = 2;
+  b.pubkey.data()[0] = 2;
   nodeDB.Put(b);
 
   llarp::RouterContact c;
-  c.pubkey[0] = 3;
+  c.pubkey.data()[0] = 3;
   nodeDB.Put(c);
 
   REQUIRE(3 == nodeDB.NumLoaded());

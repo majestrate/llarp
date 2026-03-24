@@ -31,10 +31,10 @@ namespace llarp
 
       /// path dh creator's side
       bool
-      dh_client(SharedSecret&, const PubKey&, const SecretKey&, const TunnelNonce&) override;
+      dh_client(SharedSecret&, const PubKey&, const SecretKey&, const KeyExchangeNonce&) override;
       /// path dh relay side
       bool
-      dh_server(SharedSecret&, const PubKey&, const SecretKey&, const TunnelNonce&) override;
+      dh_server(SharedSecret&, const PubKey&, const SecretKey&, const KeyExchangeNonce&) override;
       /// transport dh client side
       bool
       transport_dh_client(

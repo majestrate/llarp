@@ -381,15 +381,15 @@ namespace llarp
 
       // generate path key as we are in a worker thread
       auto crypto = CryptoManager::instance();
-      if (!crypto->dh_server(
-              self->hop->pathKey,
-              self->record.commkey,
-              self->context->EncryptionSecretKey(),
-              self->record.tunnelNonce))
       {
-        llarp::LogError("LRCM DH Failed ", info);
-        self->decrypter = nullptr;
-        return;
+        const KeyExchangeNonce n{self->record.tunnelNonce.data()};
+        if (!crypto->dh_server(
+                self->hop->pathKey, self->record.commkey, self->context->EncryptionSecretKey(), n))
+        {
+          llarp::LogError("LRCM DH Failed ", info);
+          self->decrypter = nullptr;
+          return;
+        }
       }
       // generate hash of hop key for nonce mutation
       crypto->shorthash(self->hop->nonceXOR, llarp_buffer_t(self->hop->pathKey));
@@ -402,9 +402,6 @@ namespace llarp
 
       // TODO: check if we really want to accept it
       self->hop->started = now;
-
-      self->context->Router()->NotifyRouterEvent<tooling::PathRequestReceivedEvent>(
-          self->context->Router()->pubkey(), self->hop);
 
       size_t sz = self->frames[0].size();
       // shift

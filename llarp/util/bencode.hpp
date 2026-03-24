@@ -1,5 +1,5 @@
 #pragma once
-
+#include "aligned.hpp"
 #include "buffer.hpp"
 #include "bencode.h"
 #include "file.hpp"
@@ -7,11 +7,10 @@
 #include "mem.hpp"
 
 #include <type_traits>
-#include <set>
-#include <vector>
 
 namespace llarp
 {
+
   template <typename List_t>
   bool
   BEncodeReadList(List_t& result, llarp_buffer_t* buf);
@@ -34,7 +33,12 @@ namespace llarp
   bool
   BEncodeWriteDictEntry(const char* k, const Obj_t& o, llarp_buffer_t* buf)
   {
-    return bencode_write_bytestring(buf, k, 1) && o.BEncode(buf);
+    if (not bencode_write_bytestring(buf, k, 1))
+      return false;
+    if constexpr (llarp::is_std_array<Obj_t>)
+      return bencode_write_bytestring(buf, o.data(), o.size());
+    else
+      return o.BEncode(buf);
   }
 
   template <typename Int_t>
@@ -77,12 +81,24 @@ namespace llarp
   {
     if (key.startswith(k))
     {
-      if (!item.BDecode(buf))
+      if constexpr (llarp::is_std_array<Item_t>)
       {
-        log::warning(
-            bencode_detail::logcat, "failed to decode key {} for entry in dict", std::string{k});
+        llarp_buffer_t str{};
+        if (not bencode_read_string(buf, &str))
+          return false;
+        if (str.sz != item.size())
+          return false;
+        std::copy_n(str.base, item.size(), item.begin());
+      }
+      else
+      {
+        if (not item.BDecode(buf))
+        {
+          log::warning(
+              bencode_detail::logcat, "failed to decode key {} for entry in dict", std::string{k});
 
-        return false;
+          return false;
+        }
       }
       read = true;
     }

@@ -51,7 +51,7 @@ namespace llarp
       auto crypto = CryptoManager::instance();
       crypto->pqe_encrypt(frame->C, K, self->introPubKey);
       // randomize Nonce
-      frame->N.Randomize();
+      Randomize(frame->N);
       // compure post handshake session key
       // PKE (A, B, N)
       SharedSecret sharedSecret;
@@ -65,7 +65,13 @@ namespace llarp
       std::copy(K.begin(), K.end(), tmp.begin());
       // H (K + PKE(A, B, N))
       std::copy(sharedSecret.begin(), sharedSecret.end(), tmp.begin() + 32);
-      crypto->shorthash(self->sharedKey, llarp_buffer_t(tmp));
+      {
+        ShortHash h{};
+        MemWipe{&h};
+        crypto->shorthash(h, llarp_buffer_t(tmp));
+        static_assert(decltype(self->sharedKey)::SIZE == h.size());
+        self->sharedKey = h.data();
+      }
       // set tag
       self->msg.tag = self->tag;
       // set sender

@@ -64,7 +64,7 @@ namespace llarp
       bool
       FindClosest(const Key_t& target, Key_t& result) const
       {
-        Key_t mindist;
+        Key_t mindist{};
         mindist.Fill(0xff);
         for (const auto& item : nodes)
         {

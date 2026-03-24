@@ -131,7 +131,7 @@ namespace llarp
 
       if (!BEncodeWriteDictMsgType(buf, "A", "H"))
         return false;
-      if (!C.IsZero())
+      if (not IsZero(C))
       {
         if (!BEncodeWriteDictEntry("C", C, buf))
           return false;
@@ -204,7 +204,11 @@ namespace llarp
     {
       Encrypted_t tmp = D;
       auto buf = tmp.Buffer();
-      CryptoManager::instance()->xchacha20(*buf, sharedkey, N);
+      TunnelNonce n{};
+      MemWipe{&n};
+      static_assert(decltype(N)::SIZE == n.size());
+      std::copy_n(N.begin(), n.size(), n.begin());
+      CryptoManager::instance()->xchacha20(*buf, sharedkey, n);
       return bencode_decode_dict(msg, buf);
     }
 
@@ -243,7 +247,13 @@ namespace llarp
       buf.sz = buf.cur - buf.base;
       buf.cur = buf.base;
       // encrypt
-      CryptoManager::instance()->xchacha20(buf, sessionKey, N);
+      {
+        TunnelNonce n{};
+        MemWipe{&n};
+        static_assert(decltype(N)::SIZE == n.size());
+        std::copy_n(N.begin(), n.size(), n.begin());
+        CryptoManager::instance()->xchacha20(buf, sessionKey, n);
+      }
       // put encrypted buffer
       D = buf;
       // zero out signature
@@ -309,7 +319,13 @@ namespace llarp
         }
         // decrypt
         auto buf = frame.D.Buffer();
-        crypto->xchacha20(*buf, K, self->frame.N);
+        {
+          TunnelNonce n{};
+          MemWipe{&n};
+          static_assert(decltype(self->frame.N)::SIZE == n.size());
+          std::copy_n(self->frame.N.begin(), n.size(), n.begin());
+          crypto->xchacha20(*buf, K, n);
+        }
         if (!bencode_decode_dict(*self->msg, buf))
         {
           LogError("failed to decode inner protocol message");
@@ -324,7 +340,7 @@ namespace llarp
               "intro frame has invalid signature Z=",
               self->frame.Z,
               " from ",
-              self->msg->sender.Addr());
+              self->msg->sender.Addr().ToString());
           Dump<MAX_PROTOCOL_MESSAGE_SIZE>(self->frame);
           Dump<MAX_PROTOCOL_MESSAGE_SIZE>(*self->msg);
           self->msg.reset();
@@ -351,12 +367,19 @@ namespace llarp
           self->msg.reset();
           return;
         }
-        std::array<byte_t, 64> tmp;
+        std::array<byte_t, 64> tmp{};
+        MemWipe{&tmp};
         // K
         std::copy(K.begin(), K.end(), tmp.begin());
         // S = HS( K + PKE( A, B, N))
         std::copy(sharedSecret.begin(), sharedSecret.end(), tmp.begin() + 32);
-        crypto->shorthash(sharedKey, llarp_buffer_t(tmp));
+        {
+          ShortHash h{};
+          MemWipe{&h};
+          static_assert(h.size() == sharedKey.size());
+          crypto->shorthash(h, llarp_buffer_t(tmp));
+          sharedKey = h.data();
+        }
 
         std::shared_ptr<ProtocolMessage> msg = std::move(self->msg);
         path::Path_ptr path = std::move(self->path);

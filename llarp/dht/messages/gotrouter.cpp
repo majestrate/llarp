@@ -102,7 +102,7 @@ namespace llarp
           dht.pendingExploreLookups().NotFound(owner, closerTarget);
         else
         {
-          dht.pendingExploreLookups().Found(owner, From.as_array(), nearKeys);
+          dht.pendingExploreLookups().Found(owner, From.Router(), nearKeys);
         }
         return true;
       }
@@ -126,7 +126,6 @@ namespace llarp
         if (txid == 0)  // txid == 0 on gossip
         {
           auto* router = dht.GetRouter();
-          router->NotifyRouterEvent<tooling::RCGossipReceivedEvent>(router->pubkey(), rc);
           router->GossipRCIfNeeded(rc);
         }
       }

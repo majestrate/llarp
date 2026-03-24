@@ -22,7 +22,7 @@ add_executable(testAll
   crypto/test_llarp_crypto.cpp
   crypto/test_llarp_key_manager.cpp
   dns/test_llarp_dns_dns.cpp
-        net/test_llarp_net.cpp
+  net/test_llarp_net.cpp
   net/test_sock_addr.cpp
   nodedb/test_nodedb.cpp
   path/test_path.cpp
@@ -35,7 +35,6 @@ add_executable(testAll
   util/meta/test_llarp_util_memfn.cpp
   util/thread/test_llarp_util_queue_manager.cpp
   util/thread/test_llarp_util_queue.cpp
-  util/test_llarp_util_aligned.cpp
   util/test_llarp_util_bencode.cpp
   util/test_llarp_util_bits.cpp
   util/test_llarp_util_decaying_hashset.cpp

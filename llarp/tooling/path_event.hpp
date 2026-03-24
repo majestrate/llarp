@@ -97,7 +97,7 @@ namespace tooling
     ToString() const
     {
       std::string result = RouterEvent::ToString();
-      result += "---- path rxid: " + rxid.ShortHex();
+      result += "---- path rxid: " + oxenc::to_hex(rxid.begin(), rxid.end());
       result += ", status: " + std::to_string(status);
 
       return result;
@@ -122,7 +122,7 @@ namespace tooling
     ToString() const
     {
       std::string result = RouterEvent::ToString();
-      result += "---- path rxid: " + rxid.ShortHex();
+      result += "---- path rxid: " + oxenc::to_hex(rxid.begin(), rxid.end());
       result += ", rejectedBy: " + rejectedBy.ShortString();
 
       return result;

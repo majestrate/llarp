@@ -74,7 +74,7 @@ namespace llarp
         it += std::uniform_int_distribution<size_t>{0, introset.intros.size() - 1}(rng);
       }
       m_NextIntro = *it;
-      currentConvoTag.Randomize();
+      Randomize(currentConvoTag);
       lastShift = Now();
       // add send and connect timeouts to the parent endpoints path alignment timeout
       // this will make it so that there is less of a chance for timing races

@@ -50,12 +50,15 @@ namespace llarp
 
       // generate key
       crypto->encryption_keygen(hop.commkey);
-      hop.nonce.Randomize();
+      Randomize(hop.nonce);
       // do key exchange
-      if (!crypto->dh_client(hop.shared, hop.rc.enckey, hop.commkey, hop.nonce))
       {
-        LogError(pathset->Name(), " Failed to generate shared key for path build");
-        return;
+        const KeyExchangeNonce n{hop.nonce.data()};
+        if (!crypto->dh_client(hop.shared, hop.rc.enckey, hop.commkey, n))
+        {
+          LogError(pathset->Name(), " Failed to generate shared key for path build");
+          return;
+        }
       }
       // generate nonceXOR valueself->hop->pathKey
       crypto->shorthash(hop.nonceXOR, llarp_buffer_t(hop.shared));
@@ -139,8 +142,6 @@ namespace llarp
   {
     if (ctx->pathset->IsStopped())
       return;
-
-    ctx->router->NotifyRouterEvent<tooling::PathAttemptEvent>(ctx->router->pubkey(), ctx->path);
 
     ctx->router->pathContext().AddOwnPath(ctx->pathset, ctx->path);
     ctx->pathset->PathBuildStarted(ctx->path);

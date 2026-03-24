@@ -44,12 +44,12 @@ namespace llarp
         hops[idx].rc = h[idx];
         do
         {
-          hops[idx].txID.Randomize();
+          Randomize(hops[idx].txID);
         } while (hops[idx].txID.IsZero());
 
         do
         {
-          hops[idx].rxID.Randomize();
+          Randomize(hops[idx].rxID);
         } while (hops[idx].rxID.IsZero());
       }
 
@@ -193,7 +193,6 @@ namespace llarp
       {
         if (failedAt)
         {
-          r->NotifyRouterEvent<tooling::PathBuildRejectedEvent>(Endpoint(), RXID(), *failedAt);
           LogWarn(
               Name(),
               " build failed at ",
@@ -686,8 +685,8 @@ namespace llarp
         return false;
       }
       // make nonce
-      TunnelNonce N;
-      N.Randomize();
+      TunnelNonce N{};
+      Randomize(N);
       buf.sz = buf.cur - buf.base;
       // pad smaller messages
       if (buf.sz < pad_size)

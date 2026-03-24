@@ -5,16 +5,25 @@
 
 namespace llarp
 {
-  struct PathID_t final : public AlignedBuffer<PATHIDSIZE>
+  struct PathID_t final
   {
-    using AlignedBuffer<PATHIDSIZE>::AlignedBuffer;
+    ALIGNED_BUFFER_MEMBERS(PathID_t, 16)
   };
 
+  template <>
+  constexpr inline bool is_aligned_buffer<PathID_t> = true;
 }  // namespace llarp
 
 namespace std
 {
   template <>
-  struct hash<llarp::PathID_t> : hash<llarp::AlignedBuffer<llarp::PathID_t::SIZE>>
-  {};
+  struct hash<llarp::PathID_t>
+  {
+    hash<llarp::AlignedBuffer<llarp::PathID_t::SIZE>> m_hasher;
+    size_t
+    operator()(const llarp::PathID_t& id) const noexcept
+    {
+      return m_hasher(id.as_array());
+    }
+  };
 }  // namespace std

@@ -114,9 +114,9 @@ namespace llarp
             "Network ID; this is '"s + llarp::DEFAULT_NETID + "' for mainnet, 'gamma' for testnet.",
         },
         [this](std::string arg) {
-          if (arg.size() > NetID::size())
+          if (arg.size() > NetID::max_size())
             throw std::invalid_argument{
-                fmt::format("netid is too long, max length is {}", NetID::size())};
+                fmt::format("netid is too long, max length is {}", NetID::max_size())};
 
           m_netId = std::move(arg);
         });

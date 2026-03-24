@@ -10,9 +10,9 @@ namespace llarp
   void
   RelayUpstreamMessage::Clear()
   {
-    pathid.Zero();
+    Zero(pathid);
     X.Clear();
-    Y.Zero();
+    Zero(Y);
     version = 0;
   }
 
@@ -66,7 +66,7 @@ namespace llarp
   {
     pathid.Zero();
     X.Clear();
-    Y.Zero();
+    Zero(Y);
     version = 0;
   }
 

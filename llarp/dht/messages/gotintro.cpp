@@ -23,13 +23,6 @@ namespace llarp
         llarp_dht_context* ctx, std::vector<std::unique_ptr<IMessage>>& /*replies*/) const
     {
       auto& dht = *ctx->impl;
-      auto* router = dht.GetRouter();
-
-      router->NotifyRouterEvent<tooling::GotIntroReceivedEvent>(
-          router->pubkey(),
-          Key_t(From.data()),
-          (found.size() > 0 ? found[0] : llarp::service::EncryptedIntroSet{}),
-          txid);
 
       for (const auto& introset : found)
       {
@@ -73,7 +66,7 @@ namespace llarp
         auto copy = std::make_shared<const RelayedGotIntroMessage>(*this);
         return pathset->HandleGotIntroMessage(copy);
       }
-      LogWarn("No path for got intro message pathid=", pathID);
+      LogWarn("No path for got intro message pathid=", pathID.ToHex());
       return false;
     }
 

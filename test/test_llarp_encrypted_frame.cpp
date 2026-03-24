@@ -32,7 +32,7 @@ TEST_CASE_METHOD(FrameTest, "Frame crypto")
   f.Fill(0);
   LRCR record{};
   record.nextHop.Fill(1);
-  record.tunnelNonce.Fill(2);
+  record.tunnelNonce.fill(2);
   record.rxid.Fill(3);
   record.txid.Fill(4);
 

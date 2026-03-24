@@ -10,12 +10,9 @@
 #include "intro.hpp"
 #include "handler.hpp"
 #include <llarp/util/bencode.hpp>
-#include <llarp/util/time.hpp>
 #include <llarp/path/pathset.hpp>
 
 #include <vector>
-
-struct llarp_threadpool;
 
 namespace llarp
 {
@@ -40,10 +37,10 @@ namespace llarp
       ProtocolType proto = ProtocolType::TrafficV4;
       llarp_time_t queued = 0s;
       std::vector<byte_t> payload;
-      Introduction introReply;
-      ServiceInfo sender;
+      Introduction introReply{};
+      ServiceInfo sender{};
       Endpoint* handler = nullptr;
-      ConvoTag tag;
+      ConvoTag tag{};
       uint64_t seqno = 0;
       uint64_t version = llarp::constants::proto_version;
 
@@ -71,19 +68,19 @@ namespace llarp
     };
 
     /// outer message
-    struct ProtocolFrame final : public routing::IMessage
+    struct ProtocolFrame final : routing::IMessage
     {
       using Encrypted_t = Encrypted<2048>;
-      PQCipherBlock C;
-      Encrypted_t D;
+      PQCipherBlock C{};
+      Encrypted_t D{};
       uint64_t R;
-      KeyExchangeNonce N;
-      Signature Z;
-      PathID_t F;
-      service::ConvoTag T;
+      KeyExchangeNonce N{};
+      Signature Z{};
+      PathID_t F{};
+      ConvoTag T{};
 
       ProtocolFrame(const ProtocolFrame& other)
-          : routing::IMessage()
+          : IMessage{}
           , C(other.C)
           , D(other.D)
           , R(other.R)
@@ -96,7 +93,7 @@ namespace llarp
         version = other.version;
       }
 
-      ProtocolFrame() : routing::IMessage{}
+      ProtocolFrame() : IMessage{}
       {
         Clear();
       }
@@ -148,14 +145,14 @@ namespace llarp
       void
       Clear() override
       {
-        C.Zero();
+        Zero(C);
         D.Clear();
         F.Zero();
         T.Zero();
         N.Zero();
         Z.Zero();
         R = 0;
-        version = llarp::constants::proto_version;
+        version = constants::proto_version;
       }
 
       bool

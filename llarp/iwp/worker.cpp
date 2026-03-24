@@ -25,7 +25,9 @@ namespace llarp::iwp
   EncryptWorker::EncryptPacket(Session* session, Packet_t pkt)
   {
     llarp_buffer_t pktbuf{pkt};
-    const TunnelNonce nonce_ptr{pkt.data() + HMACSIZE};
+    byte_t* ptr = pkt.data() + HMACSIZE;
+    TunnelNonce nonce_ptr{};
+    std::copy_n(ptr, nonce_ptr.size(), nonce_ptr.begin());
     pktbuf.base += PacketOverhead;
     pktbuf.cur = pktbuf.base;
     pktbuf.sz -= PacketOverhead;

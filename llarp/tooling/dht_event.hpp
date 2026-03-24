@@ -27,7 +27,7 @@ namespace tooling
     std::string
     ToString() const
     {
-      return RouterEvent::ToString() + " ---- introset pubkey: " + introsetPubkey.ShortHex()
+      return RouterEvent::ToString() + " ---- introset pubkey: " + introsetPubkey.ToHex()
           + ", relay: " + relay.ShortString() + ", relayIndex: " + std::to_string(relayIndex);
     }
   };
@@ -55,9 +55,8 @@ namespace tooling
     std::string
     ToString() const override
     {
-      return RouterEvent::ToString() + "from " + from.ShortHex()
-          + " location=" + location.ShortHex() + " order=" + std::to_string(relayOrder)
-          + " txid=" + std::to_string(txid);
+      return RouterEvent::ToString() + "from " + from.ToHex() + " location=" + location.ToHex()
+          + " order=" + std::to_string(relayOrder) + " txid=" + std::to_string(txid);
     }
   };
 
@@ -82,8 +81,8 @@ namespace tooling
     std::string
     ToString() const override
     {
-      return RouterEvent::ToString() + "from " + From.ShortHex()
-          + " location=" + Introset.derivedSigningKey.ShortHex()
+      return RouterEvent::ToString() + "from " + From.ToHex()
+          + " location=" + Introset.derivedSigningKey.ToHex()
           + " order=" + std::to_string(RelayOrder) + " txid=" + std::to_string(TxID);
     }
   };
@@ -110,7 +109,7 @@ namespace tooling
     std::string
     ToString() const override
     {
-      return RouterEvent::ToString() + " from " + from.ShortHex()
+      return RouterEvent::ToString() + " from " + from.ToHex()
           + ", targetKey: " + targetKey.ToString() + ", iterative: " + std::to_string(iterative)
           + ", exploritory " + std::to_string(exploritory) + ", txid " + std::to_string(txid)
           + ", version " + std::to_string(version);

@@ -331,16 +331,16 @@ namespace llarp
               }
               if (const auto* loki = std::get_if<service::Address>(&addr))
               {
-                m_IPToAddr.emplace(ip, loki->data());
-                m_AddrToIP.emplace(loki->data(), ip);
-                m_SNodes[*loki] = false;
+                m_IPToAddr.emplace(ip, loki->as_array());
+                m_AddrToIP.emplace(loki->as_array(), ip);
+                m_SNodes[loki->as_array()] = false;
                 LogInfo(Name(), " remapped ", ip, " to ", *loki);
               }
               if (const auto* snode = std::get_if<RouterID>(&addr))
               {
-                m_IPToAddr.emplace(ip, snode->data());
-                m_AddrToIP.emplace(snode->data(), ip);
-                m_SNodes[*snode] = true;
+                m_IPToAddr.emplace(ip, snode->as_array());
+                m_AddrToIP.emplace(snode->as_array(), ip);
+                m_SNodes[snode->as_array()] = true;
                 LogInfo(Name(), " remapped ", ip, " to ", *snode);
               }
               if (m_NextIP < ToHost(ip))
@@ -408,9 +408,9 @@ namespace llarp
       if (itr == m_IPToAddr.end())
         return std::nullopt;
       if (m_SNodes.at(itr->second))
-        return RouterID{itr->second.as_array()};
+        return RouterID{itr->second};
       else
-        return service::Address{itr->second.as_array()};
+        return service::Address{itr->second};
     }
 
     bool
@@ -716,8 +716,8 @@ namespace llarp
           }
           else
           {
-            return ReplyToSNodeDNSWhenReady(
-                addr.as_array(), std::make_shared<dns::Message>(msg), isV6);
+            const RouterID snode{addr.data()};
+            return ReplyToSNodeDNSWhenReady(snode, std::make_shared<dns::Message>(msg), isV6);
           }
         }
         else if (service::NameIsValid(lnsName))
@@ -849,15 +849,14 @@ namespace llarp
       auto itr = m_IPToAddr.find(ip);
       if (itr != m_IPToAddr.end())
       {
-        llarp::LogWarn(
-            ip, " already mapped to ", service::Address(itr->second.as_array()).ToString());
+        llarp::LogWarn(ip, " already mapped to ", service::Address(itr->second).ToString());
         return false;
       }
       llarp::LogInfo(Name() + " map ", addr.ToString(), " to ", ip);
 
-      m_IPToAddr[ip] = addr;
-      m_AddrToIP[addr] = ip;
-      m_SNodes[addr] = SNode;
+      m_IPToAddr[ip] = addr.as_array();
+      m_AddrToIP[addr.as_array()] = ip;
+      m_SNodes[addr.as_array()] = SNode;
       MarkIPActiveForever(ip);
       MarkAddressOutbound(addr);
       return true;
@@ -953,7 +952,7 @@ namespace llarp
       LogInfo(Name(), " setting up dns...");
       SetupDNS();
       Loop()->call_soon([this]() { m_router->routePoker()->SetDNSMode(false); });
-      return HasAddress(ourAddr);
+      return HasAddress(ourAddr.as_array());
     }
 
     std::unordered_map<std::string, std::string>
@@ -1003,7 +1002,7 @@ namespace llarp
           {
             if (not m_SNodes.at(addr))
             {
-              const service::Address a{addr.as_array()};
+              const service::Address a{addr};
               if (HasInboundConvo(a))
                 addrmap[ip.ToString()] = a.ToString();
             }
@@ -1116,12 +1115,12 @@ namespace llarp
       service::ProtocolType type;
       if (m_SNodes.at(itr->second))
       {
-        to = RouterID{itr->second.as_array()};
+        to = RouterID{itr->second};
         type = service::ProtocolType::TrafficV4;
       }
       else
       {
-        to = service::Address{itr->second.as_array()};
+        to = service::Address{itr->second};
         type = m_state->m_ExitEnabled and src != m_OurIP ? service::ProtocolType::Exit
                                                          : pkt.ServiceProtocol();
       }
@@ -1324,7 +1323,8 @@ namespace llarp
       AlignedBuffer<32> ident{};
       bool snode = false;
 
-      var::visit([&ident](auto&& val) { ident = val.data(); }, addr);
+      var::visit(
+          [&ident](auto&& val) { std::copy_n(val.data(), ident.size(), ident.data()); }, addr);
 
       if (std::get_if<RouterID>(&addr))
       {

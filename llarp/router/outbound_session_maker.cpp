@@ -323,11 +323,8 @@ namespace llarp
   void
   OutboundSessionMaker::CreatePendingSession(const RouterID& router)
   {
-    {
-      util::Lock l(_mutex);
-      pendingSessions.emplace(router, nullptr);
-    }
-    _router->NotifyRouterEvent<tooling::ConnectionAttemptEvent>(_router->pubkey(), router);
+    util::Lock l(_mutex);
+    pendingSessions.emplace(router, nullptr);
   }
 
   void

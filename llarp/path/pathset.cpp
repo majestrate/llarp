@@ -121,8 +121,10 @@ namespace llarp
     {
       Lock_t l{m_PathsMutex};
       Path_ptr path = nullptr;
-      AlignedBuffer<32> dist;
-      AlignedBuffer<32> to = id;
+      RouterID dist{};
+      RouterID to{};
+      static_assert(id.size() == to.size());
+      std::copy_n(id.begin(), to.size(), to.begin());
       dist.Fill(0xff);
       for (const auto& item : m_Paths)
       {
@@ -132,7 +134,7 @@ namespace llarp
           continue;
         if (excluding.count(item.second->Endpoint()))
           continue;
-        AlignedBuffer<32> localDist = item.second->Endpoint() ^ to;
+        auto localDist = item.second->Endpoint() ^ to;
         if (localDist < dist)
         {
           dist = localDist;

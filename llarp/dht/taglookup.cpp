@@ -29,13 +29,13 @@ namespace llarp
     void
     TagLookup::Start(const TXOwner& peer)
     {
-      parent->DHTSendTo(peer.node.as_array(), new FindIntroMessage(target, peer.txid));
+      parent->DHTSendTo(peer.node.Router(), new FindIntroMessage(target, peer.txid));
     }
 
     void
     TagLookup::SendReply()
     {
-      parent->DHTSendTo(whoasked.node.as_array(), new GotIntroMessage({}, whoasked.txid));
+      parent->DHTSendTo(whoasked.node.Router(), new GotIntroMessage({}, whoasked.txid));
     }
   }  // namespace dht
 }  // namespace llarp

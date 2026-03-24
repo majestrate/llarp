@@ -156,7 +156,7 @@ namespace llarp
       std::array<byte_t, 512> tmp;
       llarp_buffer_t buf(tmp);
       Z.Zero();
-      Y.Randomize();
+      Randomize(Y);
       if (!BEncode(&buf))
         return false;
       buf.sz = buf.cur - buf.base;
@@ -220,7 +220,7 @@ namespace llarp
       std::array<byte_t, 512> tmp;
       llarp_buffer_t buf(tmp);
       Z.Zero();
-      Y.Randomize();
+      Randomize(Y);
       if (!BEncode(&buf))
         return false;
       buf.sz = buf.cur - buf.base;
@@ -304,7 +304,7 @@ namespace llarp
     {
       std::array<byte_t, 512> tmp;
       llarp_buffer_t buf(tmp);
-      Y.Randomize();
+      Randomize(Y);
       if (!BEncode(&buf))
         return false;
       buf.sz = buf.cur - buf.base;
@@ -405,7 +405,7 @@ namespace llarp
       std::array<byte_t, 512> tmp;
       llarp_buffer_t buf(tmp);
       Z.Zero();
-      Y.Randomize();
+      Randomize(Y);
       if (!BEncode(&buf))
         return false;
       buf.sz = buf.cur - buf.base;

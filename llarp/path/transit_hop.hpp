@@ -24,9 +24,8 @@ namespace llarp
       TransitHopInfo() = default;
       TransitHopInfo(const RouterID& down, const LR_CommitRecord& record);
 
-      PathID_t txID, rxID;
-      RouterID upstream;
-      RouterID downstream;
+      PathID_t txID{}, rxID{};
+      RouterID upstream{}, downstream{};
 
       std::string
       ToString() const;
@@ -98,9 +97,9 @@ namespace llarp
       friend TransitWorker;
       TransitHop();
 
-      TransitHopInfo info;
-      SharedSecret pathKey;
-      ShortHash nonceXOR;
+      TransitHopInfo info{};
+      SharedSecret pathKey{};
+      ShortHash nonceXOR{};
       llarp_time_t started = 0s;
       // 10 minutes default
       llarp_time_t lifetime = default_lifetime;

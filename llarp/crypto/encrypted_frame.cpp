@@ -25,7 +25,8 @@ namespace llarp
       crypto->randbytes(pubkey, PUBKEYSIZE);
     }
 
-    TunnelNonce nonce(noncePtr);
+    TunnelNonce nonce{};
+    std::copy_n(noncePtr, nonce.size(), nonce.begin());
 
     llarp_buffer_t buf;
     buf.base = body;
@@ -66,7 +67,7 @@ namespace llarp
     byte_t* noncePtr = hash + SHORTHASHSIZE;
     byte_t* pubkey = noncePtr + TUNNONCESIZE;
 
-    SharedSecret shared;
+    SharedSecret shared{};
 
     auto crypto = CryptoManager::instance();
 
@@ -74,7 +75,9 @@ namespace llarp
     memcpy(pubkey, ourSecretKey.toPublic().data(), PUBKEYSIZE);
     // randomize nonce
     crypto->randbytes(noncePtr, TUNNONCESIZE);
-    TunnelNonce nonce(noncePtr);
+
+    KeyExchangeNonce nonce{};
+    std::copy_n(noncePtr, nonce.size(), nonce.begin());
 
     // derive shared key
     if (!crypto->dh_client(shared, otherPubkey, ourSecretKey, nonce))
@@ -89,10 +92,14 @@ namespace llarp
   bool
   EncryptedFrame::DoDecrypt(const SharedSecret& shared)
   {
-    ShortHash hash(data());
+    ShortHash hash{};
+    std::copy_n(data(), hash.size(), hash.begin());
+
     byte_t* noncePtr = data() + SHORTHASHSIZE;
     byte_t* body = data() + EncryptedFrameOverheadSize;
-    TunnelNonce nonce(noncePtr);
+
+    TunnelNonce nonce{};
+    std::copy_n(noncePtr, nonce.size(), nonce.begin());
 
     auto crypto = CryptoManager::instance();
 
@@ -137,10 +144,13 @@ namespace llarp
     // <N bytes encrypted payload>
     //
     byte_t* noncePtr = data() + SHORTHASHSIZE;
-    TunnelNonce nonce(noncePtr);
+
+    KeyExchangeNonce nonce{};
+    std::copy_n(noncePtr, nonce.size(), nonce.begin());
+
     PubKey otherPubkey(noncePtr + TUNNONCESIZE);
 
-    SharedSecret shared;
+    SharedSecret shared{};
 
     auto crypto = CryptoManager::instance();
 

@@ -47,7 +47,7 @@ namespace llarp
         if (buf)
           memcpy(_buf.data(), buf, sz);
         else
-          _buf.Zero();
+          llarp::Zero(_buf.data(), _buf.size());
       }
       else
         _sz = 0;

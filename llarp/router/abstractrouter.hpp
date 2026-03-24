@@ -337,6 +337,12 @@ namespace llarp
       return false;
     };
 
+    RouterID
+    PublicKey() const
+    {
+      return RouterID{pubkey()};
+    }
+
     virtual path::BuildLimiter&
     pathBuildLimiter() = 0;
 
@@ -361,13 +367,8 @@ namespace llarp
     /// Templated convenience function to generate a RouterHive event and
     /// delegate to non-templated (and overridable) function for handling.
     template <class EventType, class... Params>
-    void
-    NotifyRouterEvent([[maybe_unused]] Params&&... args) const
-    {
-      // TODO: no-op when appropriate
-      auto event = std::make_unique<EventType>(args...);
-      HandleRouterEvent(std::move(event));
-    }
+    [[deprecated]] void
+    NotifyRouterEvent([[maybe_unused]] Params&&... args) const = delete;
 
     virtual int
     OutboundUDPSocket() const

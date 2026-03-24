@@ -91,7 +91,7 @@ namespace std
     size_t
     operator()(const llarp::service::Introduction& i) const
     {
-      return std::hash<llarp::PubKey>{}(i.router) ^ std::hash<llarp::PathID_t>{}(i.pathID);
+      return std::hash<llarp::RouterID>{}(i.router) ^ std::hash<llarp::PathID_t>{}(i.pathID);
     }
   };
 }  // namespace std

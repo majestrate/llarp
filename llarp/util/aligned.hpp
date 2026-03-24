@@ -1,20 +1,17 @@
 #pragma once
-
-#include "bencode.h"
+#include "types.hpp"
+#include "buffer.hpp"
 #include <fmt/ranges.h>
-#include <llarp/util/logging.hpp>
 #include <llarp/util/formattable.hpp>
 
 #include <oxenc/hex.h>
 
 #include <array>
 #include <cstddef>
-#include <iomanip>
-#include <iostream>
 #include <memory>
 #include <numeric>
 #include <type_traits>
-#include <algorithm>
+#include <compare>
 
 extern "C"
 {
@@ -24,293 +21,63 @@ extern "C"
   extern int
   sodium_is_zero(const unsigned char* n, const size_t nlen);
 }
+
+bool
+bencode_write_bytestring(llarp_buffer_t*, const void*, size_t);
+bool
+bencode_read_string(llarp_buffer_t*, llarp_buffer_t*);
+
+namespace llarp::service
+{
+  struct ConvoTag;
+}
+
 namespace llarp
 {
-  namespace aligned_detail
+
+  void
+  Zero(void*, size_t);
+
+  /// Assigns a value from a bare pointer to a fixzed size container.
+  template <typename Container_t>
+  struct AssignPtr
   {
-    inline static auto logcat = log::Cat("aligned-buffer");
-  }
-  /// aligned buffer that is sz bytes long and aligns to the nearest Alignment
-  template <size_t sz>
-  // Microsoft C malloc(3C) cannot return pointers aligned wider than 8 ffs
-  struct alignas(std::max_align_t) AlignedBuffer
-  {
-    static_assert(alignof(std::max_align_t) <= 16, "insane alignment");
-    static_assert(
-        sz >= 8,
-        "AlignedBuffer cannot be used with buffers smaller than 8 "
-        "bytes");
-
-    static constexpr size_t SIZE = sz;
-
-    using Data = std::array<byte_t, SIZE>;
-
-    virtual ~AlignedBuffer() = default;
-
-    AlignedBuffer()
+    Container_t& ref;
+    Container_t&
+    operator=(const byte_t* ptr)
     {
-      Zero();
+      std::memcpy(ref.data(), ptr, ref.size());
+      return ref;
     }
-
-    explicit AlignedBuffer(const byte_t* data)
-    {
-      *this = data;
-    }
-
-    explicit AlignedBuffer(const Data& buf)
-    {
-      m_data = buf;
-    }
-
-    AlignedBuffer&
-    operator=(const byte_t* data)
-    {
-      std::memcpy(m_data.data(), data, sz);
-      return *this;
-    }
-
-    /// bitwise NOT
-    AlignedBuffer<sz>
-    operator~() const
-    {
-      AlignedBuffer<sz> ret;
-      std::transform(begin(), end(), ret.begin(), [](byte_t a) { return ~a; });
-
-      return ret;
-    }
-
-    bool
-    operator==(const AlignedBuffer& other) const
-    {
-      return m_data == other.m_data;
-    }
-
-    bool
-    operator!=(const AlignedBuffer& other) const
-    {
-      return m_data != other.m_data;
-    }
-
-    bool
-    operator<(const AlignedBuffer& other) const
-    {
-      return m_data < other.m_data;
-    }
-
-    bool
-    operator>(const AlignedBuffer& other) const
-    {
-      return m_data > other.m_data;
-    }
-
-    bool
-    operator<=(const AlignedBuffer& other) const
-    {
-      return m_data <= other.m_data;
-    }
-
-    bool
-    operator>=(const AlignedBuffer& other) const
-    {
-      return m_data >= other.m_data;
-    }
-
-    AlignedBuffer
-    operator^(const AlignedBuffer& other) const
-    {
-      AlignedBuffer<sz> ret;
-      std::transform(begin(), end(), other.begin(), ret.begin(), std::bit_xor<>());
-      return ret;
-    }
-
-    AlignedBuffer&
-    operator^=(const AlignedBuffer& other)
-    {
-      // Mutate in place instead.
-      for (size_t i = 0; i < sz; ++i)
-      {
-        m_data[i] ^= other.m_data[i];
-      }
-      return *this;
-    }
-
-    byte_t&
-    operator[](size_t idx)
-    {
-      assert(idx < SIZE);
-      return m_data[idx];
-    }
-
-    const byte_t&
-    operator[](size_t idx) const
-    {
-      assert(idx < SIZE);
-      return m_data[idx];
-    }
-
-    static constexpr size_t
-    size()
-    {
-      return sz;
-    }
-
-    void
-    Fill(byte_t f)
-    {
-      m_data.fill(f);
-    }
-
-    Data&
-    as_array()
-    {
-      return m_data;
-    }
-
-    const Data&
-    as_array() const
-    {
-      return m_data;
-    }
-
-    byte_t*
-    data()
-    {
-      return m_data.data();
-    }
-
-    const byte_t*
-    data() const
-    {
-      return m_data.data();
-    }
-
-    bool
-    IsZero() const
-    {
-      const uint64_t* ptr = reinterpret_cast<const uint64_t*>(data());
-      for (size_t idx = 0; idx < SIZE / sizeof(uint64_t); idx++)
-      {
-        if (ptr[idx])
-          return false;
-      }
-      return true;
-    }
-
-    void
-    Zero()
-    {
-      m_data.fill(0);
-    }
-
-    virtual void
-    Randomize()
-    {
-      randombytes(data(), SIZE);
-    }
-
-    typename Data::iterator
-    begin()
-    {
-      return m_data.begin();
-    }
-
-    typename Data::iterator
-    end()
-    {
-      return m_data.end();
-    }
-
-    typename Data::const_iterator
-    begin() const
-    {
-      return m_data.cbegin();
-    }
-
-    typename Data::const_iterator
-    end() const
-    {
-      return m_data.cend();
-    }
-
-    bool
-    FromBytestring(llarp_buffer_t* buf)
-    {
-      if (buf->sz != sz)
-      {
-        log::error(aligned_detail::logcat, "bdecode buffer size mismatch {} != {} ", buf->sz, sz);
-        return false;
-      }
-      memcpy(data(), buf->base, sz);
-      return true;
-    }
-
-    bool
-    BEncode(llarp_buffer_t* buf) const
-    {
-      return bencode_write_bytestring(buf, data(), sz);
-    }
-
-    bool
-    BDecode(llarp_buffer_t* buf)
-    {
-      llarp_buffer_t strbuf;
-      if (!bencode_read_string(buf, &strbuf))
-      {
-        return false;
-      }
-      return FromBytestring(&strbuf);
-    }
-
-    std::string_view
-    ToView() const
-    {
-      return {reinterpret_cast<const char*>(data()), sz};
-    }
-
-    std::string
-    ToHex() const
-    {
-      return oxenc::to_hex(begin(), end());
-    }
-
-    std::string
-    ShortHex() const
-    {
-      return oxenc::to_hex(begin(), begin() + 4);
-    }
-
-    bool
-    FromHex(std::string_view str)
-    {
-      if (str.size() != 2 * size() || !oxenc::is_hex(str))
-        return false;
-      oxenc::from_hex(str.begin(), str.end(), begin());
-      return true;
-    }
-
-   private:
-    Data m_data;
   };
 
-  namespace detail
-  {
-    template <size_t Sz>
-    static std::true_type
-    is_aligned_buffer_impl(AlignedBuffer<Sz>*);
+  template <size_t sz>
+  using AlignedBuffer = std::array<byte_t, sz>;
 
-    static std::false_type
-    is_aligned_buffer_impl(...);
-  }  // namespace detail
-  // True if T is or is derived from AlignedBuffer<N> for any N
+  // True if T implements aligned buffer style interface.
   template <typename T>
-  constexpr inline bool is_aligned_buffer =
-      decltype(detail::is_aligned_buffer_impl(static_cast<T*>(nullptr)))::value;
+  constexpr inline bool is_aligned_buffer = false;
+
+  template <typename T>
+  constexpr inline bool is_std_array = false;
+
+  template <size_t sz>
+  constexpr inline bool is_std_array<std::array<uint8_t, sz>> = true;
+
+  template <typename T>
+    requires is_aligned_buffer<T>
+  void
+  Randomize(T& t)
+  {
+    ::randombytes(t.data(), t.size());
+    if constexpr (std::is_same_v<T, service::ConvoTag>)
+      t.data()[0] = 0xfc;
+  }
 
 }  // namespace llarp
 
 namespace fmt
 {
-
   /// disable range formatting for aligned buffer.
   template <typename T>
   struct range_format_kind<T, char, std::enable_if_t<llarp::is_aligned_buffer<T>>>
@@ -318,12 +85,12 @@ namespace fmt
     static constexpr auto value = range_format::disabled;
   };
 
-  // Any AlignedBuffer<N> (or subclass) gets hex formatted when output:
+  // Any aligned buffer like gets hex formatted when output:
   template <typename T>
   struct formatter<
       T,
       char,
-      std::enable_if_t<llarp::is_aligned_buffer<T> && !llarp::IsToStringFormattable<T>>>
+      std::enable_if_t<llarp::is_aligned_buffer<T> and not llarp::IsToStringFormattable<T>>>
       : formatter<std::string_view>
   {
     template <typename FormatContext>
@@ -339,14 +106,142 @@ namespace fmt
 namespace std
 {
   template <size_t sz>
-  struct hash<llarp::AlignedBuffer<sz>>
+  struct hash<array<uint8_t, sz>>
   {
+    static_assert(sz >= sizeof(size_t));
+
     std::size_t
-    operator()(const llarp::AlignedBuffer<sz>& buf) const noexcept
+    operator()(const array<uint8_t, sz>& buf) const noexcept
     {
-      std::size_t h = 0;
+      std::size_t h{};
       std::memcpy(&h, buf.data(), sizeof(std::size_t));
       return h;
     }
   };
 }  // namespace std
+
+#define ALIGNED_BUFFER_MEMBERS_NO_OPERS(_Kind_t, _sz)                                  \
+ public:                                                                               \
+  static constexpr size_t SIZE = _sz;                                                  \
+  constexpr size_t size() const noexcept                                               \
+  {                                                                                    \
+    return SIZE;                                                                       \
+  }                                                                                    \
+  using Data = std::array<byte_t, SIZE>;                                               \
+  constexpr byte_t* data() noexcept                                                    \
+  {                                                                                    \
+    return m_data.data();                                                              \
+  }                                                                                    \
+  constexpr const byte_t* data() const noexcept                                        \
+  {                                                                                    \
+    return m_data.data();                                                              \
+  }                                                                                    \
+  constexpr const std::array<byte_t, SIZE>& as_array() const noexcept                  \
+  {                                                                                    \
+    return m_data;                                                                     \
+  }                                                                                    \
+  using iter_t = Data::iterator;                                                       \
+  using c_iter_t = Data::const_iterator;                                               \
+  constexpr iter_t begin() noexcept                                                    \
+  {                                                                                    \
+    return m_data.begin();                                                             \
+  }                                                                                    \
+  constexpr iter_t end() noexcept                                                      \
+  {                                                                                    \
+    return m_data.end();                                                               \
+  }                                                                                    \
+  constexpr c_iter_t begin() const noexcept                                            \
+  {                                                                                    \
+    return m_data.begin();                                                             \
+  }                                                                                    \
+  constexpr c_iter_t end() const noexcept                                              \
+  {                                                                                    \
+    return m_data.end();                                                               \
+  }                                                                                    \
+  std::string_view ToView() const noexcept                                             \
+  {                                                                                    \
+    return std::string_view{                                                           \
+        reinterpret_cast<const char*>(begin()), reinterpret_cast<const char*>(end())}; \
+  }                                                                                    \
+  void Fill(byte_t ch) noexcept                                                        \
+  {                                                                                    \
+    m_data.fill(ch);                                                                   \
+  }                                                                                    \
+                                                                                       \
+ private:                                                                              \
+  Data m_data;
+
+#define ALIGNED_BUFFER_MEMBERS_NO_CTOR(_Kind_t, _sz)                              \
+  ALIGNED_BUFFER_MEMBERS_NO_OPERS(_Kind_t, _sz)                                   \
+ public:                                                                          \
+  constexpr bool operator==(const _Kind_t& other) const noexcept                  \
+  {                                                                               \
+    return as_array() == other.as_array();                                        \
+  }                                                                               \
+  constexpr bool operator!=(const _Kind_t& other) const noexcept                  \
+  {                                                                               \
+    return not(*this == other);                                                   \
+  }                                                                               \
+  constexpr bool operator<(const _Kind_t& other) const noexcept                   \
+  {                                                                               \
+    return as_array() < other.as_array();                                         \
+  }                                                                               \
+  _Kind_t& operator=(const byte_t* ptr) noexcept                                  \
+  {                                                                               \
+    return AssignPtr{*this} = ptr;                                                \
+  }                                                                               \
+  template <typename Other_t>                                                     \
+    requires llarp::is_aligned_buffer<Other_t>                                    \
+  constexpr _Kind_t operator^(const Other_t& other) const noexcept                \
+  {                                                                               \
+    static_assert(other.size() == size());                                        \
+    _Kind_t ret{};                                                                \
+    std::transform(begin(), end(), other.begin(), ret.begin(), std::bit_xor<>{}); \
+    return ret;                                                                   \
+  }
+
+#define ALIGNED_BUFFER_MEMBERS_NO_SERIALIZE(_Kind_t, _sz) \
+  ALIGNED_BUFFER_MEMBERS_NO_CTOR(_Kind_t, _sz)            \
+ public:                                                  \
+  _Kind_t() = default;                                    \
+  explicit _Kind_t(const byte_t* buf)                     \
+  {                                                       \
+    *this = buf;                                          \
+  }                                                       \
+  template <typename Kind_t>                              \
+    requires llarp::is_aligned_buffer<Kind_t>             \
+  explicit _Kind_t(const Kind_t& data)                    \
+  {                                                       \
+    static_assert(data.size() == size());                 \
+    std::copy_n(data.begin(), size(), m_data.begin());    \
+  }
+
+#define ALIGNED_BUFFER_MEMBERS(_kind_t, _sz)              \
+  ALIGNED_BUFFER_MEMBERS_NO_SERIALIZE(_kind_t, _sz)       \
+ public:                                                  \
+  inline std::string ToHex() const noexcept               \
+  {                                                       \
+    return oxenc::to_hex(begin(), end());                 \
+  }                                                       \
+  inline bool BEncode(llarp_buffer_t* buf) const          \
+  {                                                       \
+    return bencode_write_bytestring(buf, data(), size()); \
+  }                                                       \
+  inline bool BDecode(llarp_buffer_t* buf)                \
+  {                                                       \
+    llarp_buffer_t str{};                                 \
+    if (not bencode_read_string(buf, &str))               \
+      return false;                                       \
+    if (str.sz != size())                                 \
+      return false;                                       \
+    std::copy_n(str.base, size(), begin());               \
+    return true;                                          \
+  }                                                       \
+  inline void Zero()                                      \
+  {                                                       \
+    llarp::Zero(data(), size());                          \
+  }                                                       \
+  inline bool IsZero() const                              \
+  {                                                       \
+    return ::sodium_is_zero(data(), size());              \
+  }

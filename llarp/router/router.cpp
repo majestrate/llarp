@@ -752,7 +752,7 @@ namespace llarp
     const bool isSvcNode = IsServiceNode();
     const bool decom = LooksDecommissioned();
     bool shouldGossip = isSvcNode and whitelistRouters and gotWhitelist
-        and _rcLookupHandler.SessionIsAllowed(pubkey());
+        and _rcLookupHandler.SessionIsAllowed(PublicKey());
 
     if (isSvcNode
         and (_rc.ExpiresSoon(now, std::chrono::milliseconds(randint() % 10000)) or (now - _rc.last_updated) > rcRegenInterval))
@@ -763,7 +763,7 @@ namespace llarp
         // our rc changed so we should gossip it
         shouldGossip = true;
         // remove our replay entry so it goes out
-        _rcGossiper.Forget(pubkey());
+        _rcGossiper.Forget(PublicKey());
       }
       else
         LogError("failed to update our RC");
@@ -943,7 +943,6 @@ namespace llarp
   Router::ConnectionEstablished(ILinkSession* session, bool inbound)
   {
     RouterID id{session->GetPubKey()};
-    NotifyRouterEvent<tooling::LinkSessionEstablishedEvent>(pubkey(), id, inbound);
     return _outboundSessionMaker.OnSessionEstablished(session);
   }
 
@@ -1064,7 +1063,7 @@ namespace llarp
         return false;
       }
     }
-    _outboundSessionMaker.SetOurRouter(pubkey());
+    _outboundSessionMaker.SetOurRouter(PublicKey());
     if (!_linkManager.StartLinks())
     {
       LogWarn("One or more links failed to start.");
@@ -1079,7 +1078,7 @@ namespace llarp
         LogError("Failed to initialize service node");
         return false;
       }
-      const RouterID us = pubkey();
+      const RouterID us{PublicKey()};
       LogInfo("initalized service node: ", us);
       // init gossiper here
       _rcGossiper.Init(&_linkManager, us, this);
@@ -1344,7 +1343,7 @@ namespace llarp
   {
     (void)tries;
 
-    if (rc.pubkey == pubkey())
+    if (rc.pubkey == PublicKey())
     {
       return false;
     }

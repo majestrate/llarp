@@ -20,10 +20,10 @@ bool
 bencode_read_integer(llarp_buffer_t* buffer, uint64_t* result);
 
 bool
-bencode_read_string(llarp_buffer_t* buffer, llarp_buffer_t* result);
+bencode_read_string(llarp_buffer_t*, llarp_buffer_t*);
 
 bool
-bencode_write_bytestring(llarp_buffer_t* buff, const void* data, size_t sz);
+bencode_write_bytestring(llarp_buffer_t*, const void*, size_t);
 
 bool
 bencode_write_uint64(llarp_buffer_t* buff, uint64_t i);

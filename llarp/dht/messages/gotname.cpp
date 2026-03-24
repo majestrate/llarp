@@ -40,7 +40,13 @@ namespace llarp::dht
     }
     if (key.startswith("N"))
     {
-      return result.nonce.BDecode(val);
+      llarp_buffer_t str{};
+      if (not bencode_read_string(val, &str))
+        return false;
+      if (str.sz != result.nonce.size())
+        return false;
+      AssignPtr{result.nonce} = str.base;
+      return true;
     }
     if (key.startswith("T"))
     {

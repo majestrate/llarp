@@ -1,5 +1,6 @@
 #include <llarp/util/alloc.h>
 #include "types.hpp"
+#include <llarp/util/logging.hpp>
 #include <llarp/util/buffer.hpp>
 #include <llarp/util/file.hpp>
 #include <llarp/util/fs.hpp>
@@ -14,6 +15,11 @@
 
 namespace llarp
 {
+  namespace
+  {
+    auto logcat = log::Cat("cryptography");
+  }
+
   bool
   PubKey::FromString(const std::string& str)
   {
@@ -29,12 +35,27 @@ namespace llarp
     return oxenc::to_hex(begin(), end());
   }
 
+  SecretKey::SecretKey(const std::array<byte_t, SECKEYSIZE>& buf) : SecretKey{}
+  {
+    std::copy_n(buf.begin(), size(), begin());
+  }
+  SecretKey::SecretKey(const std::array<byte_t, SEEDSIZE>& seed) : SecretKey{}
+  {
+    std::copy_n(seed.begin(), SEEDSIZE, begin());
+    Recalculate();
+  }
+
+  SecretKey::~SecretKey()
+  {
+    ::sodium_memzero(data(), size());
+  }
+
   template <>
   bool
   SecretKey::LoadFromFile(const fs::path& fname)
   {
     size_t sz;
-    std::array<byte_t, 128> tmp;
+    std::array<byte_t, 128> tmp{};
     try
     {
       sz = util::slurp_file(fname, tmp.data(), tmp.size());
@@ -52,7 +73,13 @@ namespace llarp
     }
 
     llarp_buffer_t buf(tmp);
-    return BDecode(&buf);
+    llarp_buffer_t str{};
+    if (not bencode_read_string(&buf, &str))
+      return false;
+    if (str.sz != size())
+      return false;
+    std::copy_n(str.begin(), str.sz, begin());
+    return true;
   }
 
   bool
@@ -88,6 +115,11 @@ namespace llarp
     return crypto_scalarmult_ed25519_base_noclamp(pubkey.data(), data()) != -1;
   }
 
+  PrivateKey::~PrivateKey()
+  {
+    ::sodium_memzero(data(), size());
+  }
+
   template <>
   bool
   SecretKey::SaveToFile(const fs::path& fname) const
@@ -121,16 +153,21 @@ namespace llarp
     }
     catch (const std::exception& e)
     {
-      llarp::LogError("failed to load service node seed: ", e.what());
+      log::error(logcat, "failed to load service node seed: {}", e.what());
       return false;
     }
     if (sz != SIZE)
     {
-      llarp::LogError("service node seed size invalid: ", sz, " != ", SIZE);
+      log::error(logcat, "service node seed size invalid: {} != {}", sz, SIZE);
       return false;
     }
     std::copy(buf.begin(), buf.end(), begin());
     return true;
+  }
+
+  IdentitySecret::~IdentitySecret()
+  {
+    ::sodium_memzero(data(), size());
   }
 
   byte_t*
@@ -155,5 +192,10 @@ namespace llarp
   Signature::Hi() const
   {
     return data() + 32;
+  }
+
+  PQKeyPair::~PQKeyPair()
+  {
+    ::sodium_memzero(data(), size());
   }
 }  // namespace llarp

@@ -19,7 +19,7 @@ namespace llarp
       // exploritory
       FindRouterMessage(uint64_t id) : IMessage({}), exploritory(true), txid(id)
       {
-        targetKey.Randomize();
+        Randomize(targetKey);
       }
 
       ~FindRouterMessage() override;
