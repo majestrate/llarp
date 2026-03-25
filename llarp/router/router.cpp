@@ -1204,6 +1204,7 @@ namespace llarp
         }
       });
     }
+    _loop->add_ticker([self = this]() { self->PumpLL(); });
     llarp::sys::service_manager->ready();
     return _running;
   }
