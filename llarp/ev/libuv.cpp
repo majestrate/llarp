@@ -209,7 +209,7 @@ namespace llarp::uv
         num_threads--;
 
         m_ReaderThreads.emplace_back([this]() {
-          util::SetThreadName("llarp-udp");
+          util::SetThreadName("llarp-recvmsg");
           const int recv_flags{};
           msghdr msg{};
           using Buffer_t = std::array<uint8_t, 1500>;
