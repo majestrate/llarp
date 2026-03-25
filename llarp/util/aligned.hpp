@@ -169,7 +169,7 @@ namespace std
   }                                                                                    \
                                                                                        \
  private:                                                                              \
-  Data m_data;
+  Data m_data{};
 
 #define ALIGNED_BUFFER_MEMBERS_NO_CTOR(_Kind_t, _sz)                              \
   ALIGNED_BUFFER_MEMBERS_NO_OPERS(_Kind_t, _sz)                                   \

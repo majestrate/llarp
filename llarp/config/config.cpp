@@ -1013,8 +1013,7 @@ namespace llarp
             "env-var: LLARP_PUBLIC_PORT"},
         [this](uint16_t arg) { PublicPort = net::port_t::from_host(arg); });
 
-    auto parse_addr_for_link = [net_ptr](
-                                   const std::string& arg, net::port_t default_port, bool) {
+    auto parse_addr_for_link = [net_ptr](const std::string& arg, net::port_t default_port, bool) {
       std::optional<SockAddr> addr = std::nullopt;
       // explicitly provided value
       if (not arg.empty())
