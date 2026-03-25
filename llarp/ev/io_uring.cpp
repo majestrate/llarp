@@ -464,7 +464,7 @@ namespace llarp::io_uring
     }
 
     std::optional<int>
-    file_descriptor() override
+    file_descriptor() const override
     {
       if (m_FD == -1)
         return std::nullopt;
