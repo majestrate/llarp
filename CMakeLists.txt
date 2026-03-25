@@ -257,6 +257,12 @@ if(WITH_SYSTEMD AND (NOT ANDROID))
   target_compile_definitions(base_libs INTERFACE WITH_SYSTEMD)
 endif()
 
+if (WITH_IOURING)
+  target_compile_definitions(base_libs INTERFACE -DWITH_IO_URING)
+else()
+  target_compile_definitions(base_libs INTERFACE -DWITH_LIBUV)
+endif()
+
 add_subdirectory(external)
 
 if(USE_JEMALLOC AND NOT STATIC_LINK)

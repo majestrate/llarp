@@ -1,4 +1,5 @@
 #pragma once
+#ifdef WITH_IO_URING
 #include "ev.hpp"
 #include <llarp/util/thread/queue.hpp>
 #include <liburing.h>
@@ -110,3 +111,5 @@ namespace llarp::io_uring
   };
 
 }  // namespace llarp::io_uring
+
+#endif

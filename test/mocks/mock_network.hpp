@@ -5,6 +5,8 @@
 #include <llarp/ev/libuv.hpp>
 #include <oxenc/variant.h>
 
+#include <llarp/ev/udp_handle.hpp>
+
 namespace mocks
 {
   class Network;

@@ -1,3 +1,4 @@
+#ifdef WITH_LIBUV
 #include <llarp/util/alloc.h>
 #include "libuv.hpp"
 #include <uv.h>
@@ -8,7 +9,6 @@
 #include <cstring>
 #include <netinet/udp.h>
 
-#include <llarp/util/exceptions.hpp>
 #include <llarp/util/thread/queue.hpp>
 #include <llarp/vpn/platform.hpp>
 #include <llarp/util/fd.hpp>
@@ -766,3 +766,4 @@ namespace llarp::uv
   }
 
 }  // namespace llarp::uv
+#endif
