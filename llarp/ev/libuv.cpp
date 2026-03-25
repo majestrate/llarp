@@ -6,15 +6,18 @@
 #include <thread>
 #include <type_traits>
 #include <cstring>
+#include <netinet/udp.h>
 
 #include <llarp/util/exceptions.hpp>
 #include <llarp/util/thread/queue.hpp>
 #include <llarp/vpn/platform.hpp>
-
+#include <llarp/util/fd.hpp>
 #include <uvw.hpp>
 
 namespace llarp::uv
 {
+  static auto logcat = log::Cat("libuv");
+
   std::shared_ptr<uvw::Loop>
   Loop::MaybeGetUVWLoop()
   {
@@ -67,28 +70,38 @@ namespace llarp::uv
 
   struct UDPHandle final : llarp::UDPHandle
   {
-    UDPHandle(uvw::Loop& loop, ReceiveFunc rf);
+    UDPHandle(Loop&, ReceiveFunc rf);
 
     bool
     listen(const SockAddr& addr) override;
 
     bool
-    send(const SockAddr& dest, const llarp_buffer_t& buf) override;
+    send(const SockAddr& dest, const llarp_buffer_t& buf) override
+    {
+      m_Loop.call([this,
+                   dest = SockAddr{dest},
+                   buffer = std::make_shared<OwnedBuffer>(buf.base, buf.sz)]() {
+        OwnedBuffer& buf = *buffer;
+        m_SendQueue.emplace_back(std::make_pair(dest, std::move(buf)));
+        m_SendWakeup->Trigger();
+      });
+      return true;
+    }
 
     std::optional<SockAddr>
     LocalAddr() const override
     {
-      if (auto addr = handle->sock<uvw::IPv4>(); not addr.ip.empty())
-        return SockAddr{addr.ip, huint16_t{static_cast<uint16_t>(addr.port)}};
-      if (auto addr = handle->sock<uvw::IPv6>(); not addr.ip.empty())
-        return SockAddr{addr.ip, huint16_t{static_cast<uint16_t>(addr.port)}};
-      return std::nullopt;
+      if (file_descriptor() == std::nullopt)
+        return std::nullopt;
+      return m_LocalAddr;
     }
 
     std::optional<int>
-    file_descriptor() override
+    file_descriptor() const override
     {
-      if (int fd = handle->fd(); fd >= 0)
+      if (not m_FD)
+        return std::nullopt;
+      if (int fd = m_FD->fd(); fd >= 0)
         return fd;
       return std::nullopt;
     }
@@ -99,10 +112,174 @@ namespace llarp::uv
     ~UDPHandle() override;
 
    private:
-    std::shared_ptr<uvw::UDPHandle> handle;
+    // (remote_addr, data)
+    using Event_t = std::pair<SockAddr, OwnedBuffer>;
+    Loop& m_Loop;
+    std::unique_ptr<util::FD> m_FD;
+    SockAddr m_LocalAddr{};
+
+    std::vector<std::jthread> m_ReaderThreads;
+    thread::Queue<Event_t> m_Gather;
+
+    std::vector<Event_t> m_SendQueue;
+    std::shared_ptr<EventLoopWakeup> m_SendWakeup, m_RecvWakeup;
 
     void
-    reset_handle(uvw::Loop& loop);
+    reset_handle(int num_threads)
+    {
+      if (num_threads <= 0)
+        num_threads = std::thread::hardware_concurrency();
+
+      close();
+
+      // create send flusher
+      if (m_SendWakeup == nullptr)
+      {
+        m_SendWakeup = m_Loop.make_waker([this]() {
+          std::vector<::mmsghdr> msgs{};
+          std::vector<::iovec> send_vecs;
+          send_vecs.resize(m_SendQueue.size());
+          size_t idx{};
+          const int send_flags{MSG_DONTWAIT | MSG_NOSIGNAL};
+          for (auto& [addr, pkt] : m_SendQueue)
+          {
+            auto& msg = msgs.emplace_back();
+            auto& hdr = msg.msg_hdr;
+            hdr.msg_name =
+                const_cast<void*>(reinterpret_cast<const void*>(addr.operator const sockaddr*()));
+            hdr.msg_namelen = addr.sockaddr_len();
+            hdr.msg_control = nullptr;
+            hdr.msg_controllen = 0;
+            hdr.msg_flags = send_flags;
+
+            ::iovec* start = &send_vecs[idx];
+
+            auto& vec = send_vecs[idx];
+            vec.iov_base = pkt.buf.get();
+            vec.iov_len = pkt.sz;
+            ++idx;
+
+            hdr.msg_iov = start;
+            hdr.msg_iovlen = 1;
+          }
+          int ret{};
+          log::debug(
+              logcat,
+              "UDPHandle sendmmsg(): send {} addrs {} vecs | sendq={}",
+              msgs.size(),
+              idx,
+              m_SendQueue.size());
+
+          if (auto maybe_fd = file_descriptor())
+          {
+            if (ret = ::sendmmsg(*maybe_fd, msgs.data(), msgs.size(), send_flags); ret == -1)
+            {
+              log::error(logcat, "UPDHandle sendmmsg(): ", strerror(errno));
+              errno = 0;
+            }
+            log::debug(logcat, "sendmmsg(): {}", ret);
+          }
+          else
+            log::warning(logcat, "sendmmsg(): no file descriptor");
+
+          m_SendQueue.clear();
+        });
+      }
+
+      // create recv handler.
+      if (m_RecvWakeup == nullptr)
+      {
+        m_RecvWakeup = m_Loop.make_waker([this]() {
+          const bool should_skip = not(bool{on_recv} and m_Gather.enabled());
+          while (auto maybe = m_Gather.tryPopFront())
+          {
+            log::debug(logcat, "process {}B from {}", maybe->second.sz, maybe->first);
+            if (should_skip)
+              continue;
+            on_recv(*this, maybe->first, std::move(maybe->second));
+          }
+          m_Loop.io_cycle_complete();
+        });
+      }
+
+      // spawn reader threads.
+      m_Gather.enable();
+      while (num_threads > 0)
+      {
+        num_threads--;
+
+        m_ReaderThreads.emplace_back([this]() {
+          util::SetThreadName("llarp-udp");
+          const int recv_flags{};
+          msghdr msg{};
+          using Buffer_t = std::array<uint8_t, 1500>;
+          Buffer_t recv_buffer{};
+          ::iovec recv_vec{};
+          sockaddr_storage recv_addr{};
+
+          while (m_Gather.enabled())
+          {
+            auto maybe_fd = file_descriptor();
+            if (not maybe_fd)
+            {
+              log::debug(logcat, "UDPHandle: no fd, sleeping");
+              std::this_thread::sleep_for(100ms);
+              continue;
+            }
+
+            msg.msg_control = 0;
+            msg.msg_controllen = 0;
+            msg.msg_flags = 0;
+            msg.msg_namelen = 0;
+            msg.msg_iov = &recv_vec;
+            msg.msg_iovlen = 1;
+            msg.msg_name = &recv_addr;
+            msg.msg_namelen = sizeof(sockaddr_storage);
+            msg.msg_iov->iov_base = recv_buffer.data();
+            msg.msg_iov->iov_len = recv_buffer.size();
+
+            int ret{};
+            if (ret = ::recvmsg(*maybe_fd, &msg, recv_flags); ret == -1)
+            {
+              int err = errno;
+              errno = 0;
+              if (err == EAGAIN or err == EWOULDBLOCK)
+                continue;
+              log::error(logcat, "UPDHandle recvmsg(): {}", strerror(err));
+              continue;
+            }
+            log::debug(logcat, "recvmsg(): {}", ret);
+
+            if (ret <= 0)
+            {
+              log::debug(logcat, "UPDHandle ret: {} <= 0", ret);
+              continue;
+            }
+            auto& hdr = msg;
+            if (hdr.msg_namelen == 0)
+            {
+              log::debug(logcat, "UPDHandle msg_namelen: {} <= 0", hdr.msg_namelen);
+              continue;
+            }
+            sockaddr* from_ptr = reinterpret_cast<sockaddr*>(hdr.msg_name);
+            if (from_ptr == nullptr)
+            {
+              log::debug(logcat, "UPDHandle from_ptr == nullptr");
+              continue;
+            }
+            m_RecvWakeup->Trigger();
+            SockAddr from{*from_ptr};
+            OwnedBuffer pkt{static_cast<byte_t*>(hdr.msg_iov->iov_base), static_cast<size_t>(ret)};
+            auto result = m_Gather.tryPushBack(std::make_pair(from, std::move(pkt)));
+            if (result == thread::QueueReturn::QueueDisabled)
+            {
+              log::debug(logcat, "UPDHandle m_Gater has been disabled");
+            }
+          }
+          log::info(logcat, "UDP worker ended");
+        });
+      }
+    }
   };
 
   void
@@ -121,6 +298,13 @@ namespace llarp::uv
       f();
     }
     llarp::LogTrace("Loop::FlushLogic() end");
+  }
+
+  void
+  Loop::io_cycle_complete()
+  {
+    for (auto& ticker : m_tickers)
+      ticker();
   }
 
   void
@@ -174,6 +358,11 @@ namespace llarp::uv
     m_EventLoopThreadID = std::this_thread::get_id();
     m_Impl->run();
     m_Impl->close();
+
+    for (auto& closer : m_closers)
+      closer();
+    m_closers.clear();
+
     m_DiskCalls.disable();
     if (m_DiskThread and m_DiskThread->joinable())
       m_DiskThread->join();
@@ -199,7 +388,7 @@ namespace llarp::uv
   Loop::make_udp(UDPReceiveFunc on_recv)
   {
     return std::static_pointer_cast<llarp::UDPHandle>(
-        std::make_shared<llarp::uv::UDPHandle>(*m_Impl, std::move(on_recv)));
+        std::make_shared<llarp::uv::UDPHandle>(*this, std::move(on_recv)));
   }
 
   static void
@@ -244,6 +433,12 @@ namespace llarp::uv
   }
 
   void
+  Loop::add_closer(std::function<void()> f)
+  {
+    m_closers.emplace_back(std::move(f));
+  }
+
+  void
   Loop::stop()
   {
     if (!m_Run)
@@ -257,6 +452,12 @@ namespace llarp::uv
       if constexpr (!std::is_pointer_v<std::remove_reference_t<decltype(handle)>>)
         handle.close();
     });
+
+    for (auto& closer : m_closers)
+      closer();
+
+    m_closers.clear();
+
     llarp::LogDebug("Closed all handles, stopping the loop");
     m_Impl->stop();
 
@@ -283,6 +484,7 @@ namespace llarp::uv
   bool
   Loop::add_ticker(std::function<void(void)> func)
   {
+    m_tickers.push_back(func);
     auto check = m_Impl->resource<uvw::CheckHandle>();
     check->on<uvw::CheckEvent>([f = std::move(func)](auto&, auto&) { f(); });
     check->start();
@@ -337,63 +539,69 @@ namespace llarp::uv
     m_WakeUp->send();
   }
 
-  // Sets `handle` to a new uvw UDP handle, first initiating a close and then disowning the handle
-  // if already set, allocating the resource, and setting the receive event on it.
-  void
-  UDPHandle::reset_handle(uvw::Loop& loop)
+  llarp::uv::UDPHandle::UDPHandle(Loop& loop, ReceiveFunc rf)
+      : llarp::UDPHandle{std::move(rf)}, m_Loop{loop}, m_Gather{128}
   {
-    if (handle)
-      handle->close();
-    handle = loop.resource<uvw::UDPHandle>();
-    handle->on<uvw::UDPDataEvent>([this](auto& event, auto& /*handle*/) {
-      on_recv(
-          *this,
-          SockAddr{event.sender.ip, huint16_t{static_cast<uint16_t>(event.sender.port)}},
-          OwnedBuffer{reinterpret_cast<const byte_t*>(event.data.get()), event.length});
-    });
-  }
-
-  llarp::uv::UDPHandle::UDPHandle(uvw::Loop& loop, ReceiveFunc rf) : llarp::UDPHandle{std::move(rf)}
-  {
-    reset_handle(loop);
+    loop.add_closer([this]() { close(); });
+    reset_handle(loop.num_worker_threads());
   }
 
   bool
   UDPHandle::listen(const SockAddr& addr)
   {
-    if (handle->active())
-      reset_handle(handle->loop());
+    int fd = ::socket(addr.Family(), SOCK_DGRAM, IPPROTO_UDP);
+    if (fd < 0)
+      return false;
+    if (::bind(fd, addr.operator const sockaddr*(), addr.sockaddr_len()) == -1)
+      return false;
 
-    auto err = handle->on<uvw::ErrorEvent>([addr](auto& event, auto&) {
-      throw llarp::util::bind_socket_error{
-          fmt::format("failed to bind udp socket on {}: {}", addr, event.what())};
-    });
-    handle->bind(*static_cast<const sockaddr*>(addr));
-    handle->recv();
-    handle->erase(err);
+    const timeval timeout{
+        .tv_sec = 0,
+        .tv_usec = 100 * 1000,
+    };
+
+    if (::setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) == -1)
+      return false;
+
+    m_FD = std::make_unique<util::FD>(fd);
+    m_LocalAddr = addr;
     return true;
-  }
-
-  bool
-  UDPHandle::send(const SockAddr& to, const llarp_buffer_t& buf)
-  {
-    return handle->trySend(
-               *static_cast<const sockaddr*>(to),
-               const_cast<char*>(reinterpret_cast<const char*>(buf.base)),
-               buf.sz)
-        >= 0;
   }
 
   void
   UDPHandle::close()
   {
-    handle->close();
-    handle.reset();
+    // stop reading
+    m_Gather.disable();
+    log::debug(logcat, "UDPHandle close(): disable m_Gather");
+    // clear fd
+    m_FD.reset();
+    log::debug(logcat, "UDPHandle close(): m_FD closed");
+    // join reader threads
+    size_t joined{};
+    for (auto& th : m_ReaderThreads)
+    {
+      if (th.joinable())
+      {
+        joined++;
+        log::debug(logcat, "UDPHandle close(): join {}/{}", joined, m_ReaderThreads.size());
+        th.join();
+      }
+    }
+    log::debug(logcat, "UDPHandle close(): joined {}/{} threads", joined, m_ReaderThreads.size());
+    m_ReaderThreads.clear();
+    log::debug(logcat, "UDPHandle close(): m_ReadThreads.clear() complete");
   }
 
   UDPHandle::~UDPHandle()
   {
-    close();
+    m_Gather.disable();
+    m_FD.reset();
+    for (auto& th : m_ReaderThreads)
+    {
+      if (th.joinable())
+        th.join();
+    }
   }
 
   std::shared_ptr<llarp::EventLoopWakeup>
@@ -423,7 +631,6 @@ namespace llarp::uv
   {
     using Queue_t = llarp::thread::Queue<std::function<void(void)>>;
     llarp::util::SetThreadName("llarpd-worker");
-    LogInfo("Worker started");
     auto* queue = reinterpret_cast<Queue_t*>(arg);
     while (queue->enabled())
     {
@@ -431,7 +638,6 @@ namespace llarp::uv
       if (maybe)
         maybe.value()();
     }
-    LogInfo("Worker ended");
   }
 
   void

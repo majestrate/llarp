@@ -18,10 +18,12 @@ namespace llarp::uv
 {
   class UVWakeup;
   class UVRepeater;
+  class UDPHandle;
 
   class Loop : public llarp::EventLoop
   {
    public:
+    friend UDPHandle;
     using Callback = std::function<void()>;
 
     Loop(size_t queue_size, size_t worker_num_threads);
@@ -88,9 +90,15 @@ namespace llarp::uv
     size_t
     num_worker_threads() const override;
 
+    void
+    add_closer(std::function<void(void)> f);
+
    protected:
     std::shared_ptr<uvw::Loop> m_Impl;
     std::optional<std::thread::id> m_EventLoopThreadID;
+
+    void
+    io_cycle_complete();
 
    private:
     std::shared_ptr<uvw::AsyncHandle> m_WakeUp;
@@ -101,6 +109,7 @@ namespace llarp::uv
     AtomicQueue_t m_WorkCalls;
     std::unique_ptr<std::thread> m_DiskThread;
     std::vector<std::thread> m_WorkThreads;
+    std::vector<std::function<void()>> m_closers, m_tickers;
 
 #ifdef LOKINET_DEBUG
     uint64_t last_time;

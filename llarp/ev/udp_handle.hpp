@@ -27,7 +27,7 @@ namespace llarp
     // Returns the file descriptor of the socket, if available.  This generally exists only after
     // listen() has been called, and never exists on Windows.
     virtual std::optional<int>
-    file_descriptor()
+    file_descriptor() const
     {
       return std::nullopt;
     }
