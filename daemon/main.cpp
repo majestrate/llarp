@@ -297,7 +297,7 @@ namespace
         exit_code.set_value(1);
         return;
       }
-      llarp::util::SetThreadName("llarpd-mainloop");
+      llarp::util::SetThreadName("llarp-state");
 
       auto result = ctx->Run(opts);
       exit_code.set_value(result);

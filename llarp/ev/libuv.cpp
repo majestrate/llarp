@@ -655,7 +655,7 @@ namespace llarp::uv
   run_disk_thread(void* arg)
   {
     using Queue_t = llarp::thread::Queue<std::function<void(void)>>;
-    llarp::util::SetThreadName("llarpd-disk");
+    llarp::util::SetThreadName("llarp-disk");
     LogInfo("Disk worker started");
     auto* queue = reinterpret_cast<Queue_t*>(arg);
     while (queue->enabled())
