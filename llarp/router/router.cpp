@@ -324,6 +324,13 @@ namespace llarp
       _onDown();
     log::debug(logcat, "stopping mainloop");
     _loop->stop();
+    if (m_LinkHasher)
+    {
+      m_LinkHasher->stop();
+    }
+    m_LinkHasher.reset();
+    m_LinkWorker.reset();
+
     _running.store(false);
   }
 
@@ -1111,6 +1118,8 @@ namespace llarp
 
       if (m_LinkWorker)
         m_LinkWorker->Start(num_threads);
+      if (m_LinkHasher)
+        m_LinkHasher->start(num_threads);
     }
     LogInfo("starting hidden service context...");
     if (!hiddenServiceContext().StartAll())
@@ -1448,6 +1457,8 @@ namespace llarp
       _linkManager.AddLink(std::move(server), true);
       if (m_LinkWorker == nullptr)
         m_LinkWorker.reset(new iwp::Worker{});
+      if (m_LinkHasher == nullptr)
+        m_LinkHasher.reset(new iwp::Hasher{_loop});
     }
   }
 
@@ -1503,6 +1514,8 @@ namespace llarp
       _linkManager.AddLink(std::move(link), false);
       if (m_LinkWorker == nullptr)
         m_LinkWorker.reset(new iwp::Worker{});
+      if (m_LinkHasher == nullptr)
+        m_LinkHasher.reset(new iwp::Hasher{_loop});
     }
   }
 

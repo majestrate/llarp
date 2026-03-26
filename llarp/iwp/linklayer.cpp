@@ -35,66 +35,7 @@ namespace llarp::iwp
         m_CollectHash.clear();
       })}
       , m_Inbound{allowInbound}
-  {
-    m_Hasher.start(
-        ev->num_worker_threads(), ev->make_waker([this]() { HandleWorkerCompletion(); }));
-  }
-
-  void
-  LinkLayer::HandleWorkerCompletion()
-  {
-    log::debug(logcat, "handle worker completion");
-    std::unordered_map<SockAddr, std::vector<OutboundMessage>> hashed;
-    std::unordered_map<SockAddr, std::vector<uint64_t>> verified;
-    std::unordered_map<SockAddr, std::vector<uint64_t>> drop;
-    for (const auto& result : m_Hasher.poll_verified())
-    {
-      if (result.result)
-        verified[result.from].emplace_back(result.msgid);
-      else
-        drop[result.from].emplace_back(result.msgid);
-    }
-    for (auto& result : m_Hasher.poll_hashed())
-    {
-      hashed[result.to].emplace_back(std::move(result.msg));
-    }
-    std::unordered_set<std::shared_ptr<Session>, SessionAddrHash> should_pump;
-    for (auto& [addr, msgs] : hashed)
-    {
-      if (auto session = SessionForAddr(addr))
-      {
-        session->RecvHashed(std::move(msgs));
-        should_pump.emplace(session);
-      }
-    }
-    std::unordered_set<std::shared_ptr<Session>, SessionAddrHash> send_flush;
-    for (const auto& [addr, msgids] : verified)
-    {
-      if (auto session = SessionForAddr(addr))
-      {
-        send_flush.emplace(session);
-        should_pump.emplace(session);
-        for (auto msgid : msgids)
-          session->VerifiedMessage(msgid);
-      }
-    }
-    for (const auto& session : send_flush)
-    {
-      session->SendMACK();
-    }
-    for (const auto& [addr, msgids] : drop)
-    {
-      if (auto session = SessionForAddr(addr))
-      {
-        for (auto msgid : msgids)
-          session->DropMessage(msgid);
-      }
-    }
-    for (const auto& session : should_pump)
-    {
-      session->Pump();
-    }
-  }
+  {}
 
   std::shared_ptr<Session>
   LinkLayer::SessionForAddr(const SockAddr& addr) const
@@ -136,8 +77,12 @@ namespace llarp::iwp
   }
 
   LinkLayer::~LinkLayer()
+  {}
+
+  Hasher*
+  LinkLayer::hasher()
   {
-    m_Hasher.stop();
+    return Router()->linkHasher().get();
   }
 
   void

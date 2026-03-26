@@ -236,7 +236,7 @@ namespace llarp::iwp
     if (msgs.empty())
       return;
 
-    m_Parent->hasher()->async_hash_many(m_RemoteAddr, std::move(msgs));
+    m_Parent->hasher()->async_hash_many(weak_from_this(), std::move(msgs));
 
     m_ToHash.clear();
   }
@@ -1024,7 +1024,7 @@ namespace llarp::iwp
     {
       log::debug(logcat, "message {} is completed", itr->first);
       m_PendingHash.emplace(itr->first);
-      m_Parent->hasher()->async_verify_hash(itr->second, m_RemoteAddr);
+      m_Parent->hasher()->async_verify_hash(itr->second, weak_from_this());
     }
     else
       log::debug(logcat, "message {} is not completed", itr->first);

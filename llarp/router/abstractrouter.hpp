@@ -62,7 +62,8 @@ namespace llarp
   namespace iwp
   {
     class Worker;
-  }
+    struct Hasher;
+  }  // namespace iwp
 
   namespace path
   {
@@ -152,6 +153,9 @@ namespace llarp
 
     virtual Profiling&
     routerProfiling() = 0;
+
+    virtual const std::unique_ptr<iwp::Hasher>&
+    linkHasher() = 0;
 
     virtual const EventLoop_ptr&
     loop() const = 0;

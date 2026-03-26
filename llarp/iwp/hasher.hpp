@@ -8,13 +8,17 @@
 #include <vector>
 namespace llarp::iwp
 {
+
+  struct Session;
+
   struct Hasher
   {
     struct VerifyRequest
     {
       InboundMessage msg;
-      SockAddr from;
-      inline bool
+      std::weak_ptr<Session> session;
+
+      bool
       Verify() const
       {
         return msg.Verify();
@@ -23,10 +27,11 @@ namespace llarp::iwp
 
     struct VerifyResult
     {
-      SockAddr from;
+      std::weak_ptr<Session> session;
       uint64_t msgid;
       bool result;
-      inline bool
+
+      bool
       operator<(const VerifyResult& other) const
       {
         return msgid < other.msgid;
@@ -36,19 +41,20 @@ namespace llarp::iwp
     struct HashedMessage
     {
       OutboundMessage msg;
-      SockAddr to;
-      inline const byte_t*
+      std::weak_ptr<Session> session;
+
+      const byte_t*
       data() const
       {
         return msg.data();
       }
-      inline size_t
+      size_t
       size() const
       {
         return msg.size();
       }
 
-      inline bool
+      bool
       operator<(const HashedMessage& other) const
       {
         return msg.m_MsgID < other.msg.m_MsgID;
@@ -62,16 +68,18 @@ namespace llarp::iwp
     static ShortHash&
     GetOutboundMessageHash(HashedMessage& msg);
 
-    llarp::thread::Queue<VerifyRequest> m_VerifyHash{1024};
-    llarp::thread::Queue<VerifyResult> m_ProcessVerified{1024};
+    thread::Queue<VerifyRequest> m_VerifyHash{128};
+    thread::Queue<VerifyResult> m_ProcessVerified{128};
     std::vector<std::thread> m_Threads;
     util::MultithreadedHasher<HashedMessage, ShortHash> m_Hasher{
-        Hasher::HashOutboundMessage, Hasher::GetOutboundMessageHash};
+        HashOutboundMessage, GetOutboundMessageHash};
     std::shared_ptr<EventLoopWakeup> m_Waker;
 
    public:
+    explicit Hasher(EventLoop_ptr ev);
+
     void
-    start(size_t N_threads, std::shared_ptr<EventLoopWakeup> waker);
+    start(size_t N_threads);
 
     void
     stop();
@@ -86,10 +94,10 @@ namespace llarp::iwp
     poll_hashed();
 
     void
-    async_verify_hash(const InboundMessage& msg, const SockAddr& from);
+    async_verify_hash(const InboundMessage& msg, std::weak_ptr<Session> session);
 
     void
-    async_hash_many(const SockAddr& to, std::vector<OutboundMessage> msgs);
+    async_hash_many(std::weak_ptr<Session> sess, std::vector<OutboundMessage> msgs);
   };
 
 }  // namespace llarp::iwp

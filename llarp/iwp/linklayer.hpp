@@ -54,20 +54,10 @@ namespace llarp::iwp
     PrintableName() const;
 
     Hasher*
-    hasher()
-    {
-      return &m_Hasher;
-    }
+    hasher();
 
     void
     TriggerHashing(std::shared_ptr<Session> s);
-
-   private:
-    void
-    HandleWakeupPlaintext();
-
-    void
-    HandleWorkerCompletion();
 
     struct SessionAddrHash
     {
@@ -81,11 +71,13 @@ namespace llarp::iwp
       }
     };
 
+   private:
+    void
+    HandleWakeupPlaintext();
+
     const std::shared_ptr<EventLoopWakeup> m_Wakeup, m_HashingWakeup;
     std::vector<ILinkSession*> m_WakingUp;
     std::unordered_set<std::shared_ptr<Session>, SessionAddrHash> m_CollectHash;
-
-    Hasher m_Hasher;
 
     const bool m_Inbound;
 

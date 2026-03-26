@@ -65,11 +65,17 @@ namespace llarp
     std::unique_ptr<EventLoopWork> m_CurrentEvLoopWork;
     std::shared_ptr<EventLoopWakeup> m_LoopWorkPumper;
     std::unique_ptr<iwp::Worker> m_LinkWorker;
+    std::unique_ptr<iwp::Hasher> m_LinkHasher;
 
     const std::unique_ptr<iwp::Worker>&
     linkWorker() const override
     {
       return m_LinkWorker;
+    }
+    const std::unique_ptr<iwp::Hasher>&
+    linkHasher() override
+    {
+      return m_LinkHasher;
     }
 
     path::BuildLimiter&

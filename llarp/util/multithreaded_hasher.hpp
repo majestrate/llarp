@@ -19,8 +19,7 @@ namespace llarp::util
 #endif
 
     template <typename T>
-    concept is_hashbuffer_compatible =
-        std::is_move_constructible_v<T> and std::is_copy_constructible_v<T>;
+    concept is_hashbuffer_compatible = std::is_move_constructible_v<T>;
   };  // namespace
 
   template <
@@ -35,13 +34,13 @@ namespace llarp::util
     {
       T buf;
 
-      inline const uint8_t*
+      const uint8_t*
       data() const
       {
         return buf.data();
       }
 
-      inline size_t
+      size_t
       size() const
       {
         return buf.size();
@@ -103,8 +102,8 @@ namespace llarp::util
     {}
 
    private:
-    llarp::thread::Queue<HashedBuffer> m_IngestData{128};
-    llarp::thread::Queue<T> m_HashedData{1024};
+    thread::Queue<HashedBuffer> m_IngestData{128};
+    thread::Queue<T> m_HashedData{128};
     std::vector<std::thread> m_Threads;
     const HashFunc_t m_HashFunc;
     std::function<void(void)> m_Notify;
@@ -113,7 +112,7 @@ namespace llarp::util
     void
     run_thread_worker()
     {
-      llarp::util::SetThreadName("llarpd-hasher");
+      SetThreadName("llarp-hasher");
       do
       {
         auto maybe = m_IngestData.popFrontWithTimeout(50ms);
