@@ -118,7 +118,7 @@ namespace llarp::net
   /// an Packet
   struct IPPacket
   {
-    static constexpr size_t _max_size = 1500;
+    static constexpr size_t _max_size = 1800;
     llarp_time_t timestamp;
     std::vector<byte_t> _buf;
 

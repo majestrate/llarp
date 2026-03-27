@@ -33,6 +33,7 @@ namespace llarp::vpn
   {
     std::string ifname;
     unsigned int index;
+    uint16_t mtu{net::IPPacket::MaxSize};
     std::vector<InterfaceAddress> addrs;
 
     /// get address number N
