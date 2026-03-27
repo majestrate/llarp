@@ -851,7 +851,7 @@ namespace llarp::io_uring
     for (size_t idx = 0; idx < worker_threads; ++idx)
     {
       auto t = std::make_shared<std::thread>(
-          [queue = &m_WorkCalls]() { run_thread_worker(queue, "llarpd-worker"); });
+          [queue = &m_WorkCalls]() { run_thread_worker(queue, "llarp-worker"); });
       m_WorkerThreads.push_back(t);
     }
     m_DiskThread = std::make_shared<std::thread>(

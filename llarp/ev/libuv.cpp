@@ -630,7 +630,7 @@ namespace llarp::uv
   run_worker_thread(void* arg)
   {
     using Queue_t = llarp::thread::Queue<std::function<void(void)>>;
-    llarp::util::SetThreadName("llarpd-worker");
+    llarp::util::SetThreadName("llarp-worker");
     auto* queue = reinterpret_cast<Queue_t*>(arg);
     while (queue->enabled())
     {
