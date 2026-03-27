@@ -11,7 +11,7 @@ RUN mkdir -p llarp/build && cd llarp && cmake -B build -S . -DNATIVE_BUILD=OFF -
 FROM debian:stable-slim
 
 RUN apt update -q -y && apt upgrade -q -y
-RUN apt install -q -y libuv1-dev libsodium-dev nettle-dev libevent-dev libunbound-dev
+RUN apt install -q -y libuv1-dev libsodium-dev nettle-dev libevent-dev libunbound-dev libjemalloc-dev
 RUN mkdir -p /var/lib/llarpd/
 RUN mkdir -p /data/
 COPY ./contrib/docker/entrypoint.sh /entrypoint.sh
