@@ -24,8 +24,6 @@ if(SUBMODULE_CHECK)
     endfunction ()
 
     message(STATUS "Checking submodules")
-    check_submodule(ghc-filesystem)
-    check_submodule(pybind11)
     check_submodule(oxen-encoding)
     check_submodule(uvw)
     check_submodule(CLI11)
@@ -57,15 +55,15 @@ macro(system_or_submodule BIGNAME smallname pkgconf subdir)
 endmacro()
 
 
-system_or_submodule(FMT fmt libfmt=10.2.1 fmt)
-system_or_submodule(SPDLOG spdlog libspdlog=1.14.1 spdlog)
-system_or_submodule(OXENC oxenc liboxenc>=1.0.4 oxen-encoding)
+system_or_submodule(FMT fmt libfmt>=12.1.0 fmt)
+system_or_submodule(SPDLOG spdlog libspdlog>=1.17.0 spdlog)
+system_or_submodule(OXENC oxenc liboxenc>=1.1.0 oxen-encoding)
 
 if(WITH_HIVE)
   add_subdirectory(pybind11 EXCLUDE_FROM_ALL)
 endif()
 
-system_or_submodule(CLI11 CLI11 CLI11>=2.2.0 CLI11)
+system_or_submodule(CLI11 CLI11 CLI11>=2.6.2 CLI11)
 
 if(WITH_LIBUV)
   set(USE_LIBCPP OFF CACHE INTERNAL "")
