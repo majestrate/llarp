@@ -74,6 +74,41 @@ namespace llarp
       t.data()[0] = 0xfc;
   }
 
+  template <typename T>
+    requires is_aligned_buffer<T> or is_std_array<T>
+  size_t
+  overhead_for(const T& t) noexcept
+  {
+    if (::sodium_is_zero(t.data(), t.size()))
+      return 0;
+    // bencode overhead.
+    return std::floor(std::log10(t.size())) + 1 + 1 + t.size();
+  }
+
+  template <typename Int_t>
+    requires std::is_integral_v<Int_t> and std::is_unsigned_v<Int_t>
+  size_t
+  overhead_for(const Int_t& i) noexcept
+  {
+    // bencode overhead
+    if (i == 0)
+      return 1 + 2;
+    return std::floor(std::log10(i)) + 1 + 2;
+  }
+
+  namespace routing
+  {
+    struct IMessage;
+  }
+
+  template <typename Msg_t>
+    requires std::is_base_of_v<routing::IMessage, Msg_t>
+  size_t
+  overhead_for(const Msg_t& msg) noexcept
+  {
+    return msg.overhead();
+  }
+
 }  // namespace llarp
 
 namespace fmt

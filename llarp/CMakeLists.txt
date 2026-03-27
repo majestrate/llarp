@@ -244,6 +244,7 @@ add_library(lokinet-layer-routing
   routing/path_latency_message.cpp
   routing/path_transfer_message.cpp
   routing/transfer_traffic_message.cpp
+  routing/message.cpp
 )
 
 # kitchen sink to be removed after refactor

@@ -52,6 +52,9 @@ namespace llarp
       bool
       BEncode(llarp_buffer_t* buf) const;
 
+      bool
+      BDecode(llarp_buffer_t* buf);
+
       void
       PutBuffer(const llarp_buffer_t& payload);
 
@@ -76,6 +79,9 @@ namespace llarp
       Signature Z{};
       PathID_t F{};
       ConvoTag T{};
+
+      size_t
+      overhead() const noexcept override;
 
       ProtocolFrame(const ProtocolFrame& other)
           : IMessage{}
@@ -115,6 +121,12 @@ namespace llarp
           const ProtocolMessage& msg, const SharedSecret& sharedkey, const Identity& localIdent);
 
       bool
+      EncryptAndSign(
+          std::deque<ProtocolMessage>& msgs,
+          const SharedSecret& sharedkey,
+          const Identity& localIdent);
+
+      bool
       Sign(const Identity& localIdent);
 
       bool
@@ -126,7 +138,7 @@ namespace llarp
           std::function<void(std::shared_ptr<ProtocolMessage>)> hook = nullptr) const;
 
       bool
-      DecryptPayloadInto(const SharedSecret& sharedkey, ProtocolMessage& into) const;
+      DecryptPayloadInto(const SharedSecret& sharedkey, std::vector<ProtocolMessage>& into) const;
 
       bool
       DecodeKey(const llarp_buffer_t& key, llarp_buffer_t* val) override;
@@ -159,5 +171,9 @@ namespace llarp
       bool
       HandleMessage(routing::IMessageHandler* h, AbstractRouter* r) const override;
     };
+
   }  // namespace service
+
+  template <>
+  constexpr inline bool is_aligned_buffer<service::ProtocolFrame::Encrypted_t> = true;
 }  // namespace llarp

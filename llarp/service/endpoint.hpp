@@ -62,6 +62,8 @@ namespace llarp
                       public IDataHandler,
                       public EndpointBase
     {
+      friend SendContext;
+
       Endpoint(AbstractRouter* r, Context* parent);
       ~Endpoint() override;
 
@@ -576,7 +578,11 @@ namespace llarp
       util::DecayingHashSet<Address> m_IntrosetLookupFilter;
 
      private:
-      std::shared_ptr<EventLoopWakeup> m_RecvQueueFlusher;
+      void
+      FlushPendingTraffic();
+
+      std::shared_ptr<EventLoopWakeup> m_RecvQueueFlusher, m_TrafficFlusher, m_PumpFlusher;
+      OverheadStats m_Overhead{};
     };
 
     using Endpoint_ptr = std::shared_ptr<Endpoint>;

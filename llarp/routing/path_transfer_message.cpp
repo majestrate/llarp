@@ -55,5 +55,11 @@ namespace llarp
       return h->HandlePathTransferMessage(*this, r);
     }
 
+    size_t
+    PathTransferMessage::overhead() const noexcept
+    {
+      return IMessage::overhead() + overhead_for(P) + overhead_for(T) + overhead_for(Y);
+    }
+
   }  // namespace routing
 }  // namespace llarp

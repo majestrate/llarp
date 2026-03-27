@@ -80,6 +80,8 @@ namespace llarp
       // this will make it so that there is less of a chance for timing races
       sendTimeout += parent->PathAlignmentTimeout();
       connectTimeout += parent->PathAlignmentTimeout();
+
+      m_Wakeup = m_Endpoint->Router()->loop()->make_waker([this]() { SendPacketsToRemote(); });
     }
 
     OutboundContext::~OutboundContext() = default;
@@ -636,13 +638,17 @@ namespace llarp
         SharedSecret sessionKey{};
         if (m_DataHandler->GetCachedSessionKeyFor(frame.T, sessionKey))
         {
-          ProtocolMessage msg{};
-          if (frame.DecryptPayloadInto(sessionKey, msg))
+          std::vector<ProtocolMessage> msgs{};
+          if (frame.DecryptPayloadInto(sessionKey, msgs))
           {
-            if (msg.proto == ProtocolType::Auth and not msg.payload.empty())
+            for (const auto& msg : msgs)
             {
-              result.reason = std::string{
-                  reinterpret_cast<const char*>(msg.payload.data()), msg.payload.size()};
+              if (msg.proto == ProtocolType::Auth and not msg.payload.empty())
+              {
+                result.reason = std::string{
+                    reinterpret_cast<const char*>(msg.payload.data()), msg.payload.size()};
+                break;
+              }
             }
           }
         }
@@ -675,7 +681,7 @@ namespace llarp
       {
         // send reset convo tag message
         LogError("failed to decrypt and verify frame");
-        ProtocolFrame f;
+        ProtocolFrame f{};
         f.R = 1;
         f.T = frame.T;
         f.F = p->intro.pathID;
@@ -694,7 +700,17 @@ namespace llarp
     void
     OutboundContext::SendPacketToRemote(const llarp_buffer_t& buf, service::ProtocolType t)
     {
-      AsyncEncryptAndSendTo(buf, t);
+      m_WriteQueues[t].emplace_back(buf.copy());
+      m_Wakeup->Trigger();
+    }
+
+    void
+    OutboundContext::SendPacketsToRemote()
+    {
+      for (auto& [t, pkts] : m_WriteQueues)
+        AsyncEncryptAndSendTo(std::move(pkts), t);
+
+      m_WriteQueues.clear();
     }
 
   }  // namespace service

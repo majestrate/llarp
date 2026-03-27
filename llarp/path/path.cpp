@@ -637,6 +637,8 @@ namespace llarp
           r->TriggerPump();
           m_LastRecvMessage = r->Now();
         }
+        else
+          DumpBuffer(buf);
       }
     }
 

@@ -13,6 +13,8 @@ namespace llarp
 {
   namespace service
   {
+    static auto logcat = log::Cat("hsproto");
+
     ProtocolMessage::ProtocolMessage()
     {
       tag.Zero();
@@ -34,8 +36,23 @@ namespace llarp
     ProtocolMessage::ProcessAsync(
         path::Path_ptr path, PathID_t from, std::shared_ptr<ProtocolMessage> self)
     {
+      if (self == nullptr or self->handler == nullptr)
+      {
+        log::error(
+            logcat,
+            "invalid message path={} handler={}",
+            self != nullptr,
+            self->handler != nullptr);
+        return;
+      }
       if (!self->handler->HandleDataMessage(path, from, self))
         LogWarn("failed to handle data message from ", path->Name());
+    }
+
+    bool
+    ProtocolMessage::BDecode(llarp_buffer_t* buf)
+    {
+      return bencode_decode_dict(*this, buf);
     }
 
     bool
@@ -200,7 +217,8 @@ namespace llarp
     }
 
     bool
-    ProtocolFrame::DecryptPayloadInto(const SharedSecret& sharedkey, ProtocolMessage& msg) const
+    ProtocolFrame::DecryptPayloadInto(
+        const SharedSecret& sharedkey, std::vector<ProtocolMessage>& msgs) const
     {
       Encrypted_t tmp = D;
       auto buf = tmp.Buffer();
@@ -209,7 +227,14 @@ namespace llarp
       static_assert(decltype(N)::SIZE == n.size());
       std::copy_n(N.begin(), n.size(), n.begin());
       CryptoManager::instance()->xchacha20(*buf, sharedkey, n);
-      return bencode_decode_dict(msg, buf);
+      if (buf->base[0] == 'd')
+      {
+        auto& msg = msgs.emplace_back();
+        return bencode_decode_dict(msg, buf);
+      }
+      if (buf->base[0] == 'l')
+        return BEncodeReadList(msgs, buf);
+      return false;
     }
 
     bool
@@ -278,11 +303,76 @@ namespace llarp
       return true;
     }
 
+    bool
+    ProtocolFrame::EncryptAndSign(
+        std::deque<ProtocolMessage>& msgs,
+        const SharedSecret& sessionKey,
+        const Identity& localIdent)
+    {
+      {
+        std::array<byte_t, constants::service_proto_message_max_size> tmp{};
+        llarp_buffer_t buf(tmp);
+        if (not bencode_start_list(&buf))
+          return false;
+        for (size_t idx{}; idx < msgs.size(); ++idx)
+        {
+          auto& msg = msgs[idx];
+          // encode message
+          auto* cur = buf.cur;
+          if (not msg.BEncode(&buf))
+          {
+            // too big, stop here.
+            buf.cur = cur;
+            break;
+          }
+          msgs.pop_front();
+        }
+        if (not bencode_end(&buf))
+          return false;
+        // rewind
+        buf.sz = buf.cur - buf.base;
+        buf.cur = buf.base;
+        // encrypt
+        {
+          TunnelNonce n{};
+          MemWipe{&n};
+          static_assert(decltype(N)::SIZE == n.size());
+          std::copy_n(N.begin(), n.size(), n.begin());
+          CryptoManager::instance()->xchacha20(buf, sessionKey, n);
+        }
+        // put encrypted buffer
+        D = buf;
+        // zero out signature
+        Z.Zero();
+      }
+      {
+        std::array<uint8_t, constants::service_proto_frame_max_size> tmp{};
+        llarp_buffer_t buf(tmp);
+        // encode frame
+        if (!BEncode(&buf))
+        {
+          LogError("frame too big to encode");
+          DumpBuffer(buf);
+          return false;
+        }
+        // rewind
+        buf.sz = buf.cur - buf.base;
+        buf.cur = buf.base;
+        // sign
+        if (!localIdent.Sign(Z, buf))
+        {
+          LogError("failed to sign? wtf?!");
+          return false;
+        }
+      }
+      return true;
+    }
+
     struct AsyncFrameDecrypt
     {
       path::Path_ptr path;
       EventLoop_ptr loop;
-      std::shared_ptr<ProtocolMessage> msg;
+      std::vector<ProtocolMessage> msgs;
       const Identity& m_LocalIdentity;
       Endpoint* handler;
       const ProtocolFrame frame;
@@ -292,11 +382,9 @@ namespace llarp
           EventLoop_ptr l,
           const Identity& localIdent,
           Endpoint* h,
-          std::shared_ptr<ProtocolMessage> m,
           const ProtocolFrame& f,
           const Introduction& recvIntro)
           : loop(std::move(l))
-          , msg(std::move(m))
           , m_LocalIdentity(localIdent)
           , handler(h)
           , frame(f)
@@ -314,7 +402,6 @@ namespace llarp
         if (!crypto->pqe_decrypt(self->frame.C, K, pq_keypair_to_secret(self->m_LocalIdentity.pq)))
         {
           LogError("pqke failed C=", self->frame.C);
-          self->msg.reset();
           return;
         }
         // decrypt
@@ -326,88 +413,99 @@ namespace llarp
           std::copy_n(self->frame.N.begin(), n.size(), n.begin());
           crypto->xchacha20(*buf, K, n);
         }
-        if (!bencode_decode_dict(*self->msg, buf))
+        if (buf->cur[0] == 'd')
         {
-          LogError("failed to decode inner protocol message");
-          DumpBuffer(*buf);
-          self->msg.reset();
-          return;
+          auto& msg = self->msgs.emplace_back();
+          if (not bencode_decode_dict(msg, buf))
+            return;
         }
+        else if (buf->cur[0] == 'l')
+        {
+          if (not BEncodeReadList(self->msgs, buf))
+            return;
+        }
+        else
+          return;
+
+        const auto& sender = self->msgs[0].sender;
         // verify signature of outer message after we parsed the inner message
-        if (!self->frame.Verify(self->msg->sender))
+        if (!self->frame.Verify(sender))
         {
           LogError(
               "intro frame has invalid signature Z=",
               self->frame.Z,
               " from ",
-              self->msg->sender.Addr().ToString());
-          self->msg.reset();
+              sender.Addr().ToString());
           return;
         }
-
-        if (self->handler->HasConvoTag(self->msg->tag))
+        // KEX
         {
-          LogError("dropping duplicate convo tag T=", self->msg->tag);
-          // TODO: send convotag reset
-          self->msg.reset();
-          return;
+          const auto& msg = self->msgs[0];
+          if (self->handler->HasConvoTag(msg.tag))
+          {
+            LogError("dropping duplicate convo tag T=", msg.tag);
+            return;
+          }
+
+          // PKE (A, B, N)
+          SharedSecret sharedSecret;
+          path_dh_func dh_server = util::memFn(&Crypto::dh_server, CryptoManager::instance());
+
+          if (not self->m_LocalIdentity.KeyExchange(dh_server, sharedSecret, sender, self->frame.N))
+          {
+            LogError("x25519 key exchange failed");
+            return;
+          }
+          std::array<byte_t, 64> tmp{};
+          MemWipe{&tmp};
+          // K
+          std::copy(K.begin(), K.end(), tmp.begin());
+          // S = HS( K + PKE( A, B, N))
+          std::copy(sharedSecret.begin(), sharedSecret.end(), tmp.begin() + 32);
+          {
+            ShortHash h{};
+            MemWipe{&h};
+            static_assert(h.size() == sharedKey.size());
+            crypto->shorthash(h, llarp_buffer_t(tmp));
+            sharedKey = h.data();
+          }
         }
 
-        // PKE (A, B, N)
-        SharedSecret sharedSecret;
-        path_dh_func dh_server = util::memFn(&Crypto::dh_server, CryptoManager::instance());
-
-        if (!self->m_LocalIdentity.KeyExchange(
-                dh_server, sharedSecret, self->msg->sender, self->frame.N))
-        {
-          LogError("x25519 key exchange failed");
-          self->msg.reset();
-          return;
-        }
-        std::array<byte_t, 64> tmp{};
-        MemWipe{&tmp};
-        // K
-        std::copy(K.begin(), K.end(), tmp.begin());
-        // S = HS( K + PKE( A, B, N))
-        std::copy(sharedSecret.begin(), sharedSecret.end(), tmp.begin() + 32);
-        {
-          ShortHash h{};
-          MemWipe{&h};
-          static_assert(h.size() == sharedKey.size());
-          crypto->shorthash(h, llarp_buffer_t(tmp));
-          sharedKey = h.data();
-        }
-
-        std::shared_ptr<ProtocolMessage> msg = std::move(self->msg);
-        path::Path_ptr path = std::move(self->path);
         const PathID_t from = self->frame.F;
-        msg->handler = self->handler;
-        self->handler->AsyncProcessAuthMessage(
-            msg,
-            [path, msg, from, handler = self->handler, fromIntro = self->fromIntro, sharedKey](
-                AuthResult result) {
-              if (result.code == AuthResultCode::eAuthAccepted)
-              {
-                if (handler->WantsOutboundSession(msg->sender.Addr()))
+        for (auto& msg : self->msgs)
+        {
+          auto msg_ptr = std::make_shared<ProtocolMessage>(std::move(msg));
+          msg_ptr->handler = self->handler;
+          self->handler->AsyncProcessAuthMessage(
+              msg_ptr,
+              [path = self->path,
+               msg = msg_ptr,
+               from,
+               handler = self->handler,
+               fromIntro = self->fromIntro,
+               sharedKey](AuthResult result) {
+                if (result.code == AuthResultCode::eAuthAccepted)
                 {
-                  handler->PutSenderFor(msg->tag, msg->sender, false);
+                  if (handler->WantsOutboundSession(msg->sender.Addr()))
+                  {
+                    handler->PutSenderFor(msg->tag, msg->sender, false);
+                  }
+                  else
+                  {
+                    handler->PutSenderFor(msg->tag, msg->sender, true);
+                  }
+                  handler->PutReplyIntroFor(msg->tag, msg->introReply);
+                  handler->PutCachedSessionKeyFor(msg->tag, sharedKey);
+                  handler->SendAuthResult(path, from, msg->tag, result);
+                  LogInfo("auth okay for T=", msg->tag, " from ", msg->sender.Addr());
+                  ProtocolMessage::ProcessAsync(path, from, msg);
                 }
                 else
                 {
-                  handler->PutSenderFor(msg->tag, msg->sender, true);
+                  LogWarn("auth not okay for T=", msg->tag, ": ", result.reason);
                 }
-                handler->PutReplyIntroFor(msg->tag, msg->introReply);
-                handler->PutCachedSessionKeyFor(msg->tag, sharedKey);
-                handler->SendAuthResult(path, from, msg->tag, result);
-                LogInfo("auth okay for T=", msg->tag, " from ", msg->sender.Addr());
-                ProtocolMessage::ProcessAsync(path, from, msg);
-              }
-              else
-              {
-                LogWarn("auth not okay for T=", msg->tag, ": ", result.reason);
-              }
-              handler->Pump(time_now_ms());
-            });
+              });
+        }
       }
     };
 
@@ -441,13 +539,11 @@ namespace llarp
         Endpoint* handler,
         std::function<void(std::shared_ptr<ProtocolMessage>)> hook) const
     {
-      auto msg = std::make_shared<ProtocolMessage>();
-      msg->handler = handler;
       if (T.IsZero())
       {
         // we need to dh
-        auto dh = std::make_shared<AsyncFrameDecrypt>(
-            loop, localIdent, handler, msg, *this, recvPath->intro);
+        auto dh =
+            std::make_shared<AsyncFrameDecrypt>(loop, localIdent, handler, *this, recvPath->intro);
         dh->path = recvPath;
         handler->Router()->QueueWork([dh = std::move(dh)] { return AsyncFrameDecrypt::Work(dh); });
         return true;
@@ -484,32 +580,37 @@ namespace llarp
           loop->call([msg, hook]() { hook(msg); });
         }
       };
-      handler->Router()->QueueWork(
-          [v, msg = std::move(msg), recvPath = std::move(recvPath), callback, handler]() {
-            auto resetTag = [handler, tag = v->frame.T, from = v->frame.F, path = recvPath]() {
-              handler->ResetConvoTag(tag, path, from);
-            };
+      handler->Router()->QueueWork([v, recvPath = std::move(recvPath), callback, handler]() {
+        auto resetTag = [handler, tag = v->frame.T, from = v->frame.F, path = recvPath]() {
+          handler->ResetConvoTag(tag, path, from);
+        };
 
-            if (not v->frame.Verify(v->si))
-            {
-              LogError("Signature failure from ", v->si.Addr());
-              handler->Loop()->call_soon(resetTag);
-              return;
-            }
-            if (not v->frame.DecryptPayloadInto(v->shared, *msg))
-            {
-              LogError("failed to decrypt message from ", v->si.Addr());
-              handler->Loop()->call_soon(resetTag);
-              return;
-            }
-            callback(msg);
-            RecvDataEvent ev;
-            ev.fromPath = std::move(recvPath);
-            ev.pathid = v->frame.F;
-            auto* handler = msg->handler;
-            ev.msg = std::move(msg);
-            handler->QueueRecvData(std::move(ev));
-          });
+        if (not v->frame.Verify(v->si))
+        {
+          LogError("Signature failure from ", v->si.Addr());
+          handler->Loop()->call_soon(resetTag);
+          return;
+        }
+        std::vector<ProtocolMessage> msgs;
+        if (not v->frame.DecryptPayloadInto(v->shared, msgs))
+        {
+          LogError("failed to decrypt message from ", v->si.Addr());
+          handler->Loop()->call_soon(resetTag);
+          return;
+        }
+        for (auto& msg : msgs)
+        {
+          auto msg_ptr = std::make_shared<ProtocolMessage>(std::move(msg));
+          msg_ptr->handler = handler;
+          msg_ptr->tag = v->frame.T;
+          callback(msg_ptr);
+          RecvDataEvent ev;
+          ev.fromPath = recvPath;
+          ev.pathid = v->frame.F;
+          ev.msg = std::move(msg_ptr);
+          handler->QueueRecvData(std::move(ev));
+        }
+      });
       return true;
     }
 
@@ -518,6 +619,13 @@ namespace llarp
     {
       return C == other.C && D == other.D && N == other.N && Z == other.Z && T == other.T
           && S == other.S && version == other.version;
+    }
+
+    size_t
+    ProtocolFrame::overhead() const noexcept
+    {
+      return IMessage::overhead() + overhead_for(C) + overhead_for(R) + overhead_for(N)
+          + overhead_for(F) + overhead_for(T) + overhead_for(Z);
     }
 
     bool

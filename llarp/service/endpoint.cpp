@@ -56,7 +56,9 @@ namespace llarp::service
     m_state->m_Router = r;
     m_state->m_Name = "endpoint";
     m_RecvQueue.enable();
-    m_RecvQueueFlusher = r->loop()->make_waker([self = this]() { self->FlushRecvData(); });
+    m_RecvQueueFlusher = r->loop()->make_waker([this]() { FlushRecvData(); });
+    m_TrafficFlusher = r->loop()->make_waker([this]() { FlushPendingTraffic(); });
+    m_PumpFlusher = r->loop()->make_waker([this]() { Pump(Router()->Now()); });
   }
 
   bool
@@ -415,6 +417,25 @@ namespace llarp::service
         });
       }
     }
+    if (m_Overhead.ShouldReport())
+    {
+      m_Overhead.Report(Name());
+      m_Overhead.Clear();
+    }
+  }
+
+  void
+  OverheadStats::Report(std::string_view name) const
+  {
+    log::debug(logcat, "Overhead for {}: {:.2f}% ({} / {})", name, percent(), overhead, total);
+    last_report = llarp::time_now_ms();
+  }
+
+  bool
+  OverheadStats::ShouldReport() const
+  {
+    constexpr auto ReportInterval = 1s;
+    return last_report + ReportInterval <= llarp::time_now_ms();
   }
 
   bool
@@ -1178,9 +1199,12 @@ namespace llarp::service
     while (auto maybe = m_RecvQueue.tryPopFront())
     {
       auto& ev = *maybe;
+      if (not ev.msg)
+        continue;
+      if (not ev.fromPath)
+        continue;
       ProtocolMessage::ProcessAsync(ev.fromPath, ev.pathid, ev.msg);
     }
-    Pump(Now());
   }
 
   void
@@ -1258,6 +1282,7 @@ namespace llarp::service
         || msg->proto == ProtocolType::TrafficV4 || msg->proto == ProtocolType::TrafficV6)
     {
       m_InboundTrafficQueue.tryPushBack(std::move(msg));
+      m_PumpFlusher->Trigger();
       return true;
     }
     if (msg->proto == ProtocolType::Control)
@@ -1762,6 +1787,7 @@ namespace llarp::service
     {
       SendEvent_t item = m_SendQueue.popFront();
       item.first->S = item.second->NextSeqNo();
+      m_Overhead.RecordOverhead(*item.first);
       if (item.second->SendRoutingMessage(*item.first, Router()))
         ConvoTagTX(item.first->T.T);
     }
@@ -1897,6 +1923,115 @@ namespace llarp::service
     return false;
   }
 
+  void
+  Endpoint::FlushPendingTraffic()
+  {
+    std::unordered_set<Address> sent{};
+    for (auto& [remote, pkts] : m_state->m_PendingTraffic)
+    {
+      // sanity check.
+      if (not HasInboundConvo(remote))
+        continue;
+
+      sent.emplace(remote);
+
+      std::shared_ptr<path::Path> p;
+      ConvoTag tag{};
+      // the remote guy's intro
+      Introduction replyIntro{};
+      SharedSecret K{};
+      if (const auto maybe = GetBestConvoTagFor(remote))
+      {
+        tag = *maybe;
+      }
+      else
+        continue;
+
+      if (not GetCachedSessionKeyFor(tag, K))
+      {
+        LogError(Name(), " no cached key for inbound session from ", remote, " T=", tag);
+        continue;
+      }
+      if (not GetReplyIntroFor(tag, replyIntro))
+      {
+        LogError(Name(), "no reply intro for inbound session from ", remote, " T=", tag);
+        continue;
+      }
+      // get path for intro
+      p = GetPathByRouter(replyIntro.router);
+
+      if (not p)
+      {
+        LogWarn(
+            Name(),
+            " has no path for intro router ",
+            RouterID{replyIntro.router},
+            " for inbound convo T=",
+            tag);
+        continue;
+      }
+
+      bool fail{};
+      std::deque<ProtocolMessage> pending;
+      for (auto& pkt : pkts)
+      {
+        auto& msg = pending.emplace_back();
+        msg.PutBuffer(pkt.payload);
+        msg.proto = pkt.protocol;
+        msg.introReply = p->intro;
+        msg.sender = m_Identity.pub;
+        if (auto maybe = GetSeqNoForConvo(tag))
+        {
+          msg.seqno = *maybe;
+        }
+        else
+        {
+          LogWarn(Name(), " could not set sequence number, no session T=", tag);
+          fail = true;
+          break;
+        }
+      }
+
+      if (fail)
+        continue;
+
+      Router()->QueueWork(
+          [msgs = std::move(pending), p, K, replyIntro = replyIntro, tag = tag, this]() mutable {
+            size_t initial_sz = msgs.size();
+            size_t iters{};
+            while (not msgs.empty())
+            {
+              if (iters and msgs.size() == initial_sz)
+                return;
+              initial_sz = msgs.size();
+              ++iters;
+              auto transfer = std::make_shared<routing::PathTransferMessage>();
+              ProtocolFrame& f = transfer->T;
+              f.R = 0;
+
+              Randomize(f.N);
+              Zero(f.C);
+              f.R = 0;
+              Randomize(transfer->Y);
+              f.T = tag;
+              f.S = msgs[0].seqno;
+              f.F = p->intro.pathID;
+              transfer->P = replyIntro.pathID;
+              transfer->S = f.S;
+              if (not transfer->T.EncryptAndSign(msgs, K, m_Identity))
+              {
+                LogError("failed to encrypt and sign for session T=", transfer->T.T);
+              }
+              m_SendQueue.tryPushBack(SendEvent_t{transfer, p});
+              Router()->TriggerPump();
+            }
+          });
+    }
+
+    for (const auto& addr : sent)
+      m_state->m_PendingTraffic.erase(addr);
+  }
+
   bool
   Endpoint::SendToOrQueue(const Address& remote, const llarp_buffer_t& data, ProtocolType t)
   {
@@ -1910,84 +2045,11 @@ namespace llarp::service
     {
       // inbound conversation
       LogTrace("Have inbound convo");
-      auto transfer = std::make_shared<routing::PathTransferMessage>();
-      ProtocolFrame& f = transfer->T;
-      f.R = 0;
-      std::shared_ptr<path::Path> p;
-      if (const auto maybe = GetBestConvoTagFor(remote))
-      {
-        // the remote guy's intro
-        Introduction replyIntro;
-        SharedSecret K;
-        const auto tag = *maybe;
-
-        if (not GetCachedSessionKeyFor(tag, K))
-        {
-          LogError(Name(), " no cached key for inbound session from ", remote, " T=", tag);
-          return false;
-        }
-        if (not GetReplyIntroFor(tag, replyIntro))
-        {
-          LogError(Name(), "no reply intro for inbound session from ", remote, " T=", tag);
-          return false;
-        }
-        // get path for intro
-        auto p = GetPathByRouter(replyIntro.router);
-
-        if (not p)
-        {
-          LogWarn(
-              Name(),
-              " has no path for intro router ",
-              RouterID{replyIntro.router},
-              " for inbound convo T=",
-              tag);
-          return false;
-        }
-
-        f.T = tag;
-        // TODO: check expiration of our end
-        auto m = std::make_shared<ProtocolMessage>(f.T);
-        m->PutBuffer(data);
-        Randomize(f.N);
-        Zero(f.C);
-        f.R = 0;
-        Randomize(transfer->Y);
-        m->proto = t;
-        m->introReply = p->intro;
-        m->sender = m_Identity.pub;
-        if (auto maybe = GetSeqNoForConvo(f.T))
-        {
-          m->seqno = *maybe;
-        }
-        else
-        {
-          LogWarn(Name(), " could not set sequence number, no session T=", f.T);
-          return false;
-        }
-        f.S = m->seqno;
-        f.F = p->intro.pathID;
-        transfer->P = replyIntro.pathID;
-        Router()->QueueWork([transfer, p, m, K, this]() {
-          if (not transfer->T.EncryptAndSign(*m, K, m_Identity))
-          {
-            LogError("failed to encrypt and sign for sessionn T=", transfer->T.T);
-            return;
-          }
-          m_SendQueue.tryPushBack(SendEvent_t{transfer, p});
-          Router()->TriggerPump();
-        });
-        return true;
-      }
-      else
-      {
-        LogWarn(
-            Name(),
-            " SendToOrQueue on inbound convo from ",
-            remote,
-            " but get-best returned none; bug?");
-      }
+      m_state->m_PendingTraffic[remote].emplace_back(data, t);
+      m_TrafficFlusher->Trigger();
+      return true;
     }
+
     if (not WantsOutboundSession(remote))
     {
       LogWarn(
@@ -2007,7 +2069,7 @@ namespace llarp::service
       if (itr->second->ReadyToSend())
       {
         LogTrace("Found an outbound session to use to reach ", remote);
-        itr->second->AsyncEncryptAndSendTo(data, t);
+        itr->second->SendPacketToRemote(data, t);
         return true;
       }
     }
@@ -2022,7 +2084,7 @@ namespace llarp::service
           {
             for (auto& pending : m_state->m_PendingTraffic[addr])
             {
-              ctx->AsyncEncryptAndSendTo(pending.Buffer(), pending.protocol);
+              ctx->SendPacketToRemote(pending.Buffer(), pending.protocol);
             }
           }
           else

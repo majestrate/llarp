@@ -181,13 +181,14 @@ namespace llarp
   bool
   BEncodeWriteList(Iter itr, Iter end, llarp_buffer_t* buf)
   {
-    if (!bencode_start_list(buf))
+    if (not bencode_start_list(buf))
       return false;
     while (itr != end)
-      if (!itr->BEncode(buf))
+    {
+      if (not itr->BEncode(buf))
         return false;
-      else
-        ++itr;
+      ++itr;
+    }
     return bencode_end(buf);
   }
 
@@ -294,10 +295,9 @@ namespace llarp
         [&result](llarp_buffer_t* buffer, bool has) {
           if (has)
           {
-            if (!result.emplace(result.end())->BDecode(buffer))
-            {
+            auto& ent = result.emplace_back();
+            if (not ent.BDecode(buffer))
               return false;
-            }
           }
           return true;
         },

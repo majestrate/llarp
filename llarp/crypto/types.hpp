@@ -6,6 +6,7 @@
 #include <llarp/util/types.hpp>
 #include <llarp/util/formattable.hpp>
 #include <sodium/utils.h>
+#include <llarp/util/mem.hpp>
 
 namespace llarp
 {

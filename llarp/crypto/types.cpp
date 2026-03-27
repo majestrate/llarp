@@ -15,6 +15,14 @@
 
 namespace llarp
 {
+  size_t
+  overhead_for(const PQCipherBlock& block) noexcept
+  {
+    if (IsZero(block))
+      return 0;
+    return block.size() + 4 + 1;
+  }
+
   namespace
   {
     auto logcat = log::Cat("cryptography");

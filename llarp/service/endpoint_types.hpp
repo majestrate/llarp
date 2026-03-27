@@ -52,5 +52,39 @@ namespace llarp
 
     using LNSNameCache = std::unordered_map<std::string, std::pair<Address, llarp_time_t>>;
 
+    struct OverheadStats
+    {
+      size_t overhead{};
+      size_t total{};
+      mutable llarp_time_t last_report{};
+
+      void
+      Clear()
+      {
+        overhead = 0;
+        total = 0;
+      }
+
+      constexpr double
+      percent() const
+      {
+        if (total)
+          return (static_cast<double>(overhead) / static_cast<double>(total)) * 100;
+        return 0;
+      }
+
+      template <typename T>
+      void
+      RecordOverhead(const T& t)
+      {
+        overhead += overhead_for(t);
+        total += total_size_for(t);
+      }
+
+      bool
+      ShouldReport() const;
+
+      void Report(std::string_view) const;
+    };
   }  // namespace service
 }  // namespace llarp

@@ -66,5 +66,6 @@ namespace llarp
       bool
       Configure(const NetworkConfig& conf);
     };
+
   }  // namespace service
 }  // namespace llarp

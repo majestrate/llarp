@@ -134,7 +134,6 @@ namespace llarp
       else
       {
         llarp::LogError("read dict failed in routing layer");
-        llarp::DumpBuffer<llarp_buffer_t, 128>(buf);
       }
       if (msg)
         msg->Clear();

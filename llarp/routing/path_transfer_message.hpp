@@ -38,6 +38,9 @@ namespace llarp::routing
       Zero(Y);
       version = 0;
     }
+
+    size_t
+    overhead() const noexcept override;
   };
 
 }  // namespace llarp::routing

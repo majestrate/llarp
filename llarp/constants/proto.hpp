@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <llarp/crypto/constants.hpp>
+#include "link_layer.hpp"
 
 namespace llarp::constants
 {
@@ -13,5 +14,8 @@ namespace llarp::constants
   constexpr size_t service_proto_message_max_size = 2048;
   constexpr size_t service_proto_frame_max_size = service_proto_message_max_size * 2;
   constexpr size_t service_proto_message_overhead = 128 + 24 + encrypted_frame_overhead_size;
+
+  constexpr size_t routing_message_max_size =
+      (MAX_LINK_MSG_SIZE - 128) - encrypted_frame_overhead_size;
 
 }  // namespace llarp::constants

@@ -39,7 +39,20 @@ namespace llarp
       {
         return other.S < S;
       }
-    };
 
+      virtual size_t
+      overhead() const noexcept;
+
+      size_t
+      total_size() const noexcept;
+    };
   }  // namespace routing
+
+  template <typename T>
+    requires std::is_base_of_v<routing::IMessage, T>
+  size_t
+  total_size_for(const T& t)
+  {
+    return t.total_size();
+  }
 }  // namespace llarp

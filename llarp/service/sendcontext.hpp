@@ -22,7 +22,7 @@ namespace llarp
       SendContext(ServiceInfo ident, const Introduction& intro, path::PathSet* send, Endpoint* ep);
 
       void
-      AsyncEncryptAndSendTo(const llarp_buffer_t& payload, ProtocolType t);
+      AsyncEncryptAndSendTo(std::vector<std::vector<byte_t>> payloads, ProtocolType t);
 
       /// queue send a fully encrypted hidden service frame
       /// via a path
@@ -81,10 +81,10 @@ namespace llarp
       IntroSent() const = 0;
 
       void
-      EncryptAndSendTo(const llarp_buffer_t& payload, ProtocolType t);
+      EncryptAndSendTo(std::vector<std::vector<byte_t>>, ProtocolType t);
 
       virtual void
-      AsyncGenIntro(const llarp_buffer_t& payload, ProtocolType t) = 0;
+      AsyncGenIntro(const llarp_buffer_t&, ProtocolType t) = 0;
     };
   }  // namespace service
 }  // namespace llarp
