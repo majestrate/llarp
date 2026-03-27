@@ -1,7 +1,7 @@
 FROM debian:stable-slim AS build
 
 RUN apt update -q -y && apt upgrade -q -y
-RUN apt install -q -y libuv1-dev libsodium-dev nettle-dev libevent-dev libunbound-dev
+RUN apt install -q -y libuv1-dev libsodium-dev nettle-dev libevent-dev libunbound-dev libjemalloc-dev
 RUN apt install -q -y build-essential cmake git pkg-config automake libtool ninja-build
 WORKDIR /usr/local/src
 COPY . ./llarp
