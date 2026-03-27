@@ -216,7 +216,7 @@ namespace llarp
     ProtocolFrame::Sign(const Identity& localIdent)
     {
       Z.Zero();
-      std::array<byte_t, MAX_PROTOCOL_MESSAGE_SIZE> tmp;
+      std::array<byte_t, constants::service_proto_frame_max_size> tmp{};
       llarp_buffer_t buf(tmp);
       // encode
       if (!BEncode(&buf))
@@ -235,7 +235,7 @@ namespace llarp
     ProtocolFrame::EncryptAndSign(
         const ProtocolMessage& msg, const SharedSecret& sessionKey, const Identity& localIdent)
     {
-      std::array<byte_t, MAX_PROTOCOL_MESSAGE_SIZE> tmp;
+      std::array<byte_t, constants::service_proto_frame_max_size> tmp{};
       llarp_buffer_t buf(tmp);
       // encode message
       if (!msg.BEncode(&buf))
@@ -341,8 +341,6 @@ namespace llarp
               self->frame.Z,
               " from ",
               self->msg->sender.Addr().ToString());
-          Dump<MAX_PROTOCOL_MESSAGE_SIZE>(self->frame);
-          Dump<MAX_PROTOCOL_MESSAGE_SIZE>(*self->msg);
           self->msg.reset();
           return;
         }
@@ -363,7 +361,6 @@ namespace llarp
                 dh_server, sharedSecret, self->msg->sender, self->frame.N))
         {
           LogError("x25519 key exchange failed");
-          Dump<MAX_PROTOCOL_MESSAGE_SIZE>(self->frame);
           self->msg.reset();
           return;
         }
@@ -531,7 +528,7 @@ namespace llarp
       // zero out signature for verify
       copy.Z.Zero();
       // serialize
-      std::array<byte_t, MAX_PROTOCOL_MESSAGE_SIZE> tmp;
+      std::array<byte_t, constants::service_proto_frame_max_size> tmp{};
       llarp_buffer_t buf(tmp);
       if (!copy.BEncode(&buf))
       {

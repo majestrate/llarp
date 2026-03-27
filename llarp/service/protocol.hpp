@@ -26,8 +26,6 @@ namespace llarp
   {
     struct Endpoint;
 
-    constexpr std::size_t MAX_PROTOCOL_MESSAGE_SIZE = 2048 * 2;
-
     /// inner message
     struct ProtocolMessage
     {
@@ -70,7 +68,7 @@ namespace llarp
     /// outer message
     struct ProtocolFrame final : routing::IMessage
     {
-      using Encrypted_t = Encrypted<2048>;
+      using Encrypted_t = Encrypted<constants::service_proto_message_max_size>;
       PQCipherBlock C{};
       Encrypted_t D{};
       uint64_t R;
