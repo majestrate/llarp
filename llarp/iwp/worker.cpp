@@ -72,10 +72,12 @@ namespace llarp::iwp
       auto maybe = m_SubmitQueue.popFrontWithTimeout(1s);
       if (not maybe)
         continue;
-      auto& [weak, pkt] = *maybe;
+      auto& [weak, ev] = *maybe;
       auto session = weak.lock();
       if (not session)
         continue;
+
+      auto& [seq, pkt] = ev;
 
       if (not session->DecryptMessageInPlace(pkt))
       {
@@ -92,7 +94,7 @@ namespace llarp::iwp
         continue;
       }
       LogDebug("decrypted from ", session->m_RemoteAddr);
-      session->m_PlaintextRecv.tryPushBack(std::move(pkt));
+      session->m_PlaintextRecv.tryPushBack(std::move(ev));
       session->m_PlaintextEmpty.clear();
       session->m_Parent->WakeupPlaintext();
     }
@@ -113,7 +115,7 @@ namespace llarp::iwp
   void
   DecryptWorker::Submit(std::weak_ptr<Session> ptr, Packet_t pkt)
   {
-    m_SubmitQueue.pushBack(std::make_pair(ptr, pkt));
+    m_SubmitQueue.pushBack(std::make_pair(ptr, std::make_pair(m_Seq++, pkt)));
   }
 
   DecryptWorker::~DecryptWorker()

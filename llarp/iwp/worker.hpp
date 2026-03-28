@@ -38,6 +38,7 @@ namespace llarp::iwp
     thread::Queue<std::pair<std::weak_ptr<Session>, Packet_t>> m_SubmitQueue{worker_queue_size};
     static void
     EncryptPacket(Session*, Packet_t);
+    uint64_t m_Seq{};
   };
 
   class DecryptWorker
@@ -58,7 +59,9 @@ namespace llarp::iwp
     void Submit(std::weak_ptr<Session>, Packet_t);
 
    private:
-    thread::Queue<std::pair<std::weak_ptr<Session>, Packet_t>> m_SubmitQueue{worker_queue_size};
+    using Event_t = std::pair<uint64_t, Packet_t>;
+    thread::Queue<std::pair<std::weak_ptr<Session>, Event_t>> m_SubmitQueue{worker_queue_size};
+    uint64_t m_Seq{};
   };
 
   class Worker

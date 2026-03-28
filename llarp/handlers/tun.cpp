@@ -376,7 +376,7 @@ namespace llarp
         m_NetworkToUserPktQueue.pop();
       }
 
-      service::Endpoint::Pump(now);
+      Endpoint::Pump(now);
     }
 
     static bool
@@ -1103,7 +1103,6 @@ namespace llarp
                 if (extra_cb)
                   extra_cb();
                 ctx->SendPacketToRemote(pkt.ConstBuffer(), service::ProtocolType::Exit);
-                Router()->TriggerPump();
                 return;
               }
               LogWarn("cannot ensure path to exit ", addr, " so we drop some packets");
@@ -1142,7 +1141,6 @@ namespace llarp
         if (SendToOrQueue(*maybe, pkt.ConstBuffer(), type))
         {
           MarkIPActive(dst);
-          Router()->TriggerPump();
           return;
         }
       }
@@ -1162,7 +1160,6 @@ namespace llarp
             if (SendToOrQueue(*maybe, pkt.ConstBuffer(), type))
             {
               MarkIPActive(dst);
-              Router()->TriggerPump();
             }
             else
             {
@@ -1305,7 +1302,7 @@ namespace llarp
       }
       m_NetworkToUserPktQueue.push(std::move(write));
       // wake up so we ensure that all packets are written to user
-      Router()->TriggerPump();
+      m_PumpFlusher->Trigger();
       return true;
     }
 

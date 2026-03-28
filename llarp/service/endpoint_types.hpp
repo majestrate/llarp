@@ -27,6 +27,10 @@ namespace llarp
     using Msg_ptr = std::shared_ptr<routing::PathTransferMessage>;
 
     using SendEvent_t = std::pair<Msg_ptr, path::Path_ptr>;
+
+    bool
+    operator>(const SendEvent_t& lhs, const SendEvent_t& rhs) noexcept;
+
     using SendMessageQueue_t = thread::Queue<SendEvent_t>;
 
     using PendingBufferQueue = std::deque<PendingBuffer>;

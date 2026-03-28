@@ -37,7 +37,7 @@ namespace llarp
       bool
       operator<(const IMessage& other) const
       {
-        return other.S < S;
+        return S < other.S;
       }
 
       virtual size_t

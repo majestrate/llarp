@@ -61,10 +61,10 @@ namespace llarp
       static void
       ProcessAsync(path::Path_ptr p, PathID_t from, std::shared_ptr<ProtocolMessage> self);
 
-      inline bool
-      operator<(const ProtocolMessage& other) const
+      bool
+      operator>(const ProtocolMessage& other) const
       {
-        return seqno < other.seqno;
+        return seqno > other.seqno;
       }
     };
 

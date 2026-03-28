@@ -691,50 +691,57 @@ namespace llarp::iwp
   {
     if (m_PlaintextEmpty.test_and_set())
       return;
+    util::descending_priority_queue<PlaintextEvent_t> queue{};
     while (auto maybe = m_PlaintextRecv.tryPopFront())
     {
-      auto& result = *maybe;
+      queue.emplace(std::move(*maybe));
+    }
+    while (not queue.empty())
+    {
+      const auto& [seq, result] = queue.top();
+
       log::debug(logcat, "Command {} from {}", int(result[PacketOverhead + 1]), m_RemoteAddr);
       switch (result[PacketOverhead + 1])
       {
         case Command::eXMIT:
-          HandleXMIT(std::move(result));
+          HandleXMIT(result);
           m_LastRX = m_Parent->Now();
           break;
         case Command::eDATA:
-          HandleDATA(std::move(result));
+          HandleDATA(result);
           m_LastRX = m_Parent->Now();
           break;
         case Command::eACKS:
-          HandleACKS(std::move(result));
+          HandleACKS(result);
           m_LastRX = m_Parent->Now();
           break;
         case Command::ePING:
-          HandlePING(std::move(result));
+          HandlePING(result);
           m_LastRX = m_Parent->Now();
           break;
         case Command::eNACK:
-          HandleNACK(std::move(result));
+          HandleNACK(result);
           m_LastRX = m_Parent->Now();
           break;
         case Command::eCLOS:
-          HandleCLOS(std::move(result));
+          HandleCLOS(result);
           m_LastRX = m_Parent->Now();
           break;
         case Command::eMACK:
-          HandleMACK(std::move(result));
+          HandleMACK(result);
           m_LastRX = m_Parent->Now();
           break;
         default:
           LogError("invalid command ", int(result[PacketOverhead + 1]), " from ", m_RemoteAddr);
       }
+      queue.pop();
     }
     SendMACK();
     m_Parent->WakeupPlaintext();
   }
 
   void
-  Session::HandleMACK(Packet_t data)
+  Session::HandleMACK(const Packet_t& data)
   {
     if (data.size() < (3 + PacketOverhead))
     {
@@ -748,7 +755,7 @@ namespace llarp::iwp
       return;
     }
     LogTrace("got ", int(numAcks), " mack from ", m_RemoteAddr);
-    byte_t* ptr = data.data() + CommandOverhead + PacketOverhead + 1;
+    const auto* ptr = data.data() + CommandOverhead + PacketOverhead + 1;
     while (numAcks > 0)
     {
       auto acked = oxenc::load_big_to_host<uint64_t>(ptr);
@@ -771,7 +778,7 @@ namespace llarp::iwp
   }
 
   void
-  Session::HandleNACK(Packet_t data)
+  Session::HandleNACK(const Packet_t& data)
   {
     if (data.size() < (CommandOverhead + sizeof(uint64_t) + PacketOverhead))
     {
@@ -788,7 +795,7 @@ namespace llarp::iwp
   }
 
   void
-  Session::HandleXMIT(Packet_t data)
+  Session::HandleXMIT(const Packet_t& data)
   {
     static constexpr size_t XMITOverhead =
         (CommandOverhead + PacketOverhead + sizeof(uint16_t) + sizeof(uint64_t) + SHORTHASHSIZE);
@@ -839,7 +846,7 @@ namespace llarp::iwp
   }
 
   void
-  Session::HandleDATA(Packet_t data)
+  Session::HandleDATA(const Packet_t& data)
   {
     if (data.size() < (CommandOverhead + sizeof(uint16_t) + sizeof(uint64_t) + PacketOverhead))
     {
@@ -888,7 +895,7 @@ namespace llarp::iwp
   }
 
   void
-  Session::HandleACKS(Packet_t data)
+  Session::HandleACKS(const Packet_t& data)
   {
     if (data.size() < (11 + PacketOverhead))
     {
@@ -918,14 +925,14 @@ namespace llarp::iwp
   }
 
   void
-  Session::HandleCLOS(Packet_t)
+  Session::HandleCLOS(const Packet_t&)
   {
     LogInfo("remote closed by ", m_RemoteAddr);
     Close();
   }
 
   void
-  Session::HandlePING(Packet_t)
+  Session::HandlePING(const Packet_t&)
   {}
 
   bool

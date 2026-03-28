@@ -1729,11 +1729,17 @@ namespace llarp::service
     return true;
   }
 
+  bool
+  operator>(const SendEvent_t& lhs, const SendEvent_t& rhs) noexcept
+  {
+    return lhs.first->S > rhs.first->S;
+  }
+
   void
   Endpoint::Pump(llarp_time_t now)
   {
     // handle inbound traffic sorted
-    std::priority_queue<ProtocolMessage> queue;
+    util::descending_priority_queue<ProtocolMessage> queue;
     while (not m_InboundTrafficQueue.empty())
     {
       // succ it out
@@ -1782,14 +1788,23 @@ namespace llarp::service
     for (const auto& [router, session] : m_state->m_SNodeSessions)
       session->FlushUpstream();
 
+    util::descending_priority_queue<SendEvent_t> sendq;
+
     // send queue flush
     while (not m_SendQueue.empty())
     {
       SendEvent_t item = m_SendQueue.popFront();
       item.first->S = item.second->NextSeqNo();
       m_Overhead.RecordOverhead(*item.first);
+      sendq.emplace(std::move(item));
+    }
+    while (not sendq.empty())
+    {
+      const auto& item = sendq.top();
       if (item.second->SendRoutingMessage(*item.first, Router()))
         ConvoTagTX(item.first->T.T);
+
+      sendq.pop();
     }
   }
 

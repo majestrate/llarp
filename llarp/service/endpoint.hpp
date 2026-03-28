@@ -581,6 +581,7 @@ namespace llarp
       void
       FlushPendingTraffic();
 
+     protected:
       std::shared_ptr<EventLoopWakeup> m_RecvQueueFlusher, m_TrafficFlusher, m_PumpFlusher;
       OverheadStats m_Overhead{};
     };

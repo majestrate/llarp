@@ -184,7 +184,7 @@ namespace
 
     std::thread main_thread{[configFile, opts] { run_main_context(configFile, opts); }};
     auto ftr = exit_code.get_future();
-
+    llarp::util::SetThreadName("llarp-waiter");
     do
     {
       // do periodic non lokinet related tasks here
@@ -249,6 +249,7 @@ namespace
   static void
   run_main_context(std::optional<fs::path> confFile, const llarp::RuntimeOptions opts)
   {
+    llarp::util::SetThreadName("llarp-state");
     llarp::log::info(logcat, "starting up {} {}", llarp::VERSION_FULL, llarp::RELEASE_MOTTO);
     try
     {
@@ -297,8 +298,6 @@ namespace
         exit_code.set_value(1);
         return;
       }
-      llarp::util::SetThreadName("llarp-state");
-
       auto result = ctx->Run(opts);
       exit_code.set_value(result);
     }

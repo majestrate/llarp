@@ -147,6 +147,7 @@ namespace llarp::iwp
 
     void
     RecvHashed(std::vector<OutboundMessage> msgs);
+    using PlaintextEvent_t = std::pair<uint64_t, Packet_t>;
 
    private:
     enum class State
@@ -208,7 +209,7 @@ namespace llarp::iwp
     /// maps rxid to time recieved
     std::unordered_map<uint64_t, llarp_time_t> m_ReplayFilter;
     /// rx messages to send in next round of multiacks
-    std::priority_queue<uint64_t> m_SendMACKs;
+    util::descending_priority_queue<uint64_t> m_SendMACKs;
 
     using CryptoQueue_t = std::vector<Packet_t>;
 
@@ -216,7 +217,8 @@ namespace llarp::iwp
     CryptoQueue_t m_DecryptNext;
 
     std::atomic_flag m_PlaintextEmpty;
-    llarp::thread::Queue<Packet_t> m_PlaintextRecv;
+
+    llarp::thread::Queue<PlaintextEvent_t> m_PlaintextRecv;
     std::unordered_set<uint64_t> m_ToHash;
     std::unordered_set<uint64_t> m_PendingHash;
     std::atomic_flag m_SentClosed;
@@ -265,25 +267,28 @@ namespace llarp::iwp
     SendOurLIM(ILinkSession::CompletionHandler h = nullptr);
 
     void
-    HandleXMIT(Packet_t msg);
+    HandleXMIT(const Packet_t& msg);
 
     void
-    HandleDATA(Packet_t msg);
+    HandleDATA(const Packet_t& msg);
 
     void
-    HandleACKS(Packet_t msg);
+    HandleACKS(const Packet_t& msg);
 
     void
-    HandleNACK(Packet_t msg);
+    HandleNACK(const Packet_t& msg);
 
     void
-    HandlePING(Packet_t msg);
+    HandlePING(const Packet_t& msg);
 
     void
-    HandleCLOS(Packet_t msg);
+    HandleCLOS(const Packet_t& msg);
 
     void
-    HandleMACK(Packet_t msg);
+    HandleMACK(const Packet_t& msg);
   };
-  // namespace iwp
+
+  bool
+  operator<(const Session::PlaintextEvent_t& lhs, const Session::PlaintextEvent_t& rhs);
+
 }  // namespace llarp::iwp

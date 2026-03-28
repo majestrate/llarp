@@ -16,10 +16,10 @@ namespace llarp::util
     struct Wrapper
     {
       using container_type = Container_t;
-      using value_type = typename container_type::value_type;
-      using reference = typename container_type::reference;
-      using const_reference = typename container_type::const_reference;
-      using size_type = typename container_type::size_type;
+      using value_type = container_type::value_type;
+      using reference = container_type::reference;
+      using const_reference = container_type::const_reference;
+      using size_type = container_type::size_type;
 
       container_type& vector;
 
@@ -65,7 +65,7 @@ namespace llarp::util
       typename Visit_t,
       typename Queue_t = std::priority_queue<T>,
       typename Container_t = std::vector<T>>
-  inline auto
+  auto
   with_inplace_priority_queue(
       Container_t& vec,
       Visit_t&& visit,
