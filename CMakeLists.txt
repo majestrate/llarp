@@ -68,6 +68,10 @@ if(BUILD_STATIC_DEPS)
   include(StaticBuild)
 endif()
 
+if(STATIC_LINK)
+  include(static_link)
+endif()
+
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE RelWithDebInfo)
 endif()
@@ -108,8 +112,13 @@ include(cmake/solaris.cmake)
 include(MacroEnsureOutOfSourceBuild)
 macro_ensure_out_of_source_build("${PROJECT_NAME} requires an out-of-source build.  Create a build directory and run 'cmake ${CMAKE_SOURCE_DIR} [options]'.")
 
-# Always build PIC
-set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+# PIC is needed for shared libraries, but conflicts with -static linking.
+# For fully static builds, disable it.
+if(STATIC_LINK)
+  set(CMAKE_POSITION_INDEPENDENT_CODE OFF)
+else()
+  set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+endif()
 
 include(cmake/unix.cmake)
 include(cmake/check_for_std_optional.cmake)
