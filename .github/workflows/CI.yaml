@@ -65,7 +65,7 @@ jobs:
       - name: Update submodules
         run: git submodule update --init --recursive
       - name: Install deps
-        run: sudo apt update && sudo apt install mkdocs doxygen build-essential cmake git pkg-config automake libtool libuv1-dev libsodium-dev libsystemd-dev nettle-dev libevent-dev libunbound-dev libgeoip-dev libjemalloc-dev
+        run: sudo apt update && sudo apt install mkdocs doxygen build-essential cmake git pkg-config automake libtool libuv1-dev libsodium-dev libsystemd-dev libgeoip-dev libjemalloc-dev
       - name: Build docs
         run: mkdir -p build && cmake -B build && make -C build doc
       - name: Setup Pages

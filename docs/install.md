@@ -26,7 +26,6 @@ Build requirements:
 * libuv
 * libsodium >= 1.0.18
 * libsystemd
-* libunbound
 * libgeoip (optional)
 
 ## Linux <span id="linux-install" />
@@ -35,7 +34,7 @@ The current most supported platform is Linux. Currently you can compile from sou
 
 For Debian, install the following packages:
 
-    $ sudo apt install build-essential cmake git pkg-config automake libtool libuv1-dev libsodium-dev libsystemd-dev nettle-dev libevent-dev libunbound-dev libgeoip-dev
+    $ sudo apt install build-essential cmake git pkg-config automake libtool libuv1-dev libsodium-dev libsystemd-dev libgeoip-dev
 
 Clone the git repo:
 
@@ -56,7 +55,7 @@ An example systemd unit can be found at `contrib/systemd/llarp.service`
 Currently has no VPN Platform code, this is being fixed shortly.
 build:
 
-    $ pkg install cmake git pkgconf sodium libevent
+    $ pkg install cmake git pkgconf sodium
     $ git clone --recursive https://github.com/majestrate/llarp
     $ mkdir llarp/build
     $ cd llarp/build

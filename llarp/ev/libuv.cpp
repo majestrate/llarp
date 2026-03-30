@@ -7,6 +7,7 @@
 #include <thread>
 #include <type_traits>
 #include <cstring>
+#include <unistd.h>
 #include <netinet/udp.h>
 
 #include <llarp/util/thread/queue.hpp>
@@ -553,7 +554,10 @@ namespace llarp::uv
     if (fd < 0)
       return false;
     if (::bind(fd, addr.operator const sockaddr*(), addr.sockaddr_len()) == -1)
+    {
+      ::close(fd);
       return false;
+    }
 
     const timeval timeout{
         .tv_sec = 0,
@@ -561,10 +565,22 @@ namespace llarp::uv
     };
 
     if (::setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) == -1)
+    {
+      ::close(fd);
       return false;
+    }
+
+    sockaddr_storage sas{};
+    sockaddr* sa = reinterpret_cast<sockaddr*>(&sas);
+    socklen_t sa_len = sizeof(sas);
+    if (::getsockname(fd, sa, &sa_len) != 0)
+    {
+      ::close(fd);
+      return false;
+    }
 
     m_FD = std::make_unique<util::FD>(fd);
-    m_LocalAddr = addr;
+    m_LocalAddr = SockAddr{*sa};
     return true;
   }
 

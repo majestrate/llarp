@@ -58,12 +58,14 @@ namespace llarp
     {
       std::function<void(net::IPPacket)> m_Reply;
       net::ipaddr_t m_OurIP;
-      llarp::DnsConfig m_Config;
+      std::vector<SockAddr> m_Upstreams;
 
      public:
       explicit DnsInterceptor(
           std::function<void(net::IPPacket)> reply, net::ipaddr_t our_ip, llarp::DnsConfig conf)
-          : m_Reply{std::move(reply)}, m_OurIP{std::move(our_ip)}, m_Config{std::move(conf)}
+          : m_Reply{std::move(reply)}
+          , m_OurIP{std::move(our_ip)}
+          , m_Upstreams{std::move(conf.m_upstreamDNS)}
       {}
 
       ~DnsInterceptor() override = default;
@@ -87,14 +89,19 @@ namespace llarp
         return std::nullopt;
       }
 
+      void
+      SetUpstreams(std::vector<SockAddr> upstreams)
+      {
+        m_Upstreams = std::move(upstreams);
+      }
+
       bool
       WouldLoop(const SockAddr& to, const SockAddr& from) const override
       {
-        if (auto maybe_addr = m_Config.m_QueryBind)
+        for (const auto& upstream : m_Upstreams)
         {
-          const auto& addr = *maybe_addr;
-          // omit traffic to and from our dns socket
-          return addr == to or addr == from;
+          if (upstream == to or upstream == from)
+            return true;
         }
         return false;
       }
@@ -102,7 +109,7 @@ namespace llarp
 
     class TunDNS : public dns::Server
     {
-      std::optional<SockAddr> m_QueryBind;
+      std::shared_ptr<DnsInterceptor> m_Interceptor;
       net::ipaddr_t m_OurIP;
       TunEndpoint* const m_Endpoint;
 
@@ -112,10 +119,7 @@ namespace llarp
       virtual ~TunDNS() = default;
 
       explicit TunDNS(TunEndpoint* ep, const llarp::DnsConfig& conf)
-          : dns::Server{ep->Router()->loop(), conf, 0}
-          , m_QueryBind{conf.m_QueryBind}
-          , m_OurIP{ep->GetIfAddr()}
-          , m_Endpoint{ep}
+          : dns::Server{ep->Router()->loop(), conf, 0}, m_OurIP{ep->GetIfAddr()}, m_Endpoint{ep}
       {}
 
       std::shared_ptr<dns::PacketSource_Base>
@@ -127,8 +131,16 @@ namespace llarp
             },
             m_OurIP,
             conf);
+        m_Interceptor = ptr;
         PacketSource = std::static_pointer_cast<dns::PacketSource_Base>(ptr);
         return PacketSource;
+      }
+
+      void
+      SetUpstreams(std::vector<SockAddr> upstreams)
+      {
+        if (m_Interceptor)
+          m_Interceptor->SetUpstreams(std::move(upstreams));
       }
     };
 
@@ -182,6 +194,10 @@ namespace llarp
     void
     TunEndpoint::ReconfigureDNS(std::vector<SockAddr> servers)
     {
+      if (m_DnsConfig.m_raw_dns)
+        if (auto* tundns = dynamic_cast<TunDNS*>(m_DNS.get()))
+          tundns->SetUpstreams(servers);
+
       if (m_DNS)
       {
         for (auto weak : m_DNS->GetAllResolvers())

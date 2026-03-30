@@ -11,20 +11,6 @@ set(OPENSSL_SOURCE openssl-${OPENSSL_VERSION}.tar.gz)
 set(OPENSSL_HASH SHA256=fa5a4143b8aae18be53ef2f3caf29a2e0747430b8bc74d32d88335b94ab63072
     CACHE STRING "openssl source hash")
 
-set(EXPAT_VERSION 2.7.5 CACHE STRING "expat version")
-string(REPLACE "." "_" EXPAT_TAG "R_${EXPAT_VERSION}")
-set(EXPAT_MIRROR ${LOCAL_MIRROR} https://github.com/libexpat/libexpat/releases/download/${EXPAT_TAG}
-    CACHE STRING "expat download mirror(s)")
-set(EXPAT_SOURCE expat-${EXPAT_VERSION}.tar.xz)
-set(EXPAT_HASH SHA512=d287fdc83d967ce6d04f96a22b544bd7820bb73504b187a8b467e281e7bd20d330c897c6ca8e3a8a2172ecce98f044b569e2b71d0b90fd1175727c13e77e61f4
-    CACHE STRING "expat source hash")
-
-set(UNBOUND_VERSION 1.24.2 CACHE STRING "unbound version")
-set(UNBOUND_MIRROR ${LOCAL_MIRROR} https://nlnetlabs.nl/downloads/unbound CACHE STRING "unbound download mirror(s)")
-set(UNBOUND_SOURCE unbound-${UNBOUND_VERSION}.tar.gz)
-set(UNBOUND_HASH SHA256=44e7b53e008a6dcaec03032769a212b46ab5c23c105284aa05a4f3af78e59cdb
-    CACHE STRING "unbound source hash")
-
 set(SODIUM_VERSION 1.0.21 CACHE STRING "libsodium version")
 set(SODIUM_MIRROR ${LOCAL_MIRROR}
   https://download.libsodium.org/libsodium/releases
@@ -42,7 +28,7 @@ set(LIBUV_HASH SHA512=3dbb61067c03d025fd880afa2015e67d9cd9de2672df2bfb9901a48759
     CACHE STRING "libuv source hash")
 
 set(ZLIB_VERSION 1.3.2 CACHE STRING "zlib version")
-set(ZLIB_MIRROR ${LOCAL_MIRROR} https://zlib.net
+set(ZLIB_MIRROR ${LOCAL_MIRROR} https://github.com/madler/zlib/releases/download/v${ZLIB_VERSION}
     CACHE STRING "zlib mirror(s)")
 set(ZLIB_SOURCE zlib-${ZLIB_VERSION}.tar.xz)
 set(ZLIB_HASH SHA256=d7a0654783a4da529d1bb793b7ad9c3318020af77667bcae35f95d0e42a792f3
@@ -208,7 +194,6 @@ set(openssl_system_env "")
 set(openssl_arch "")
 set(openssl_configure_command ./config)
 set(openssl_flags "CFLAGS=${deps_CFLAGS}")
-set(unbound_ldflags "")
 if(CMAKE_CROSSCOMPILING)
   if(ANDROID)
     set(openssl_arch android-${android_machine})
@@ -220,7 +205,6 @@ if(CMAKE_CROSSCOMPILING)
   elseif(ARCH_TRIPLET STREQUAL mips-linux-gnu)
     set(openssl_arch linux-mips32)
   elseif(ARCH_TRIPLET STREQUAL mips-openwrt-linux)
-    set(unbound_ldflags "-latomic")
     set(openssl_arch linux-mips32)
   elseif(ARCH_TRIPLET STREQUAL mipsel-linux-gnu)
     set(openssl_arch linux-mips)
@@ -259,28 +243,6 @@ add_static_target(OpenSSL::Crypto openssl_external libcrypto.a)
 set(OPENSSL_INCLUDE_DIR ${DEPS_DESTDIR}/include)
 set(OPENSSL_CRYPTO_LIBRARY ${DEPS_DESTDIR}/lib/libcrypto.a ${DEPS_DESTDIR}/lib/libssl.a)
 set(OPENSSL_ROOT_DIR ${DEPS_DESTDIR})
-
-build_external(expat
-  CONFIGURE_COMMAND ./configure ${cross_host} --prefix=${DEPS_DESTDIR} --enable-static
-  --disable-shared --with-pic --without-examples --without-tests --without-docbook --without-xmlwf
-  "CC=${deps_cc}" "CFLAGS=${deps_CFLAGS}"
-)
-add_static_target(expat expat_external libexpat.a)
-
-
-build_external(unbound
-  DEPENDS openssl_external expat_external
-  ${unbound_patch}
-  CONFIGURE_COMMAND ./configure ${cross_host} ${cross_rc} --prefix=${DEPS_DESTDIR} --disable-shared
-  --enable-static --with-libunbound-only --with-pic
-  --$<IF:$<BOOL:${WITH_LTO}>,enable,disable>-flto --with-ssl=${DEPS_DESTDIR}
-  --with-libexpat=${DEPS_DESTDIR}
-  "CC=${deps_cc}" "CFLAGS=${deps_CFLAGS}" "LDFLAGS=${unbound_ldflags}"
-)
-add_static_target(libunbound unbound_external libunbound.a)
-set_target_properties(libunbound PROPERTIES INTERFACE_LINK_LIBRARIES "OpenSSL::SSL;OpenSSL::Crypto")
-
-
 
 build_external(sodium CONFIGURE_COMMAND ./configure ${cross_host} ${cross_rc} --prefix=${DEPS_DESTDIR} --disable-shared
           --enable-static --with-pic "CC=${deps_cc}" "CFLAGS=${deps_CFLAGS}")

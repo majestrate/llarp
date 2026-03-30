@@ -71,7 +71,6 @@ Requerimientos de compilación:
 * gcovr (para generar la covertura de prueba en gcc)
 * libuv >= 1.27.0
 * libsodium >= 1.0.18
-* libunbound
 * libzmq
 * cppzmq
 * sqlite3

@@ -67,7 +67,7 @@ namespace llarp
       void
       Thaw() override;
 
-      // Reconfigures DNS servers and restarts libunbound with the new servers.
+      // Reconfigures DNS servers and restarts the forwarder with the new servers.
       void
       ReconfigureDNS(std::vector<SockAddr> servers);
 

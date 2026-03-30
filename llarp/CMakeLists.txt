@@ -429,7 +429,7 @@ target_link_libraries(lokinet-layers INTERFACE
 
 # per component external deps
 
-target_link_libraries(lokinet-dns PUBLIC libunbound)
+
 
 target_link_libraries(lokinet-cryptography PUBLIC
   oxenc::oxenc

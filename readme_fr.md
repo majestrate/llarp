@@ -40,7 +40,6 @@ Packets necessaires pour construire:
 * libsodium >= 1.0.18
 * libssl (pour lokinet-bootstrap)
 * libcurl (fpour lokinet-bootstrap)
-* libunbound
 * libzmq
 * cppzmq
 * sqlite3
@@ -58,7 +57,7 @@ Vous pouvez installer les paquets debian en utilisant :
 
 Si vous voulez construire lokinet à partir des sources :
 
-    $ sudo apt install build-essential cmake git libcap-dev pkg-config automake libtool libuv1-dev libsodium-dev libzmq3-dev libcurl4-openssl-dev libevent-dev nettle-dev libunbound-dev libsqlite3-dev libssl-dev nlohmann-json3-dev
+    $ sudo apt install build-essential cmake git libcap-dev pkg-config automake libtool libuv1-dev libsodium-dev libzmq3-dev libcurl4-openssl-dev libevent-dev nettle-dev libsqlite3-dev libssl-dev nlohmann-json3-dev
     $ git clone --recursive https://github.com/oxen-io/lokinet
     $ cd lokinet
     $ mkdir build
