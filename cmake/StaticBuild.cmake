@@ -31,7 +31,7 @@ set(SODIUM_MIRROR ${LOCAL_MIRROR}
   https://github.com/jedisct1/libsodium/releases/download/${SODIUM_VERSION}-RELEASE
   CACHE STRING "libsodium mirror(s)")
 set(SODIUM_SOURCE libsodium-${SODIUM_VERSION}.tar.gz)
-set(SODIUM_HASH SHA512=ee8cc2f3f5707b172bf75d8c04afb
+set(SODIUM_HASH SHA512=ee8cc2f3f5707b172bf75d8c04afbd5f0c83c6f94dbab3f988f07aab716d96f1662556a59e09b3d83c3bd5c22f59327ad95937bf499d523c86146f4df830f777
   CACHE STRING "libsodium source hash")
 
 set(LIBUV_VERSION 1.52.1 CACHE STRING "libuv version")
