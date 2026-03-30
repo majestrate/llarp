@@ -5,69 +5,48 @@
 
 set(LOCAL_MIRROR "" CACHE STRING "local mirror path/URL for lib downloads")
 
-set(OPENSSL_VERSION 3.0.7 CACHE STRING "openssl version")
+set(OPENSSL_VERSION 3.0.19 CACHE STRING "openssl version")
 set(OPENSSL_MIRROR ${LOCAL_MIRROR} https://www.openssl.org/source CACHE STRING "openssl download mirror(s)")
 set(OPENSSL_SOURCE openssl-${OPENSSL_VERSION}.tar.gz)
-set(OPENSSL_HASH SHA256=83049d042a260e696f62406ac5c08bf706fd84383f945cf21bd61e9ed95c396e
+set(OPENSSL_HASH SHA256=fa5a4143b8aae18be53ef2f3caf29a2e0747430b8bc74d32d88335b94ab63072
     CACHE STRING "openssl source hash")
 
-set(EXPAT_VERSION 2.5.0 CACHE STRING "expat version")
+set(EXPAT_VERSION 2.7.5 CACHE STRING "expat version")
 string(REPLACE "." "_" EXPAT_TAG "R_${EXPAT_VERSION}")
 set(EXPAT_MIRROR ${LOCAL_MIRROR} https://github.com/libexpat/libexpat/releases/download/${EXPAT_TAG}
     CACHE STRING "expat download mirror(s)")
 set(EXPAT_SOURCE expat-${EXPAT_VERSION}.tar.xz)
-set(EXPAT_HASH SHA512=2da73b991b7c0c54440485c787e5edeb3567230204e31b3cac1c3a6713ec6f9f1554d3afffc0f8336168dfd5df02db4a69bcf21b4d959723d14162d13ab87516
+set(EXPAT_HASH SHA512=d287fdc83d967ce6d04f96a22b544bd7820bb73504b187a8b467e281e7bd20d330c897c6ca8e3a8a2172ecce98f044b569e2b71d0b90fd1175727c13e77e61f4
     CACHE STRING "expat source hash")
 
-set(UNBOUND_VERSION 1.17.0 CACHE STRING "unbound version")
+set(UNBOUND_VERSION 1.24.2 CACHE STRING "unbound version")
 set(UNBOUND_MIRROR ${LOCAL_MIRROR} https://nlnetlabs.nl/downloads/unbound CACHE STRING "unbound download mirror(s)")
 set(UNBOUND_SOURCE unbound-${UNBOUND_VERSION}.tar.gz)
-set(UNBOUND_HASH SHA512=f6b9f279330fb19b5feca09524959940aad8c4e064528aa82b369c726d77e9e8e5ca23f366f6e9edcf2c061b96f482ed7a2c26ac70fc15ae5762b3d7e36a5284
+set(UNBOUND_HASH SHA256=44e7b53e008a6dcaec03032769a212b46ab5c23c105284aa05a4f3af78e59cdb
     CACHE STRING "unbound source hash")
 
-set(SQLITE3_VERSION 3400000 CACHE STRING "sqlite3 version")
-set(SQLITE3_MIRROR ${LOCAL_MIRROR} https://www.sqlite.org/2022
-    CACHE STRING "sqlite3 download mirror(s)")
-set(SQLITE3_SOURCE sqlite-autoconf-${SQLITE3_VERSION}.tar.gz)
-set(SQLITE3_HASH SHA3_256=7ee8f02b21edb4489df5082b5cf5b7ef47bcebcdb0e209bf14240db69633c878
-  CACHE STRING "sqlite3 source hash")
-
-set(SODIUM_VERSION 1.0.18 CACHE STRING "libsodium version")
+set(SODIUM_VERSION 1.0.21 CACHE STRING "libsodium version")
 set(SODIUM_MIRROR ${LOCAL_MIRROR}
   https://download.libsodium.org/libsodium/releases
   https://github.com/jedisct1/libsodium/releases/download/${SODIUM_VERSION}-RELEASE
   CACHE STRING "libsodium mirror(s)")
 set(SODIUM_SOURCE libsodium-${SODIUM_VERSION}.tar.gz)
-set(SODIUM_HASH SHA512=17e8638e46d8f6f7d024fe5559eccf2b8baf23e143fadd472a7d29d228b186d86686a5e6920385fe2020729119a5f12f989c3a782afbd05a8db4819bb18666ef
+set(SODIUM_HASH SHA512=ee8cc2f3f5707b172bf75d8c04afb
   CACHE STRING "libsodium source hash")
 
-set(ZMQ_VERSION 4.3.4 CACHE STRING "libzmq version")
-set(ZMQ_MIRROR ${LOCAL_MIRROR} https://github.com/zeromq/libzmq/releases/download/v${ZMQ_VERSION}
-    CACHE STRING "libzmq mirror(s)")
-set(ZMQ_SOURCE zeromq-${ZMQ_VERSION}.tar.gz)
-set(ZMQ_HASH SHA512=e198ef9f82d392754caadd547537666d4fba0afd7d027749b3adae450516bcf284d241d4616cad3cb4ad9af8c10373d456de92dc6d115b037941659f141e7c0e
-    CACHE STRING "libzmq source hash")
-
-set(LIBUV_VERSION 1.44.2 CACHE STRING "libuv version")
+set(LIBUV_VERSION 1.52.1 CACHE STRING "libuv version")
 set(LIBUV_MIRROR ${LOCAL_MIRROR} https://dist.libuv.org/dist/v${LIBUV_VERSION}
     CACHE STRING "libuv mirror(s)")
 set(LIBUV_SOURCE libuv-v${LIBUV_VERSION}.tar.gz)
-set(LIBUV_HASH SHA512=91197ff9303112567bbb915bbb88058050e2ad1c048815a3b57c054635d5dc7df458b956089d785475290132236cb0edcfae830f5d749de29a9a3213eeaf0b20
+set(LIBUV_HASH SHA512=3dbb61067c03d025fd880afa2015e67d9cd9de2672df2bfb9901a48759f7bd1285a600b4ac4177c1ee0bf8418c7b967fef356f81e37765e33a818df0aabdc1aa
     CACHE STRING "libuv source hash")
 
-set(ZLIB_VERSION 1.2.13 CACHE STRING "zlib version")
+set(ZLIB_VERSION 1.3.2 CACHE STRING "zlib version")
 set(ZLIB_MIRROR ${LOCAL_MIRROR} https://zlib.net
     CACHE STRING "zlib mirror(s)")
 set(ZLIB_SOURCE zlib-${ZLIB_VERSION}.tar.xz)
-set(ZLIB_HASH SHA256=d14c38e313afc35a9a8760dadf26042f51ea0f5d154b0630a31da0540107fb98
+set(ZLIB_HASH SHA256=d7a0654783a4da529d1bb793b7ad9c3318020af77667bcae35f95d0e42a792f3
   CACHE STRING "zlib source hash")
-
-set(CURL_VERSION 7.86.0 CACHE STRING "curl version")
-set(CURL_MIRROR ${LOCAL_MIRROR} https://curl.haxx.se/download https://curl.askapache.com
-  CACHE STRING "curl mirror(s)")
-set(CURL_SOURCE curl-${CURL_VERSION}.tar.xz)
-set(CURL_HASH SHA512=18e03a3c00f22125e07bddb18becbf5acdca22baeb7b29f45ef189a5c56f95b2d51247813f7a9a90f04eb051739e9aa7d3a1c5be397bae75d763a2b918d1b656
-  CACHE STRING "curl source hash")
 
 include(ExternalProject)
 
