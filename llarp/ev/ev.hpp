@@ -21,6 +21,8 @@ namespace llarp
   struct SockAddr;
   struct UDPHandle;
 
+  class TCPConnectionPool;
+
   namespace vpn
   {
     class NetworkInterface;
@@ -276,6 +278,9 @@ namespace llarp
 
     virtual size_t
     num_worker_threads() const = 0;
+
+    virtual TCPConnectionPool&
+    connection_pool() = 0;
   };
 
   using EventLoop_ptr = std::shared_ptr<EventLoop>;

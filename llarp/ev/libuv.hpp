@@ -19,10 +19,15 @@ namespace llarp::uv
   class UVRepeater;
   class UDPHandle;
 
+  class TCPConnectionPoolImpl;
+  class TCPAcceptorImpl;
+
   class Loop : public llarp::EventLoop
   {
    public:
     friend UDPHandle;
+    friend TCPConnectionPoolImpl;
+    friend TCPAcceptorImpl;
     using Callback = std::function<void()>;
 
     Loop(size_t queue_size, size_t worker_num_threads);
@@ -92,6 +97,9 @@ namespace llarp::uv
     void
     add_closer(std::function<void(void)> f);
 
+    TCPConnectionPool&
+    connection_pool() override;
+
    protected:
     std::shared_ptr<uvw::Loop> m_Impl;
     std::optional<std::thread::id> m_EventLoopThreadID;
@@ -109,6 +117,7 @@ namespace llarp::uv
     std::unique_ptr<std::thread> m_DiskThread;
     std::vector<std::thread> m_WorkThreads;
     std::vector<std::function<void()>> m_closers, m_tickers;
+    std::shared_ptr<TCPConnectionPool> m_ConnectionPool;
 
 #ifdef LOKINET_DEBUG
     uint64_t last_time;

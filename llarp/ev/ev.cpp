@@ -1,5 +1,8 @@
 #include <llarp/util/alloc.h>
 #include "ev.hpp"
+
+#include "tcp_handle.hpp"
+
 #include <llarp/util/mem.hpp>
 #include <llarp/util/str.hpp>
 #include <cstddef>
@@ -51,4 +54,54 @@ namespace llarp
       _cleanup(cancel);
   }
 
+  void
+  TCPConnection::SetRecvHandler(RecvHandler h)
+  {
+    m_RecvHandler = h;
+  }
+
+  void
+  TCPConnection::Untrack()
+  {
+    m_Pool.RemoveConn(shared_from_this());
+  }
+
+  void
+  TCPAcceptor::Untrack()
+  {
+    m_Pool.RemoveConn(shared_from_this());
+  }
+
+  std::shared_ptr<TCPConnection>
+  TCPAcceptor::MakeConn()
+  {
+    return m_Pool.MakeConnection(std::nullopt, [](std::optional<OwnedBuffer>, std::error_code) {});
+  }
+
+  void
+  TCPConnectionPool::RemoveConn(std::shared_ptr<TCPConnection> conn)
+  {
+    auto laddr = conn->LocalAddr();
+    if (auto itr = m_Connections.find(laddr); itr != m_Connections.end())
+      m_Connections.erase(itr);
+  }
+
+  void
+  TCPConnectionPool::RemoveConn(std::shared_ptr<TCPAcceptor> acceptor)
+  {
+    auto maybe_laddr = acceptor->LocalAddr();
+    if (not maybe_laddr)
+      return;
+    auto& laddr = *maybe_laddr;
+    if (auto itr = m_Connections.find(laddr); itr != m_Connections.end())
+      m_Connections.erase(itr);
+  }
+
+  TCPConnection::TCPConnection(RecvHandler handler, TCPConnectionPool& pool)
+      : m_RecvHandler{handler}, m_Pool{pool}
+  {}
+
+  TCPAcceptor::TCPAcceptor(AcceptHandler handler, TCPConnectionPool& pool)
+      : m_AcceptHandler{handler}, m_Pool{pool}
+  {}
 }  // namespace llarp

@@ -1,6 +1,9 @@
 #ifdef WITH_LIBUV
 #include <llarp/util/alloc.h>
 #include "libuv.hpp"
+#include "tcp_handle.hpp"
+
+#include <system_error>
 #include <uv.h>
 #include <memory>
 #include <stdexcept>
@@ -24,6 +27,337 @@ namespace llarp::uv
   {
     return m_Impl;
   }
+
+  class TCPConnectionImpl : public TCPConnection
+  {
+    ::uv_tcp_t m_Handle;
+    SockAddr m_LocalAddr{}, m_RemoteAddr{};
+
+    static void
+    OnClose(uv_handle_t* handle)
+    {
+      static_cast<TCPConnectionImpl*>(handle->data)->Untrack();
+    }
+
+    static void
+    OnSent(uv_write_t* req, int status)
+    {
+      auto* r = static_cast<SendRequest*>(req->data);
+      if (status)
+        log::warning(logcat, "TCPConnection::Send() write failed: {}", uv_strerror(status));
+      r->Completion(status);
+      delete r;
+    }
+    static void
+    ReadAlloc(uv_handle_t*, size_t suggested_size, uv_buf_t* buf)
+    {
+      buf->base = new char[suggested_size];
+    }
+
+    static void
+    OnRead(uv_stream_t* handle, ssize_t nread, const uv_buf_t* buf)
+    {
+      const std::unique_ptr<char[]> ptr{buf->base};
+      auto* self = static_cast<TCPConnectionImpl*>(handle->data);
+
+      if (nread < 0)
+      {
+        self->ReadEnded();
+        return;
+      }
+      if (nread == 0)
+      {
+        // empty buffer.
+        self->m_RecvHandler(std::nullopt, std::error_code{});
+        return;
+      }
+      // copy buffer.
+      const size_t sz = nread;
+      self->m_RecvHandler(
+          OwnedBuffer{reinterpret_cast<const byte_t*>(ptr.get()), sz}, std::error_code{});
+    }
+
+    void
+    ReadEnded()
+    {
+      m_RecvHandler(std::nullopt, std::error_code{ESHUTDOWN, std::generic_category()});
+      Close();
+    }
+
+   public:
+    friend TCPConnectionPoolImpl;
+    friend TCPAcceptorImpl;
+    TCPConnectionImpl(uv_loop_t* loop, RecvHandler h, TCPConnectionPool& pool)
+        : TCPConnection{h, pool}
+    {
+      if (auto ret = ::uv_tcp_init(loop, &m_Handle); ret < 0)
+        throw std::runtime_error{fmt::format("uv_tcp_init(): {}", uv_strerror(ret))};
+      m_Handle.data = this;
+    }
+
+    SockAddr
+    LocalAddr() const override
+    {
+      return m_LocalAddr;
+    }
+
+    SockAddr
+    RemoteAddr() const override
+    {
+      return m_RemoteAddr;
+    }
+
+    void
+    Close() override
+    {
+      ::uv_close((::uv_handle_t*)&m_Handle, &OnClose);
+    }
+
+    int
+    Bind(SockAddr laddr) override
+    {
+      if (auto err = ::uv_tcp_bind(&m_Handle, laddr.operator const sockaddr*(), 0); err != 0)
+        return err;
+
+      m_LocalAddr = laddr;
+      return 0;
+    }
+
+    bool
+    Start() override
+    {
+      if (auto err = ::uv_read_start((::uv_stream_t*)&m_Handle, &ReadAlloc, &OnRead); err != 0)
+      {
+        log::error(logcat, "TCPConnection::Start() uv_read_start(): {}", uv_strerror(err));
+        return false;
+      }
+      return true;
+    }
+
+    void
+    Send(OwnedBuffer buffer, SendCompletionHandler completionHandler) override
+    {
+      uv_write_t* req = new uv_write_t{};
+      SendRequest* sendr = new SendRequest{std::move(buffer), std::move(completionHandler), req};
+      req->data = sendr;
+      ::uv_buf_t buf = uv_buf_init(sendr->ptr(), sendr->size());
+      if (auto ret = ::uv_write(req, (::uv_stream_t*)&m_Handle, &buf, 1, &OnSent); ret < 0)
+      {
+        sendr->Completion(ret);
+        delete sendr;
+      }
+    }
+
+   private:
+    struct SendRequest
+    {
+      OwnedBuffer buffer;
+      SendCompletionHandler completed;
+      uv_write_t* const req;
+
+      char*
+      ptr() const noexcept
+      {
+        return reinterpret_cast<char*>(buffer.buf.get());
+      }
+
+      constexpr size_t
+      size() const noexcept
+      {
+        return buffer.sz;
+      }
+
+      void
+      Completion(int status)
+      {
+        completed(std::error_code(status, std::generic_category()));
+        delete req;
+      }
+    };
+  };
+
+  class TCPAcceptorImpl : public TCPAcceptor
+  {
+    uv_tcp_t m_Handle;
+    std::optional<SockAddr> m_LocalAddr;
+
+    static void
+    OnNewConn(uv_stream_t* handle, int status)
+    {
+      auto* self = static_cast<TCPAcceptorImpl*>(handle->data);
+      if (status)
+      {
+        self->m_AcceptHandler(nullptr, std::error_code{status, std::generic_category()});
+        return;
+      }
+      auto conn = std::static_pointer_cast<TCPConnectionImpl>(self->MakeConn());
+      if (auto err = ::uv_accept(handle, (::uv_stream_t*)&conn->m_Handle); err != 0)
+      {
+        log::error(logcat, "TCPAcceptor: uv_accept(): {}", uv_strerror(err));
+        conn->Untrack();
+        self->m_AcceptHandler(nullptr, std::error_code{err, std::generic_category()});
+        return;
+      }
+      self->m_AcceptHandler(std::move(conn), std::error_code{});
+    }
+
+    static void
+    OnClose(uv_handle_t* h)
+    {
+      auto* self = static_cast<TCPAcceptorImpl*>(h->data);
+      self->Untrack();
+    }
+
+   public:
+    TCPAcceptorImpl(Loop& loop, AcceptHandler handler, TCPConnectionPool& pool)
+        : TCPAcceptor{handler, pool}
+    {
+      if (auto err = ::uv_tcp_init(loop.m_Impl->raw(), &m_Handle); err != 0)
+        throw std::runtime_error{fmt::format("TCPAcceptor() uv_tcp_init(): {}", uv_strerror(err))};
+    }
+
+    bool
+    Bind(SockAddr addr) override
+    {
+      if (auto err = ::uv_tcp_bind(&m_Handle, addr.operator const sockaddr*(), 0); err != 0)
+      {
+        log::error(logcat, "TCPAcceptor::Bind() uv_tcp_bind() failed: {}", uv_strerror(err));
+        return false;
+      }
+
+      if (auto err = ::uv_listen((::uv_stream_t*)&m_Handle, 5, &OnNewConn); err != 0)
+      {
+        log::error(logcat, "TCPAcceptor::Bind() uv_listen() failed: {}", uv_strerror(err));
+        return false;
+      }
+
+      m_LocalAddr = addr;
+      return true;
+    }
+
+    std::optional<SockAddr>
+    LocalAddr() const override
+    {
+      return m_LocalAddr;
+    }
+
+    void
+    Close() override
+    {
+      ::uv_close((uv_handle_t*)&m_Handle, &OnClose);
+    }
+  };
+
+  class TCPConnectionPoolImpl : public TCPConnectionPool
+  {
+    Loop& m_Loop;
+
+    struct ConnectContext
+    {
+      std::shared_ptr<TCPConnectionImpl> conn;
+      CompletionHandler handler;
+      uv_connect_t* const m_Req;
+
+      ~ConnectContext()
+      {
+        delete m_Req;
+      }
+    };
+
+    static void
+    OnConnectResult(uv_connect_t* req, int status)
+    {
+      ConnectContext* ctx = reinterpret_cast<ConnectContext*>(req->data);
+      if (not ctx)
+        return;
+      ;
+      ctx->handler(ctx->conn, std::error_code{status, std::generic_category()});
+      delete ctx;
+    }
+
+    void
+    AsyncConnect(
+        std::shared_ptr<TCPConnectionImpl> conn, SockAddr remote, CompletionHandler handler)
+    {
+      conn->m_RemoteAddr = remote;
+      ::uv_connect_t* req = new uv_connect_t{};
+      req->data = new ConnectContext{conn, std::move(handler), req};
+      if (auto ret = ::uv_tcp_connect(
+              req, &conn->m_Handle, remote.operator const sockaddr*(), &OnConnectResult);
+          ret < 0)
+      {
+        delete static_cast<ConnectContext*>(req->data);
+        delete req;
+        throw std::runtime_error{fmt::format("uv_tcp_connect(): {}", ::uv_strerror(ret))};
+      }
+    }
+
+   public:
+    friend TCPAcceptorImpl;
+
+    TCPConnectionPoolImpl(Loop& loop) : m_Loop{loop}
+    {}
+
+    ~TCPConnectionPoolImpl() override = default;
+
+    void
+    Connect(
+        SockAddr remote_addr,
+        CompletionHandler completion_hander,
+        TCPConnection::RecvHandler recv_handler,
+        std::optional<SockAddr> local_addr) override
+    {
+      if (auto conn_ptr = std::static_pointer_cast<TCPConnectionImpl>(
+              MakeConnection(local_addr, std::move(recv_handler))))
+      {
+        AsyncConnect(std::move(conn_ptr), std::move(remote_addr), std::move(completion_hander));
+        return;
+      }
+      int err = errno;
+      errno = 0;
+      completion_hander(nullptr, std::error_code{err, std::generic_category()});
+    }
+
+    std::shared_ptr<TCPConnection>
+    MakeConnection(std::optional<SockAddr> local, TCPConnection::RecvHandler recv_handler) override
+    {
+      auto conn =
+          std::make_shared<TCPConnectionImpl>(m_Loop.m_Impl->raw(), std::move(recv_handler), *this);
+      if (local)
+      {
+        if (auto err = conn->Bind(*local); err < 0)
+        {
+          log::error(logcat, "TCPConnection::Bind() failed: {}", uv_strerror(err));
+          errno = err;
+          return nullptr;
+        }
+      }
+      return std::static_pointer_cast<TCPConnection>(conn);
+    }
+
+    std::shared_ptr<TCPAcceptor>
+    CreateAcceptor(AcceptHandler accept_handler) override
+    {
+      auto acceptor = std::make_shared<TCPAcceptorImpl>(m_Loop, std::move(accept_handler), *this);
+      return std::static_pointer_cast<TCPAcceptor>(acceptor);
+    }
+
+    void
+    CloseAll() override
+    {
+      for (const auto& [addr, conn] : m_Connections)
+      {
+        conn->Close();
+      }
+    }
+
+   protected:
+    std::shared_ptr<TCPConnection>
+    MakeConn()
+    {
+      return MakeConnection(std::nullopt, [](std::optional<OwnedBuffer>, std::error_code) {});
+    }
+  };
 
   class UVWakeup final : public EventLoopWakeup
   {
@@ -330,6 +664,8 @@ namespace llarp::uv
 #endif
 
     signal(SIGPIPE, SIG_IGN);
+
+    m_ConnectionPool = std::make_shared<TCPConnectionPoolImpl>(*this);
 
     m_Run.store(true);
     m_nextID.store(0);
@@ -779,6 +1115,12 @@ namespace llarp::uv
   Loop::num_worker_threads() const
   {
     return m_WorkThreads.size();
+  }
+
+  TCPConnectionPool&
+  Loop::connection_pool()
+  {
+    return *m_ConnectionPool;
   }
 
 }  // namespace llarp::uv

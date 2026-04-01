@@ -260,7 +260,7 @@ namespace llarp
     size_t sz;
 
     // Create a new, uninitialized owned buffer of the given size.
-    explicit OwnedBuffer(size_t sz) : buf{new byte_t[sz]}, sz{sz}
+    explicit OwnedBuffer(size_t sz) : buf{new byte_t[std::max(sz, size_t{1})]}, sz{sz}
     {}
 
     // copy content from existing memory
