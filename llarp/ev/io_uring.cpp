@@ -1,4 +1,6 @@
 #ifdef WITH_IO_URING
+#include "tcp_handle.hpp"
+#include "tcp_handle.hpp"
 #include "io_uring.hpp"
 #include <liburing.h>
 #include <sys/socket.h>
@@ -182,6 +184,76 @@ namespace llarp::io_uring
       shutdown();
     }
   };
+
+
+  class TCPConnectionImpl :public TCPConnection, public Resource
+  {
+    SockAddr m_LocalAddr;
+    SockAddr m_RemoteAddr;
+  public:
+    TCPConnectionImpl(TCPConnectionPool & pool, Loop& loop, RecvHandler recv_handler) :
+      TCPConnection{recv_handler, pool},
+      Resource{loop}
+    {
+    }
+  };
+
+  class TCPAcceptorImpl : public TCPAcceptor, public Resource
+  {
+
+  };
+
+  class TCPConnectionPoolImpl : public TCPConnectionPool
+  {
+    Loop & m_Loop;
+  protected:
+    std::shared_ptr<TCPConnection>
+    MakeConnection(std::optional<SockAddr> local_addr, TCPConnection::RecvHandler recv_handler) override
+    {
+
+        auto conn =
+            std::make_shared<TCPConnectionImpl>(*this, m_Loop, std::move(recv_handler));
+        if (local_addr)
+        {
+          if (auto err = conn->Bind(*local_addr); err < 0)
+          {
+            log::error(cat, "TCPConnection::Bind() failed: {}",strerror(err));
+            errno = err;
+            return nullptr;
+          }
+        }
+        return std::static_pointer_cast<TCPConnection>(conn);
+
+    }
+  public:
+    TCPConnectionPoolImpl(Loop& loop) :
+    TCPConnectionPool{},
+    m_Loop{loop}
+    {
+    }
+
+    void
+    Connect(SockAddr remote_addr, CompletionHandler completion_hander, TCPConnection::RecvHandler recv_handler, std::optional<SockAddr> local_addr) override
+    {
+      auto conn = MakeConnection(local_addr, recv_handler);
+    }
+
+    std::shared_ptr<TCPAcceptor>
+    CreateAcceptor(AcceptHandler accept_handler) override
+    {
+      auto ptr = std::make_shared<TCPAcceptorImpl>(*this, accept_handler);
+      return std::static_pointer_cast<TCPAcceptor>(ptr);
+    }
+
+    void CloseAll() override
+    {
+      for (auto [laddr, conn] : m_Connections)
+        conn->Close();
+
+    }
+
+  };
+
 
   struct UDPSocket : public llarp::UDPHandle, public Resource
   {
@@ -755,6 +827,12 @@ namespace llarp::io_uring
     };
   }  // namespace
 
+  TCPConnectionPool &
+  Loop::connection_pool()
+  {
+    return *m_ConnectionPool;
+  }
+
   void
   Loop::queue_work(std::unique_ptr<EventLoopWork> work)
   {
@@ -832,6 +910,7 @@ namespace llarp::io_uring
     m_Run = true;
     m_EventLoopThreadID = std::this_thread::get_id();
     llarp::util::SetThreadName("llarpd-mainloop");
+    m_ConnectionPool = std::make_shared<TCPConnectionPoolImpl>(*this);
 
     m_LogicWaker = std::make_shared<Wakeup>(
         *this, [self = this]() { self->flush_logic(); }, false);

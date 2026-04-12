@@ -82,8 +82,10 @@ namespace llarp
   TCPConnectionPool::RemoveConn(std::shared_ptr<TCPConnection> conn)
   {
     auto laddr = conn->LocalAddr();
-    if (auto itr = m_Connections.find(laddr); itr != m_Connections.end())
-      m_Connections.erase(itr);
+    auto raddr = conn->RemoteAddr();
+    std::erase_if(m_Connections, [laddr, raddr](const auto& conn) {
+      return laddr == conn->LocalAddr() and raddr == conn->RemoteAddr();
+    });
   }
 
   void
@@ -92,9 +94,10 @@ namespace llarp
     auto maybe_laddr = acceptor->LocalAddr();
     if (not maybe_laddr)
       return;
-    auto& laddr = *maybe_laddr;
-    if (auto itr = m_Connections.find(laddr); itr != m_Connections.end())
-      m_Connections.erase(itr);
+    const auto& laddr = *maybe_laddr;
+    std::erase_if(m_Connections, [laddr](const auto& conn) {
+      return laddr == conn->LocalAddr();
+    });
   }
 
   TCPConnection::TCPConnection(RecvHandler handler, TCPConnectionPool& pool)

@@ -131,6 +131,22 @@ namespace llarp::uv
         log::error(logcat, "TCPConnection::Start() uv_read_start(): {}", uv_strerror(err));
         return false;
       }
+
+
+      int lsocklen{}, rsocklen{};
+      ::sockaddr lsockaddr{}, rsockaddr{};
+      if (auto err = ::uv_tcp_getpeername(&m_Handle, &rsockaddr, &rsocklen); err < 0)
+      {
+        log::error(logcat, "uv_tcp_getpeername(): {}", uv_strerror(err));
+        return false;
+      }
+      if (auto err = ::uv_tcp_getsockname(&m_Handle, &lsockaddr, &lsocklen); err < 0)
+      {
+        log::error(logcat, "uv_tcp_getsockname(): {}", uv_strerror(err));
+        return false;
+      }
+      m_LocalAddr = lsockaddr;
+      m_RemoteAddr = rsockaddr;
       return true;
     }
 
@@ -286,6 +302,7 @@ namespace llarp::uv
               req, &conn->m_Handle, remote.operator const sockaddr*(), &OnConnectResult);
           ret < 0)
       {
+        conn->Untrack();
         delete static_cast<ConnectContext*>(req->data);
         delete req;
         throw std::runtime_error{fmt::format("uv_tcp_connect(): {}", ::uv_strerror(ret))};
@@ -332,23 +349,24 @@ namespace llarp::uv
           return nullptr;
         }
       }
-      return std::static_pointer_cast<TCPConnection>(conn);
+      return std::static_pointer_cast<TCPConnection>(m_Connections.emplace_back(conn));
     }
 
     std::shared_ptr<TCPAcceptor>
     CreateAcceptor(AcceptHandler accept_handler) override
     {
       auto acceptor = std::make_shared<TCPAcceptorImpl>(m_Loop, std::move(accept_handler), *this);
-      return std::static_pointer_cast<TCPAcceptor>(acceptor);
+      return std::static_pointer_cast<TCPAcceptor>(m_Acceptors.emplace_back(acceptor));
     }
 
     void
     CloseAll() override
     {
-      for (const auto& [addr, conn] : m_Connections)
-      {
+      for (const auto& conn : m_Connections)
         conn->Close();
-      }
+
+      for (const auto & acc: m_Acceptors)
+        acc->Close();
     }
 
    protected:

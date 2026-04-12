@@ -74,8 +74,9 @@ namespace llarp
     CloseAll() = 0;
 
    protected:
-    // maps local addr to connection
-    std::unordered_map<SockAddr, std::shared_ptr<TCPConnection>> m_Connections;
+
+    std::vector<std::shared_ptr<TCPConnection>> m_Connections;
+    std::vector<std::shared_ptr<TCPAcceptor>> m_Acceptors;
 
     virtual std::shared_ptr<TCPConnection>
     MakeConnection(std::optional<SockAddr> local_addr, TCPConnection::RecvHandler recv_handler) = 0;
