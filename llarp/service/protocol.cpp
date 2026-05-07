@@ -314,9 +314,9 @@ namespace llarp
         llarp_buffer_t buf(tmp);
         if (not bencode_start_list(&buf))
           return false;
-        for (size_t idx{}; idx < msgs.size(); ++idx)
+        while (not msgs.empty())
         {
-          auto& msg = msgs[idx];
+          auto& msg = msgs.front();
           // encode message
           auto* cur = buf.cur;
           if (not msg.BEncode(&buf))

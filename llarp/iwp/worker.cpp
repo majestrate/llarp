@@ -53,7 +53,7 @@ namespace llarp::iwp
   void
   EncryptWorker::Submit(std::weak_ptr<Session> ptr, Packet_t pkt)
   {
-    m_SubmitQueue.pushBack(std::make_pair(ptr, pkt));
+    m_SubmitQueue.pushBack(std::make_pair(std::move(ptr), std::move(pkt)));
   }
 
   EncryptWorker::~EncryptWorker()
@@ -115,7 +115,8 @@ namespace llarp::iwp
   void
   DecryptWorker::Submit(std::weak_ptr<Session> ptr, Packet_t pkt)
   {
-    m_SubmitQueue.pushBack(std::make_pair(ptr, std::make_pair(m_Seq++, pkt)));
+    m_SubmitQueue.pushBack(
+        std::make_pair(std::move(ptr), std::make_pair(m_Seq++, std::move(pkt))));
   }
 
   DecryptWorker::~DecryptWorker()
@@ -128,12 +129,12 @@ namespace llarp::iwp
   void
   Worker::Encrypt(std::weak_ptr<Session> ptr, EncryptWorker::Packet_t pkt)
   {
-    m_Encrypt.Submit(ptr, pkt);
+    m_Encrypt.Submit(std::move(ptr), std::move(pkt));
   }
   void
   Worker::Decrypt(std::weak_ptr<Session> ptr, DecryptWorker::Packet_t pkt)
   {
-    m_Decrypt.Submit(ptr, pkt);
+    m_Decrypt.Submit(std::move(ptr), std::move(pkt));
   }
 
   void

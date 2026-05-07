@@ -1,6 +1,10 @@
 #pragma once
 
 #include <functional>
+#include <memory>
+#include <optional>
+#include <system_error>
+#include <unordered_map>
 #include <llarp/net/sock_addr.hpp>
 #include <llarp/util/buffer.hpp>
 
