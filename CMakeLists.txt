@@ -22,11 +22,11 @@ endif()
 
 
 project(llarp
-    VERSION 0.10.0
+    VERSION 0.11.0
     DESCRIPTION "llarp - IP packet onion router"
     LANGUAGES ${LANGS})
 
-set(RELEASE_MOTTO "Just like me frfr" CACHE STRING "Release motto")
+set(RELEASE_MOTTO "Total Quango Death" CACHE STRING "Release motto")
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 
