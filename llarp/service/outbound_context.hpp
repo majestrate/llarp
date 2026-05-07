@@ -26,7 +26,7 @@ namespace llarp
       Tick(llarp_time_t now) override;
 
       void
-      BlacklistSNode(const RouterID) override{};
+      BlacklistSNode(const RouterID) override {};
 
       bool
       ShouldBundleRC() const override;

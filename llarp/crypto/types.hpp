@@ -307,20 +307,23 @@ namespace std
       return m_hasher(pk.as_array());
     }
   };
+};  // namespace std
 
+namespace llarp
+{
   constexpr auto&
-  operator^=(array<uint8_t, 32>& lhs, const array<uint8_t, 32>& rhs)
+  operator^=(std::array<uint8_t, 32>& lhs, const std::array<uint8_t, 32>& rhs)
   {
     transform(lhs.begin(), lhs.end(), rhs.begin(), lhs.begin(), std::bit_xor<>{});
     return lhs;
   }
 
-  constexpr array<uint8_t, 32>
-  operator^(const array<uint8_t, 32>& lhs, const array<uint8_t, 32>& rhs)
+  constexpr std::array<uint8_t, 32>
+  operator^(const std::array<uint8_t, 32>& lhs, const std::array<uint8_t, 32>& rhs)
   {
-    array<uint8_t, 32> result{};
-    transform(lhs.begin(), lhs.end(), rhs.begin(), result.begin(), std::bit_xor<>{});
+    std::array<uint8_t, 32> result{};
+    std::transform(lhs.begin(), lhs.end(), rhs.begin(), result.begin(), std::bit_xor<>{});
     return result;
   }
 
-};  // namespace std
+};  // namespace llarp

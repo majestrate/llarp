@@ -133,7 +133,7 @@ namespace llarp::path
       RelayUpstreamMessage msg{};
       CryptoManager::instance()->xchacha20(buf, transit_hop_ptr->pathKey, ev.second);
       msg.pathid = PathID_t{transit_hop_ptr->info.txID};
-      msg.Y = ev.second ^ TunnelNonce { transit_hop_ptr->nonceXOR };
+      msg.Y = ev.second ^ TunnelNonce{transit_hop_ptr->nonceXOR};
       msg.X = buf;
       if (m_UpstreamGather.tryPushBack(std::make_pair(maybe->first, msg))
           == thread::QueueReturn::Success)

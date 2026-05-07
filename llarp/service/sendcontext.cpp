@@ -29,8 +29,10 @@ namespace llarp
     SendContext::Send(std::shared_ptr<ProtocolFrame> msg, path::Path_ptr path)
     {
       if (path->IsReady()
-          and m_SendQueue.tryPushBack(std::make_pair(
-                  std::make_shared<routing::PathTransferMessage>(*msg, remoteIntro.pathID), path))
+          and m_SendQueue.tryPushBack(
+                  std::make_pair(
+                      std::make_shared<routing::PathTransferMessage>(*msg, remoteIntro.pathID),
+                      path))
               == thread::QueueReturn::Success)
       {
         m_Endpoint->Router()->TriggerPump();

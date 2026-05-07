@@ -81,7 +81,7 @@ namespace llarp
       }
 
       void
-      Stop() override{};
+      Stop() override {};
 
       std::optional<SockAddr>
       BoundOn() const override
@@ -953,8 +953,9 @@ namespace llarp
         return false;
       }
 
-      m_OurIPv6 = net::ipv6addr_t::from_host(llarp::uint128_t{
-          0xfd2e'6c6f'6b69'0000, ToHost(llarp::net::TruncateV6(m_OurRange.addr)).h});
+      m_OurIPv6 = net::ipv6addr_t::from_host(
+          llarp::uint128_t{
+              0xfd2e'6c6f'6b69'0000, ToHost(llarp::net::TruncateV6(m_OurRange.addr)).h});
 
       if (auto maybe = m_router->Net().GetInterfaceIPv6Address(m_IfName))
       {

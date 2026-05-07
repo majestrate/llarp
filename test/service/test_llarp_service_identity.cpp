@@ -77,7 +77,8 @@ TEST_CASE("test subkey derivation", "[crypto]")
 
   PrivateKey root_key;
   CHECK(root.toPrivate(root_key));
-  CHECK(memcmp(root_key.data(), root_key_data.data(), 32) == 0);
+  static_assert(root_key.size() == root_key_data.size());
+  CHECK(memcmp(root_key.data(), root_key_data.data(), root_key.size()) == 0);
 
   auto crypto = CryptoManager::instance();
 

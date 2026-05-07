@@ -74,8 +74,7 @@ namespace llarp::util
     }
 
     void
-    start(
-        size_t N_threads, std::function<void(void)> notify_ready = []() {})
+    start(size_t N_threads, std::function<void(void)> notify_ready = []() {})
     {
       if (not m_Threads.empty())
         return;

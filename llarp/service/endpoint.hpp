@@ -130,7 +130,7 @@ namespace llarp
       };
 
       virtual void
-      Thaw(){};
+      Thaw() {};
 
       void
       ResetInternalState() override;

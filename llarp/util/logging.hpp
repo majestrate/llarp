@@ -214,10 +214,10 @@ namespace llarp
         T&&... args,
         const llarp::util::source_location& location = llarp::util::source_location::current())
         : log::trace<T...>{
-            log_detail::legacy_logger,
-            log_detail::concat_args_fmt<sizeof...(T)>(),
-            std::forward<T>(args)...,
-            location}
+              log_detail::legacy_logger,
+              log_detail::concat_args_fmt<sizeof...(T)>(),
+              std::forward<T>(args)...,
+              location}
     {}
   };
   template <typename... T>
@@ -227,10 +227,10 @@ namespace llarp
         T&&... args,
         const llarp::util::source_location& location = llarp::util::source_location::current())
         : log::debug<T...>{
-            log_detail::legacy_logger,
-            log_detail::concat_args_fmt<sizeof...(T)>(),
-            std::forward<T>(args)...,
-            location}
+              log_detail::legacy_logger,
+              log_detail::concat_args_fmt<sizeof...(T)>(),
+              std::forward<T>(args)...,
+              location}
     {}
   };
   template <typename... T>
@@ -240,10 +240,10 @@ namespace llarp
         T&&... args,
         const llarp::util::source_location& location = llarp::util::source_location::current())
         : log::info<T...>{
-            log_detail::legacy_logger,
-            log_detail::concat_args_fmt<sizeof...(T)>(),
-            std::forward<T>(args)...,
-            location}
+              log_detail::legacy_logger,
+              log_detail::concat_args_fmt<sizeof...(T)>(),
+              std::forward<T>(args)...,
+              location}
     {}
   };
   template <typename... T>
@@ -253,10 +253,10 @@ namespace llarp
         T&&... args,
         const llarp::util::source_location& location = llarp::util::source_location::current())
         : log::warning<T...>{
-            log_detail::legacy_logger,
-            log_detail::concat_args_fmt<sizeof...(T)>(),
-            std::forward<T>(args)...,
-            location}
+              log_detail::legacy_logger,
+              log_detail::concat_args_fmt<sizeof...(T)>(),
+              std::forward<T>(args)...,
+              location}
     {}
   };
   template <typename... T>
@@ -266,10 +266,10 @@ namespace llarp
         T&&... args,
         const llarp::util::source_location& location = llarp::util::source_location::current())
         : log::error<T...>{
-            log_detail::legacy_logger,
-            log_detail::concat_args_fmt<sizeof...(T)>(),
-            std::forward<T>(args)...,
-            location}
+              log_detail::legacy_logger,
+              log_detail::concat_args_fmt<sizeof...(T)>(),
+              std::forward<T>(args)...,
+              location}
     {}
   };
 

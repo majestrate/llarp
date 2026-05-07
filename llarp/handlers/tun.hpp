@@ -75,7 +75,7 @@ namespace llarp
       Configure(const NetworkConfig& conf, const DnsConfig& dnsConf) override;
 
       void
-      SendPacketToRemote(const llarp_buffer_t&, service::ProtocolType) override{};
+      SendPacketToRemote(const llarp_buffer_t&, service::ProtocolType) override {};
 
       std::string
       GetIfName() const override;

@@ -40,7 +40,7 @@ namespace llarp
 
     /// hook for utp for when we have established a connection
     virtual void
-    OnLinkEstablished(ILinkLayer*){};
+    OnLinkEstablished(ILinkLayer*) {};
 
     /// called during pumping
     virtual void

@@ -833,10 +833,8 @@ namespace llarp::io_uring
     m_EventLoopThreadID = std::this_thread::get_id();
     llarp::util::SetThreadName("llarpd-mainloop");
 
-    m_LogicWaker = std::make_shared<Wakeup>(
-        *this, [self = this]() { self->flush_logic(); }, false);
-    m_TickerWaker = std::make_shared<Wakeup>(
-        *this, [self = this]() { self->io_wakeup(); }, true);
+    m_LogicWaker = std::make_shared<Wakeup>(*this, [self = this]() { self->flush_logic(); }, false);
+    m_TickerWaker = std::make_shared<Wakeup>(*this, [self = this]() { self->io_wakeup(); }, true);
 
     auto cleanup_handles = make_repeater();
     cleanup_handles->start(1s, [self = this]() {

@@ -27,7 +27,8 @@ namespace llarp::iwp
       PumpDoneHandler pumpDone,
       WorkerFunc_t worker,
       bool allowInbound)
-      : ILinkLayer{keyManager, ev, getrc, h, sign, before, est, reneg, timeout, closed, pumpDone, worker}
+      : ILinkLayer{
+            keyManager, ev, getrc, h, sign, before, est, reneg, timeout, closed, pumpDone, worker}
       , m_Wakeup{ev->make_waker([this]() { HandleWakeupPlaintext(); })}
       , m_HashingWakeup{ev->make_waker([this]() {
         for (auto& session : m_CollectHash)
