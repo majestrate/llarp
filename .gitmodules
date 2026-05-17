@@ -1,22 +1,12 @@
-[submodule "external/ghc-filesystem"]
-	path = external/ghc-filesystem
-	url = https://github.com/gulrak/filesystem.git
 [submodule "test/Catch2"]
 	path = test/Catch2
 	url = https://github.com/catchorg/Catch2
-[submodule "external/pybind11"]
-	path = external/pybind11
-	url = https://github.com/pybind/pybind11
-	branch = stable
 [submodule "external/uvw"]
 	path = external/uvw
 	url = https://github.com/jagerman/uvw.git
 [submodule "external/oxen-encoding"]
 	path = external/oxen-encoding
 	url = https://github.com/oxen-io/oxen-encoding.git
-[submodule "external/oxen-logging"]
-	path = external/oxen-logging
-	url = https://github.com/oxen-io/oxen-logging.git
 [submodule "external/CLI11"]
 	path = external/CLI11
 	url = https://github.com/CLIUtils/CLI11.git

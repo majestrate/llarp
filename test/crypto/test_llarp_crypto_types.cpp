@@ -274,7 +274,7 @@ TEST_CASE_METHOD(TestCryptoTypesSecret, "secret_key_to_file")
   llarp::test::FileGuard guard(p);
 
   llarp::SecretKey key;
-  key.Randomize();
+  ::randombytes(key.data(), key.size());
   REQUIRE(key.SaveToFile(p));
 
   // Verify we created the file

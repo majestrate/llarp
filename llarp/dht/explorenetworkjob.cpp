@@ -17,12 +17,7 @@ namespace llarp
     ExploreNetworkJob::Start(const TXOwner& peer)
     {
       auto msg = new FindRouterMessage(peer.txid);
-      auto router = parent->GetRouter();
-      if (router)
-      {
-        router->NotifyRouterEvent<tooling::FindRouterSentEvent>(router->pubkey(), *msg);
-      }
-      parent->DHTSendTo(peer.node.as_array(), msg);
+      parent->DHTSendTo(peer.node.Router(), msg);
     }
 
     void

@@ -114,9 +114,9 @@ namespace llarp
             "Network ID; this is '"s + llarp::DEFAULT_NETID + "' for mainnet, 'gamma' for testnet.",
         },
         [this](std::string arg) {
-          if (arg.size() > NetID::size())
+          if (arg.size() > NetID::max_size())
             throw std::invalid_argument{
-                fmt::format("netid is too long, max length is {}", NetID::size())};
+                fmt::format("netid is too long, max length is {}", NetID::max_size())};
 
           m_netId = std::move(arg);
         });
@@ -855,11 +855,13 @@ namespace llarp
     constexpr std::array DefaultDNSBind{
 #ifdef __linux__
 #ifdef WITH_SYSTEMD
+        Default{"127.3.2.1:53"},
         // when we have systemd support add a random high port on loopback as well
         // see https://github.com/oxen-io/lokinet/issues/1887#issuecomment-1091897282
         Default{"127.0.0.1:0"},
-#endif
+#else
         Default{"127.3.2.1:53"},
+#endif
 #else
         Default{"127.0.0.1:53"},
 #endif
@@ -907,15 +909,6 @@ namespace llarp
 
     conf.defineOption<std::string>(
         "dns",
-        "query-bind",
-        Hidden,
-        Comment{
-            "Address to bind to for sending upstream DNS requests.",
-        },
-        [this](std::string arg) { m_QueryBind = SockAddr{arg}; });
-
-    conf.defineOption<std::string>(
-        "dns",
         "bind",
         DefaultDNSBind,
         MultiValue,
@@ -931,25 +924,6 @@ namespace llarp
           m_bind.emplace_back(addr);
         });
 
-    conf.defineOption<fs::path>(
-        "dns",
-        "add-hosts",
-        ClientOnly,
-        Env{"LLARP_DNS_HOSTS_FILE", get_env},
-        Comment{
-            "Add a hosts file to the dns resolver",
-            "For use with client side dns filtering",
-            "",
-            "env-var: LLARP_DNS_HOSTS_FILE"},
-        [this](fs::path path) {
-          if (path.empty())
-            return;
-          if (not fs::exists(path))
-            throw std::invalid_argument{
-                fmt::format("cannot add hosts file {} as it does not exist", path)};
-          m_hostfiles.emplace_back(std::move(path));
-        });
-
     // Ignored option (used by the systemd service file to disable resolvconf configuration).
     conf.defineOption<bool>(
         "dns",
@@ -960,11 +934,6 @@ namespace llarp
             "(This is not used directly by lokinet itself, but by the lokinet init scripts",
             "on systems which use resolveconf)",
         });
-
-    // forward the rest to libunbound
-    conf.addUndeclaredHandler("dns", [this](auto, std::string_view key, std::string_view val) {
-      m_ExtraOpts.emplace(key, val);
-    });
   }
 
   void
@@ -1013,8 +982,7 @@ namespace llarp
             "env-var: LLARP_PUBLIC_PORT"},
         [this](uint16_t arg) { PublicPort = net::port_t::from_host(arg); });
 
-    auto parse_addr_for_link = [net_ptr](
-                                   const std::string& arg, net::port_t default_port, bool inbound) {
+    auto parse_addr_for_link = [net_ptr](const std::string& arg, net::port_t default_port, bool) {
       std::optional<SockAddr> addr = std::nullopt;
       // explicitly provided value
       if (not arg.empty())

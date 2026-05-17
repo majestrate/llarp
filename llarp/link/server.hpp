@@ -14,6 +14,9 @@
 
 namespace llarp
 {
+
+  struct AbstractRouter;
+
   /// handle a link layer message. this allows for the message to be handled by "upper layers"
   ///
   /// currently called from iwp::Session when messages are sent or received.

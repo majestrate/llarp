@@ -24,9 +24,8 @@ namespace llarp
       TransitHopInfo() = default;
       TransitHopInfo(const RouterID& down, const LR_CommitRecord& record);
 
-      PathID_t txID, rxID;
-      RouterID upstream;
-      RouterID downstream;
+      PathID_t txID{}, rxID{};
+      RouterID upstream{}, downstream{};
 
       std::string
       ToString() const;
@@ -52,15 +51,55 @@ namespace llarp
           < std::tie(rhs.txID, rhs.rxID, rhs.upstream, rhs.downstream);
     }
 
-    struct TransitHop : public IHopHandler,
-                        public routing::IMessageHandler,
+    struct PathContext;
+    struct TransitHop;
+
+    class TransitWorker
+    {
+      using Hop_ptr = std::weak_ptr<TransitHop>;
+      using Traffic_t = IHopHandler::TrafficEvent_t;
+
+      static constexpr size_t queue_length = 128;
+
+      thread::Queue<std::pair<Hop_ptr, Traffic_t>> m_UpstreamSubmit;
+      thread::Queue<std::pair<Hop_ptr, RelayUpstreamMessage>> m_UpstreamGather;
+      thread::Queue<std::pair<Hop_ptr, Traffic_t>> m_DownstreamSubmit;
+      thread::Queue<std::pair<Hop_ptr, RelayDownstreamMessage>> m_DownstreamGather;
+      std::vector<std::jthread> m_Threads;
+      std::shared_ptr<EventLoopWakeup> m_Wakeup;
+      PathContext& m_PathContext;
+
+      void
+      RunUpstream();
+
+      void
+      RunDownstream();
+
+      void
+      Gather();
+
+     public:
+      explicit TransitWorker(PathContext& ctx, const EventLoop_ptr&);
+      ~TransitWorker();
+
+      void
+      Start(size_t upstream_threads, size_t downstream_threads);
+      void
+      SubmitUpstream(std::weak_ptr<TransitHop> hop, IHopHandler::TrafficEvent_t ev);
+      void
+      SubmitDownstream(std::weak_ptr<TransitHop> hop, IHopHandler::TrafficEvent_t ev);
+    };
+
+    struct TransitHop : IHopHandler,
+                        routing::IMessageHandler,
                         std::enable_shared_from_this<TransitHop>
     {
+      friend TransitWorker;
       TransitHop();
 
-      TransitHopInfo info;
-      SharedSecret pathKey;
-      ShortHash nonceXOR;
+      TransitHopInfo info{};
+      SharedSecret pathKey{};
+      ShortHash nonceXOR{};
       llarp_time_t started = 0s;
       // 10 minutes default
       llarp_time_t lifetime = default_lifetime;
@@ -174,21 +213,14 @@ namespace llarp
       HandleDHTMessage(const dht::IMessage& msg, AbstractRouter* r) override;
 
       void
-      FlushUpstream(AbstractRouter* r) override;
-
-      void
-      FlushDownstream(AbstractRouter* r) override;
-
-      void
       QueueDestroySelf(AbstractRouter* r);
 
+      bool
+      HandleUpstream(const llarp_buffer_t& X, const TunnelNonce& Y, AbstractRouter* r) override;
+      bool
+      HandleDownstream(const llarp_buffer_t& X, const TunnelNonce& Y, AbstractRouter* r) override;
+
      protected:
-      void
-      UpstreamWork(TrafficQueue_t queue, AbstractRouter* r) override;
-
-      void
-      DownstreamWork(TrafficQueue_t queue, AbstractRouter* r) override;
-
       void
       HandleAllUpstream(std::vector<RelayUpstreamMessage> msgs, AbstractRouter* r) override;
 
@@ -198,12 +230,6 @@ namespace llarp
      private:
       void
       SetSelfDestruct();
-
-      std::set<std::shared_ptr<TransitHop>, ComparePtr<std::shared_ptr<TransitHop>>> m_FlushOthers;
-      thread::Queue<RelayUpstreamMessage> m_UpstreamGather;
-      thread::Queue<RelayDownstreamMessage> m_DownstreamGather;
-      std::atomic<uint32_t> m_UpstreamWorkCounter;
-      std::atomic<uint32_t> m_DownstreamWorkCounter;
     };
   }  // namespace path
 

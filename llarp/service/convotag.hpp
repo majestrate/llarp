@@ -7,20 +7,25 @@
 
 namespace llarp::service
 {
-  struct ConvoTag final : AlignedBuffer<16>
+  struct ConvoTag final
   {
-    using AlignedBuffer<16>::AlignedBuffer;
-
-    void
-    Randomize() override;
-
+    ALIGNED_BUFFER_MEMBERS(ConvoTag, 16)
+   public:
     sockaddr_in6
     ToV6() const;
 
     void
     FromV6(sockaddr_in6 saddr);
   };
+
 }  // namespace llarp::service
+
+namespace llarp
+{
+
+  template <>
+  constexpr inline bool is_aligned_buffer<service::ConvoTag> = true;
+}
 
 namespace std
 {

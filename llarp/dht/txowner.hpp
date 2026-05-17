@@ -9,7 +9,7 @@ namespace llarp
   {
     struct TXOwner
     {
-      Key_t node;
+      Key_t node{};
       uint64_t txid = 0;
 
       TXOwner() = default;

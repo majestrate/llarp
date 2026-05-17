@@ -16,10 +16,11 @@ namespace llarp::dht
   bool
   FindNameMessage::BEncode(llarp_buffer_t* buf) const
   {
-    const auto data = oxenc::bt_serialize(oxenc::bt_dict{
-        {"A", "N"sv},
-        {"H", std::string_view{(char*)NameHash.data(), NameHash.size()}},
-        {"T", TxID}});
+    const auto data = oxenc::bt_serialize(
+        oxenc::bt_dict{
+            {"A", "N"sv},
+            {"H", std::string_view{(char*)NameHash.data(), NameHash.size()}},
+            {"T", TxID}});
     return buf->write(data.begin(), data.end());
   }
 

@@ -39,13 +39,13 @@ namespace llarp
     PublishServiceJob::Start(const TXOwner& peer)
     {
       parent->DHTSendTo(
-          peer.node.as_array(), new PublishIntroMessage(introset, peer.txid, false, relayOrder));
+          peer.node.Router(), new PublishIntroMessage(introset, peer.txid, false, relayOrder));
     }
 
     void
     PublishServiceJob::SendReply()
     {
-      parent->DHTSendTo(whoasked.node.as_array(), new GotIntroMessage({introset}, whoasked.txid));
+      parent->DHTSendTo(whoasked.node.Router(), new GotIntroMessage({introset}, whoasked.txid));
     }
 
     LocalPublishServiceJob::LocalPublishServiceJob(
@@ -62,13 +62,13 @@ namespace llarp
     LocalPublishServiceJob::SendReply()
     {
       auto path =
-          parent->GetRouter()->pathContext().GetByUpstream(parent->OurKey().as_array(), localPath);
+          parent->GetRouter()->pathContext().GetByUpstream(parent->OurKey().Router(), localPath);
       if (!path)
       {
         llarp::LogWarn(
             "did not send reply for relayed dht request, no such local path "
             "for pathid=",
-            localPath);
+            localPath.ToHex());
         return;
       }
       routing::DHTMessage msg;
@@ -78,7 +78,7 @@ namespace llarp
         llarp::LogWarn(
             "failed to send routing message when informing result of dht "
             "request, pathid=",
-            localPath);
+            localPath.ToHex());
       }
     }
   }  // namespace dht

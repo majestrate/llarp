@@ -10,12 +10,9 @@
 #include "intro.hpp"
 #include "handler.hpp"
 #include <llarp/util/bencode.hpp>
-#include <llarp/util/time.hpp>
 #include <llarp/path/pathset.hpp>
 
 #include <vector>
-
-struct llarp_threadpool;
 
 namespace llarp
 {
@@ -29,8 +26,6 @@ namespace llarp
   {
     struct Endpoint;
 
-    constexpr std::size_t MAX_PROTOCOL_MESSAGE_SIZE = 2048 * 2;
-
     /// inner message
     struct ProtocolMessage
     {
@@ -40,10 +35,10 @@ namespace llarp
       ProtocolType proto = ProtocolType::TrafficV4;
       llarp_time_t queued = 0s;
       std::vector<byte_t> payload;
-      Introduction introReply;
-      ServiceInfo sender;
+      Introduction introReply{};
+      ServiceInfo sender{};
       Endpoint* handler = nullptr;
-      ConvoTag tag;
+      ConvoTag tag{};
       uint64_t seqno = 0;
       uint64_t version = llarp::constants::proto_version;
 
@@ -57,33 +52,39 @@ namespace llarp
       bool
       BEncode(llarp_buffer_t* buf) const;
 
+      bool
+      BDecode(llarp_buffer_t* buf);
+
       void
       PutBuffer(const llarp_buffer_t& payload);
 
       static void
       ProcessAsync(path::Path_ptr p, PathID_t from, std::shared_ptr<ProtocolMessage> self);
 
-      inline bool
-      operator<(const ProtocolMessage& other) const
+      bool
+      operator>(const ProtocolMessage& other) const
       {
-        return seqno < other.seqno;
+        return seqno > other.seqno;
       }
     };
 
     /// outer message
-    struct ProtocolFrame final : public routing::IMessage
+    struct ProtocolFrame final : routing::IMessage
     {
-      using Encrypted_t = Encrypted<2048>;
-      PQCipherBlock C;
-      Encrypted_t D;
+      using Encrypted_t = Encrypted<constants::service_proto_message_max_size>;
+      PQCipherBlock C{};
+      Encrypted_t D{};
       uint64_t R;
-      KeyExchangeNonce N;
-      Signature Z;
-      PathID_t F;
-      service::ConvoTag T;
+      KeyExchangeNonce N{};
+      Signature Z{};
+      PathID_t F{};
+      ConvoTag T{};
+
+      size_t
+      overhead() const noexcept override;
 
       ProtocolFrame(const ProtocolFrame& other)
-          : routing::IMessage()
+          : IMessage{}
           , C(other.C)
           , D(other.D)
           , R(other.R)
@@ -96,7 +97,7 @@ namespace llarp
         version = other.version;
       }
 
-      ProtocolFrame() : routing::IMessage{}
+      ProtocolFrame() : IMessage{}
       {
         Clear();
       }
@@ -120,6 +121,12 @@ namespace llarp
           const ProtocolMessage& msg, const SharedSecret& sharedkey, const Identity& localIdent);
 
       bool
+      EncryptAndSign(
+          std::deque<ProtocolMessage>& msgs,
+          const SharedSecret& sharedkey,
+          const Identity& localIdent);
+
+      bool
       Sign(const Identity& localIdent);
 
       bool
@@ -131,7 +138,7 @@ namespace llarp
           std::function<void(std::shared_ptr<ProtocolMessage>)> hook = nullptr) const;
 
       bool
-      DecryptPayloadInto(const SharedSecret& sharedkey, ProtocolMessage& into) const;
+      DecryptPayloadInto(const SharedSecret& sharedkey, std::vector<ProtocolMessage>& into) const;
 
       bool
       DecodeKey(const llarp_buffer_t& key, llarp_buffer_t* val) override;
@@ -148,14 +155,14 @@ namespace llarp
       void
       Clear() override
       {
-        C.Zero();
+        Zero(C);
         D.Clear();
         F.Zero();
         T.Zero();
         N.Zero();
         Z.Zero();
         R = 0;
-        version = llarp::constants::proto_version;
+        version = constants::proto_version;
       }
 
       bool
@@ -164,5 +171,9 @@ namespace llarp
       bool
       HandleMessage(routing::IMessageHandler* h, AbstractRouter* r) const override;
     };
+
   }  // namespace service
+
+  template <>
+  constexpr inline bool is_aligned_buffer<service::ProtocolFrame::Encrypted_t> = true;
 }  // namespace llarp

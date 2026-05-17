@@ -8,7 +8,7 @@
 
 namespace llarp
 {
-  static constexpr size_t EncryptedFrameOverheadSize = PUBKEYSIZE + TUNNONCESIZE + SHORTHASHSIZE;
+  static constexpr size_t EncryptedFrameOverheadSize = constants::encrypted_frame_overhead_size;
   static constexpr size_t EncryptedFrameBodySize = 128 * 6;
   static constexpr size_t EncryptedFrameSize = EncryptedFrameOverheadSize + EncryptedFrameBodySize;
 
@@ -19,7 +19,7 @@ namespace llarp
 
     EncryptedFrame(size_t sz)
         : Encrypted<EncryptedFrameSize>(
-            std::min(sz, EncryptedFrameBodySize) + EncryptedFrameOverheadSize)
+              std::min(sz, EncryptedFrameBodySize) + EncryptedFrameOverheadSize)
     {}
 
     void

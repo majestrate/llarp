@@ -19,7 +19,7 @@ namespace llarp::handlers
         , m_PacketRouter{new vpn::EgresPacketRouter{[](auto from, auto pkt) {
           var::visit(
               [&pkt](auto&& from) {
-                LogError("unhandled traffic from: ", from, " of ", pkt.size(), " bytes");
+                LogError("unhandled traffic from: ", from.ToString(), " of ", pkt.size(), " bytes");
               },
               from);
         }}}
@@ -88,7 +88,7 @@ namespace llarp::handlers
     }
 
     void
-    SendPacketToRemote(const llarp_buffer_t&, service::ProtocolType) override{};
+    SendPacketToRemote(const llarp_buffer_t&, service::ProtocolType) override {};
 
     net::ipv6addr_t
     ObtainIPForAddr(std::variant<service::Address, RouterID>) override

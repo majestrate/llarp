@@ -5,10 +5,8 @@
 #include <chrono>
 
 #include <llarp/bootstrap.hpp>
-#include <llarp/crypto/types.hpp>
 #include <llarp/router_contact.hpp>
 #include <llarp/util/fs.hpp>
-#include <llarp/util/str.hpp>
 #include <llarp/util/logging.hpp>
 #include <llarp/constants/files.hpp>
 #include <llarp/net/net_int.hpp>
@@ -16,15 +14,12 @@
 #include <llarp/service/address.hpp>
 #include <llarp/service/auth.hpp>
 #include <llarp/dns/srv_data.hpp>
-#include <llarp/router_contact.hpp>
 
 #include <cstdlib>
-#include <functional>
 #include <optional>
-#include <stdexcept>
 #include <string>
-#include <utility>
 #include <vector>
+#include <unordered_map>
 #include <unordered_set>
 
 namespace llarp
@@ -165,10 +160,6 @@ namespace llarp
     bool m_raw_dns;
     std::vector<SockAddr> m_bind;
     std::vector<SockAddr> m_upstreamDNS;
-    std::vector<fs::path> m_hostfiles;
-    std::optional<SockAddr> m_QueryBind;
-
-    std::unordered_multimap<std::string, std::string> m_ExtraOpts;
 
     void
     defineConfigOptions(ConfigDefinition& conf, const ConfigGenParameters& params);

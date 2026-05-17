@@ -136,8 +136,6 @@ namespace llarp
         return;
       msg.resize(buf.cur - buf.base);
 
-      m_router->NotifyRouterEvent<tooling::RCGossipSentEvent>(m_router->pubkey(), rc);
-
       // send message
       peerSession->SendMessageBuffer(std::move(msg), nullptr, gossip.Priority());
     });

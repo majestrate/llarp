@@ -3,7 +3,10 @@
 #include "i_link_manager.hpp"
 
 #include <llarp/util/compare_ptr.hpp>
+#include <llarp/util/decaying_hashset.hpp>
 #include "server.hpp"
+
+#include <llarp/constants/path.hpp>
 
 #include <unordered_map>
 #include <set>

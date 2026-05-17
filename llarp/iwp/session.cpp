@@ -1,1082 +1,1039 @@
 #include <llarp/util/alloc.h>
 #include "session.hpp"
-
-#include <cstdint>
+#include "linklayer.hpp"
+#include "worker.hpp"
 #include <llarp/messages/link_intro.hpp>
-#include <llarp/messages/discard.hpp>
+
 #include <llarp/util/meta/memfn.hpp>
+#include <llarp/util/compare_ptr.hpp>
 #include <llarp/router/abstractrouter.hpp>
+#include <llarp/crypto/crypto.hpp>
 
 #include <queue>
 
-namespace llarp
+namespace llarp::iwp
 {
-  namespace iwp
+  static auto logcat = log::Cat("iwp");
+
+  ILinkSession::Packet_t
+  CreatePacket(Command cmd, size_t plainsize, size_t minpad, size_t variance)
   {
-    static auto logcat = log::Cat("iwp");
-
-    ILinkSession::Packet_t
-    CreatePacket(Command cmd, size_t plainsize, size_t minpad, size_t variance)
+    const size_t pad = minpad > 0 ? minpad + (variance > 0 ? randint() % variance : 0) : 0;
+    ILinkSession::Packet_t pkt(PacketOverhead + plainsize + pad + CommandOverhead);
+    // randomize pad
+    if (pad)
     {
-      const size_t pad = minpad > 0 ? minpad + (variance > 0 ? randint() % variance : 0) : 0;
-      ILinkSession::Packet_t pkt(PacketOverhead + plainsize + pad + CommandOverhead);
-      // randomize pad
-      if (pad)
-      {
-        CryptoManager::instance()->randbytes(
-            pkt.data() + PacketOverhead + CommandOverhead + plainsize, pad);
-      }
-      // randomize nounce
-      CryptoManager::instance()->randbytes(pkt.data() + HMACSIZE, TUNNONCESIZE);
-      pkt[PacketOverhead] = llarp::constants::proto_version;
-      pkt[PacketOverhead + 1] = cmd;
-      return pkt;
+      CryptoManager::instance()->randbytes(
+          pkt.data() + PacketOverhead + CommandOverhead + plainsize, pad);
     }
+    // randomize nounce
+    CryptoManager::instance()->randbytes(pkt.data() + HMACSIZE, TUNNONCESIZE);
+    pkt[PacketOverhead] = llarp::constants::proto_version;
+    pkt[PacketOverhead + 1] = cmd;
+    return pkt;
+  }
 
-    constexpr size_t PlaintextQueueSize = 512;
+  constexpr size_t PlaintextQueueSize = 512;
 
-    Session::Session(LinkLayer* p, const RouterContact& rc, const AddressInfo& ai)
-        : m_State{State::Initial}
-        , m_Inbound{false}
-        , m_Parent(p)
-        , m_CreatedAt{p->Now()}
-        , m_RemoteAddr{ai}
-        , m_ChosenAI(ai)
-        , m_RemoteRC(rc)
-        , m_PlaintextRecv{PlaintextQueueSize}
+  Session::Session(LinkLayer* p, const RouterContact& rc, const AddressInfo& ai)
+      : m_State{State::Initial}
+      , m_Inbound{false}
+      , m_Parent(p)
+      , m_CreatedAt{p->Now()}
+      , m_RemoteAddr{ai}
+      , m_ChosenAI(ai)
+      , m_RemoteRC(rc)
+      , m_PlaintextRecv{PlaintextQueueSize}
+  {
+    Zero(token);
+    m_PlaintextEmpty.test_and_set();
+    GotLIM = util::memFn(&Session::GotOutboundLIM, this);
     {
-      token.Zero();
-      m_PlaintextEmpty.test_and_set();
-      GotLIM = util::memFn(&Session::GotOutboundLIM, this);
-      CryptoManager::instance()->shorthash(m_SessionKey, llarp_buffer_t(rc.pubkey));
+      ShortHash h{};
+      MemWipe{&h};
+      CryptoManager::instance()->shorthash(h, llarp_buffer_t(rc.pubkey));
+      m_SessionKey = h.data();
     }
+  }
 
-    Session::Session(LinkLayer* p, const SockAddr& from)
-        : m_State{State::Initial}
-        , m_Inbound{true}
-        , m_Parent(p)
-        , m_CreatedAt{p->Now()}
-        , m_RemoteAddr{from}
-        , m_PlaintextRecv{PlaintextQueueSize}
+  Session::Session(LinkLayer* p, const SockAddr& from)
+      : m_State{State::Initial}
+      , m_Inbound{true}
+      , m_Parent(p)
+      , m_CreatedAt{p->Now()}
+      , m_RemoteAddr{from}
+      , m_PlaintextRecv{PlaintextQueueSize}
+  {
+    Randomize(token);
+    m_PlaintextEmpty.test_and_set();
+    GotLIM = util::memFn(&Session::GotInboundLIM, this);
+    const PubKey pk = m_Parent->GetOurRC().pubkey;
     {
-      token.Randomize();
-      m_PlaintextEmpty.test_and_set();
-      GotLIM = util::memFn(&Session::GotInboundLIM, this);
-      const PubKey pk = m_Parent->GetOurRC().pubkey;
-      CryptoManager::instance()->shorthash(m_SessionKey, llarp_buffer_t(pk));
+      ShortHash h{};
+      MemWipe{&h};
+      CryptoManager::instance()->shorthash(h, llarp_buffer_t(pk));
+      m_SessionKey = h.data();
     }
+  }
 
-    void
-    Session::Send_LL(const byte_t* buf, size_t sz)
+  void
+  Session::Send_LL(const byte_t* buf, size_t sz)
+  {
+    log::debug(logcat, "send {} bytes to {}", sz, m_RemoteAddr);
+    const llarp_buffer_t pkt(buf, sz);
+    m_Parent->SendTo_LL(m_RemoteAddr, pkt);
+    m_LastTX = time_now_ms();
+    m_TXRate += sz;
+  }
+
+  bool
+  Session::GotInboundLIM(const LinkIntroMessage* msg)
+  {
+    if (not msg->Verify())
     {
-      log::debug(logcat, "send {} bytes to {}", sz, m_RemoteAddr);
-      const llarp_buffer_t pkt(buf, sz);
-      m_Parent->SendTo_LL(m_RemoteAddr, pkt);
-      m_LastTX = time_now_ms();
-      m_TXRate += sz;
-    }
-
-    bool
-    Session::GotInboundLIM(const LinkIntroMessage* msg)
-    {
-      if (not msg->Verify())
-      {
-        LogError("Inbound LIM verify Error from ", m_RemoteAddr);
-        return false;
-      }
-
-      if (msg->rc.pubkey != m_ExpectedIdent)
-      {
-        LogError(
-            "ident key mismatch from ", m_RemoteAddr, " ", msg->rc.pubkey, " != ", m_ExpectedIdent);
-        return false;
-      }
-      m_State = State::Ready;
-      GotLIM = util::memFn(&Session::GotRenegLIM, this);
-      m_RemoteRC = msg->rc;
-      m_Parent->MapAddr(m_RemoteRC.pubkey, this);
-      return m_Parent->SessionEstablished(this, true);
-    }
-
-    bool
-    Session::GotOutboundLIM(const LinkIntroMessage* msg)
-    {
-      if (not msg->Verify())
-      {
-        LogError("Outbound LIM verify error from ", m_RemoteAddr);
-        return false;
-      }
-      if (msg->rc.pubkey != m_RemoteRC.pubkey)
-      {
-        LogError("ident key mismatch");
-        return false;
-      }
-
-      m_RemoteRC = msg->rc;
-      GotLIM = util::memFn(&Session::GotRenegLIM, this);
-      assert(shared_from_this().use_count() > 1);
-      SendOurLIM([self = shared_from_this()](ILinkSession::DeliveryStatus st) {
-        if (st == ILinkSession::DeliveryStatus::eDeliverySuccess)
-        {
-          self->m_State = State::Ready;
-          self->m_Parent->MapAddr(self->m_RemoteRC.pubkey, self.get());
-          self->m_Parent->SessionEstablished(self.get(), false);
-        }
-        else
-        {
-          self->Close();
-        }
-      });
-      return true;
-    }
-
-    void
-    Session::SendOurLIM(ILinkSession::CompletionHandler h)
-    {
-      LinkIntroMessage msg;
-      msg.rc = m_Parent->GetOurRC();
-      msg.N.Randomize();
-      msg.P = 60000;
-      if (not msg.Sign(m_Parent->Sign))
-      {
-        LogError("failed to sign our RC for ", m_RemoteAddr);
-        return;
-      }
-      ILinkSession::Message_t data(LinkIntroMessage::MaxSize + PacketOverhead);
-      llarp_buffer_t buf(data);
-      if (not msg.BEncode(&buf))
-      {
-        LogError("failed to encode LIM for ", m_RemoteAddr);
-        return;
-      }
-      data.resize(buf.cur - buf.base);
-      if (not SendMessageBuffer(std::move(data), h))
-      {
-        LogError("failed to send LIM to ", m_RemoteAddr);
-        return;
-      }
-      LogTrace("sent LIM to ", m_RemoteAddr);
-    }
-
-    void
-    Session::EncryptAndSend(ILinkSession::Packet_t data)
-    {
-      if (m_State == State::LinkIntro or m_State == State::Ready)
-        log::debug(logcat, "Command {} to {}", int(data[PacketOverhead + 1]), m_RemoteAddr);
-
-      m_EncryptNext.emplace_back(std::move(data));
-      if (!IsEstablished())
-      {
-        EncryptWorker(std::move(m_EncryptNext));
-        m_EncryptNext = CryptoQueue_t{};
-      }
-      TriggerPump();
-    }
-
-    void
-    Session::EncryptWorker(CryptoQueue_t msgs)
-    {
-      LogTrace("encrypt worker ", msgs.size(), " messages");
-      for (auto& pkt : msgs)
-      {
-        llarp_buffer_t pktbuf{pkt};
-        const TunnelNonce nonce_ptr{pkt.data() + HMACSIZE};
-        pktbuf.base += PacketOverhead;
-        pktbuf.cur = pktbuf.base;
-        pktbuf.sz -= PacketOverhead;
-        CryptoManager::instance()->xchacha20(pktbuf, m_SessionKey, nonce_ptr);
-        pktbuf.base = pkt.data() + HMACSIZE;
-        pktbuf.sz = pkt.size() - HMACSIZE;
-        CryptoManager::instance()->hmac(pkt.data(), pktbuf, m_SessionKey);
-        Send_LL(pkt.data(), pkt.size());
-      }
-    }
-
-    void
-    Session::Close()
-    {
-      if (m_State == State::Closed)
-        return;
-      auto close_msg = CreatePacket(Command::eCLOS, 0, 16, 16);
-      m_Parent->UnmapAddr(m_RemoteAddr);
-      m_State = State::Closed;
-      if (m_SentClosed.test_and_set())
-        return;
-      EncryptAndSend(std::move(close_msg));
-
-      LogInfo(m_Parent->PrintableName(), " closing connection to ", m_RemoteAddr);
-    }
-
-    bool
-    Session::SendMessageBuffer(
-        ILinkSession::Message_t buf, ILinkSession::CompletionHandler completed, uint16_t priority)
-    {
-      if (m_TXMsgs.size() >= MaxSendQueueSize)
-      {
-        if (completed)
-          completed(ILinkSession::DeliveryStatus::eDeliveryDropped);
-        return false;
-      }
-      const auto now = m_Parent->Now();
-      const auto msgid = m_TXID++;
-
-      m_TXMsgs.emplace(msgid, OutboundMessage{msgid, std::move(buf), now, completed, priority});
-      m_ToHash.emplace(msgid);
-      m_Parent->TriggerHashing(shared_from_this());
-      return true;
-    }
-
-    void
-    Session::TriggerHashGen()
-    {
-      std::vector<OutboundMessage> msgs;
-      for (auto msgid : m_ToHash)
-        msgs.emplace_back(m_TXMsgs[msgid]);
-
-      log::trace(logcat, "hash {} outbound messages", msgs.size());
-
-      if (msgs.empty())
-        return;
-
-      m_Parent->hasher()->async_hash_many(m_RemoteAddr, std::move(msgs));
-
-      m_ToHash.clear();
-    }
-
-    void
-    Session::RecvHashed(std::vector<OutboundMessage> msgs)
-    {
-      log::trace(logcat, "got {} messages ready to send to {}", msgs.size(), m_RemoteAddr);
-      for (auto& msg : msgs)
-        HandleGeneratedHash(msg);
-      Pump();
-    }
-
-    void
-    Session::HandleGeneratedHash(const OutboundMessage& m)
-    {
-      uint64_t msgid = m.m_MsgID;
-      auto& msg = m_TXMsgs[msgid];
-      msg.m_Digest = m.m_Digest;
-      auto bufsz = msg.size();
-      EncryptAndSend(msg.XMIT());
-      if (bufsz > FragmentSize)
-      {
-        auto now = m_Parent->Now();
-        msg.FlushUnAcked(util::memFn(&Session::EncryptAndSend, this), now);
-      }
-      m_Stats.totalInFlightTX++;
-      log::debug(
-          logcat,
-          "send message {} to {} hash={} {} bytes",
-          msgid,
-          m_RemoteAddr,
-          msg.m_Digest,
-          bufsz);
-    }
-
-    void
-    Session::VerifiedMessage(uint64_t msgid)
-    {
-      log::debug(logcat, "got verified message {} from {}", msgid, m_RemoteAddr);
-      if (m_RXMsgs.count(msgid))
-        HandleRecvMsgCompleted(m_RXMsgs[msgid]);
-      if (auto itr = m_PendingHash.find(msgid); itr != m_PendingHash.end())
-        m_PendingHash.erase(itr);
-    }
-
-    void
-    Session::DropMessage(uint64_t msgid)
-    {
-      if (auto itr = m_RXMsgs.find(msgid); itr != m_RXMsgs.end())
-        m_RXMsgs.erase(itr);
-      if (auto itr = m_PendingHash.find(msgid); itr != m_PendingHash.end())
-        m_PendingHash.erase(itr);
-    }
-
-    void
-    Session::SendMACK()
-    {
-      // send multi acks
-      while (not m_SendMACKs.empty())
-      {
-        const auto sz = m_SendMACKs.size();
-        const auto max = Session::MaxACKSInMACK;
-        auto numAcks = std::min(sz, max);
-        auto mack = CreatePacket(Command::eMACK, 1 + (numAcks * sizeof(uint64_t)));
-        mack[PacketOverhead + CommandOverhead] = byte_t{static_cast<byte_t>(numAcks)};
-        byte_t* ptr = mack.data() + 3 + PacketOverhead;
-        log::debug(logcat, "Send {} macks to {}", numAcks, m_RemoteAddr);
-        const auto& itr = m_SendMACKs.top();
-        while (numAcks > 0)
-        {
-          oxenc::write_host_as_big(itr, ptr);
-          m_SendMACKs.pop();
-          numAcks--;
-          ptr += sizeof(uint64_t);
-        }
-        EncryptAndSend(std::move(mack));
-      }
-    }
-
-    void
-    Session::TriggerPump()
-    {
-      m_Parent->TriggerPump();
-    }
-
-    void
-    Session::Pump()
-    {
-      const auto now = m_Parent->Now();
-      if (m_State == State::Ready || m_State == State::LinkIntro)
-      {
-        if (ShouldPing())
-          SendKeepAlive();
-        for (auto& [id, msg] : m_RXMsgs)
-        {
-          if (msg.ShouldSendACKS(now))
-          {
-            msg.SendACKS(util::memFn(&Session::EncryptAndSend, this), now);
-          }
-        }
-      }
-      std::priority_queue<
-          OutboundMessage*,
-          std::vector<OutboundMessage*>,
-          ComparePtr<OutboundMessage*>>
-          to_resend;
-      for (auto& [id, msg] : m_TXMsgs)
-      {
-        if (msg.ShouldFlush(now))
-          to_resend.push(&msg);
-      }
-      if (not to_resend.empty())
-      {
-        for (auto& msg = to_resend.top(); not to_resend.empty(); to_resend.pop())
-          msg->FlushUnAcked(util::memFn(&Session::EncryptAndSend, this), now);
-      }
-
-      if (not m_EncryptNext.empty())
-      {
-        m_Parent->QueueWork(
-            [self = shared_from_this(), data = m_EncryptNext] { self->EncryptWorker(data); });
-        m_EncryptNext.clear();
-      }
-
-      if (not m_DecryptNext.empty())
-      {
-        m_Parent->QueueWork(
-            [self = shared_from_this(), data = m_DecryptNext] { self->DecryptWorker(data); });
-        m_DecryptNext.clear();
-      }
-    }
-
-    bool
-    Session::GotRenegLIM(const LinkIntroMessage* lim)
-    {
-      if (not lim->Verify())
-      {
-        LogError("Regen LIM verify failure from ", m_RemoteAddr);
-        return false;
-      }
-      LogDebug("renegotiate session on ", m_RemoteAddr);
-      return m_Parent->SessionRenegotiate(lim->rc, m_RemoteRC);
-    }
-
-    bool
-    Session::RenegotiateSession()
-    {
-      SendOurLIM();
-      return true;
-    }
-
-    bool
-    Session::ShouldPing() const
-    {
-      if (m_State == State::Ready)
-      {
-        const auto now = m_Parent->Now();
-        return now - m_LastTX > PingInterval;
-      }
+      LogError("Inbound LIM verify Error from ", m_RemoteAddr);
       return false;
     }
 
-    SessionStats
-    Session::GetSessionStats() const
+    if (msg->rc.pubkey != m_ExpectedIdent)
     {
-      // TODO: thread safety
-      return m_Stats;
+      LogError(
+          "ident key mismatch from ", m_RemoteAddr, " ", msg->rc.pubkey, " != ", m_ExpectedIdent);
+      return false;
+    }
+    m_State = State::Ready;
+    GotLIM = util::memFn(&Session::GotRenegLIM, this);
+    m_RemoteRC = msg->rc;
+    m_Parent->MapAddr(m_RemoteRC.pubkey, this);
+    return m_Parent->SessionEstablished(this, true);
+  }
+
+  bool
+  Session::GotOutboundLIM(const LinkIntroMessage* msg)
+  {
+    if (not msg->Verify())
+    {
+      LogError("Outbound LIM verify error from ", m_RemoteAddr);
+      return false;
+    }
+    if (msg->rc.pubkey != m_RemoteRC.pubkey)
+    {
+      LogError("ident key mismatch");
+      return false;
     }
 
-    bool
-    Session::TimedOut(llarp_time_t now) const
-    {
-      if (m_State == State::Ready)
+    m_RemoteRC = msg->rc;
+    GotLIM = util::memFn(&Session::GotRenegLIM, this);
+    assert(shared_from_this().use_count() > 1);
+    SendOurLIM([self = shared_from_this()](ILinkSession::DeliveryStatus st) {
+      if (st == ILinkSession::DeliveryStatus::eDeliverySuccess)
       {
-        return now > m_LastRX
-            && now - m_LastRX
-            > (m_Inbound and not m_RemoteRC.IsPublicRouter() ? DefaultLinkSessionLifetime
-                                                             : SessionAliveTimeout);
+        self->m_State = State::Ready;
+        self->m_Parent->MapAddr(self->m_RemoteRC.pubkey, self.get());
+        self->m_Parent->SessionEstablished(self.get(), false);
       }
-      return now - m_CreatedAt >= LinkLayerConnectTimeout;
+      else
+      {
+        self->Close();
+      }
+    });
+    return true;
+  }
+
+  void
+  Session::SendOurLIM(ILinkSession::CompletionHandler h)
+  {
+    LinkIntroMessage msg;
+    msg.rc = m_Parent->GetOurRC();
+    Randomize(msg.N);
+    msg.P = 60000;
+    if (not msg.Sign(m_Parent->Sign))
+    {
+      LogError("failed to sign our RC for ", m_RemoteAddr);
+      return;
     }
-
-    bool
-    Session::ShouldResetRates(llarp_time_t now) const
+    ILinkSession::Message_t data(LinkIntroMessage::MaxSize + PacketOverhead);
+    llarp_buffer_t buf(data);
+    if (not msg.BEncode(&buf))
     {
-      return now >= m_ResetRatesAt;
+      LogError("failed to encode LIM for ", m_RemoteAddr);
+      return;
     }
-
-    void
-    Session::ResetRates()
+    data.resize(buf.cur - buf.base);
+    if (not SendMessageBuffer(std::move(data), h))
     {
-      m_Stats.currentRateTX = m_TXRate;
-      m_Stats.currentRateRX = m_RXRate;
-      m_RXRate = 0;
-      m_TXRate = 0;
+      LogError("failed to send LIM to ", m_RemoteAddr);
+      return;
     }
+    LogTrace("sent LIM to ", m_RemoteAddr);
+  }
 
-    void
-    Session::Tick(llarp_time_t now)
+  void
+  Session::EncryptAndSend(ILinkSession::Packet_t data)
+  {
+    if (m_State == State::LinkIntro or m_State == State::Ready)
+      log::debug(logcat, "Command {} to {}", int(data[PacketOverhead + 1]), m_RemoteAddr);
+
+    m_EncryptNext.emplace_back(std::move(data));
+    if (!IsEstablished())
     {
-      if (ShouldResetRates(now))
-      {
-        ResetRates();
-        m_ResetRatesAt = now + 1s;
-      }
-      // remove pending outbound messsages that timed out
-      // inform waiters
-      {
-        auto itr = m_TXMsgs.begin();
-        while (itr != m_TXMsgs.end())
-        {
-          if (itr->second.IsTimedOut(now))
-          {
-            m_Stats.totalDroppedTX++;
-            m_Stats.totalInFlightTX--;
-            LogTrace("Dropped unacked packet to ", m_RemoteAddr);
-            itr->second.InformTimeout();
-            itr = m_TXMsgs.erase(itr);
-          }
-          else
-            ++itr;
-        }
-      }
-      {
-        // remove pending inbound messages that timed out
-        auto itr = m_RXMsgs.begin();
-        while (itr != m_RXMsgs.end())
-        {
-          if (itr->second.IsTimedOut(now))
-          {
-            m_ReplayFilter.emplace(itr->first, now);
-            itr = m_RXMsgs.erase(itr);
-          }
-          else
-            ++itr;
-        }
-      }
-      {
-        // decay replay window
-        auto itr = m_ReplayFilter.begin();
-        while (itr != m_ReplayFilter.end())
-        {
-          if (itr->second + ReplayWindow <= now)
-          {
-            itr = m_ReplayFilter.erase(itr);
-          }
-          else
-            ++itr;
-        }
-      }
+      for (auto& pkt : m_EncryptNext)
+        EncryptWorker::EncryptPacket(this, std::move(pkt));
+      m_EncryptNext = CryptoQueue_t{};
     }
+    TriggerPump();
+  }
 
-    using Introduction =
-        AlignedBuffer<PubKey::SIZE + PubKey::SIZE + TunnelNonce::SIZE + Signature::SIZE>;
+  void
+  Session::Close()
+  {
+    if (m_State == State::Closed)
+      return;
+    auto close_msg = CreatePacket(Command::eCLOS, 0, 16, 16);
+    m_Parent->UnmapAddr(m_RemoteAddr);
+    m_State = State::Closed;
+    if (m_SentClosed.test_and_set())
+      return;
+    EncryptAndSend(std::move(close_msg));
 
-    void
-    Session::GenerateAndSendIntro()
+    LogInfo(m_Parent->PrintableName(), " closing connection to ", m_RemoteAddr);
+  }
+
+  bool
+  Session::SendMessageBuffer(
+      ILinkSession::Message_t buf, ILinkSession::CompletionHandler completed, uint16_t priority)
+  {
+    if (m_TXMsgs.size() >= MaxSendQueueSize)
     {
-      TunnelNonce N;
-      N.Randomize();
-      {
-        ILinkSession::Packet_t req(Introduction::SIZE + PacketOverhead);
-        const auto pk = m_Parent->GetOurRC().pubkey;
-        const auto e_pk = m_Parent->RouterEncryptionSecret().toPublic();
-        auto itr = req.data() + PacketOverhead;
-        std::copy_n(pk.data(), pk.size(), itr);
-        itr += pk.size();
-        std::copy_n(e_pk.data(), e_pk.size(), itr);
-        itr += e_pk.size();
-        std::copy_n(N.data(), N.size(), itr);
-        Signature Z;
-        llarp_buffer_t signbuf(req.data() + PacketOverhead, Introduction::SIZE - Signature::SIZE);
-        m_Parent->Sign(Z, signbuf);
-        std::copy_n(
-            Z.data(),
-            Z.size(),
-            req.data() + PacketOverhead + (Introduction::SIZE - Signature::SIZE));
-        CryptoManager::instance()->randbytes(req.data() + HMACSIZE, TUNNONCESIZE);
-        EncryptAndSend(std::move(req));
-      }
-      m_State = State::Introduction;
-      if (not CryptoManager::instance()->transport_dh_client(
-              m_SessionKey, m_ChosenAI.pubkey, m_Parent->RouterEncryptionSecret(), N))
-      {
-        LogError("failed to transport_dh_client on outbound session to ", m_RemoteAddr);
-        return;
-      }
-      LogTrace("sent intro to ", m_RemoteAddr);
+      if (completed)
+        completed(ILinkSession::DeliveryStatus::eDeliveryDropped);
+      return false;
     }
+    const auto now = m_Parent->Now();
+    const auto msgid = m_TXID++;
 
-    void
-    Session::HandleCreateSessionRequest(Packet_t pkt)
+    m_TXMsgs.emplace(msgid, OutboundMessage{msgid, std::move(buf), now, completed, priority});
+    m_ToHash.emplace(msgid);
+    m_Parent->TriggerHashing(shared_from_this());
+    return true;
+  }
+
+  ILinkLayer*
+  Session::GetLinkLayer() const
+  {
+    return m_Parent;
+  }
+
+  void
+  Session::TriggerHashGen()
+  {
+    std::vector<OutboundMessage> msgs;
+    for (auto msgid : m_ToHash)
+      msgs.emplace_back(m_TXMsgs[msgid]);
+
+    log::trace(logcat, "hash {} outbound messages", msgs.size());
+
+    if (msgs.empty())
+      return;
+
+    m_Parent->hasher()->async_hash_many(weak_from_this(), std::move(msgs));
+
+    m_ToHash.clear();
+  }
+
+  void
+  Session::RecvHashed(std::vector<OutboundMessage> msgs)
+  {
+    log::trace(logcat, "got {} messages ready to send to {}", msgs.size(), m_RemoteAddr);
+    for (auto& msg : msgs)
+      HandleGeneratedHash(msg);
+    Pump();
+  }
+
+  void
+  Session::HandleGeneratedHash(const OutboundMessage& m)
+  {
+    uint64_t msgid = m.m_MsgID;
+    auto& msg = m_TXMsgs[msgid];
+    msg.m_Digest = m.m_Digest;
+    auto bufsz = msg.size();
+    EncryptAndSend(msg.XMIT());
+    if (bufsz > FragmentSize)
     {
-      if (not DecryptMessageInPlace(pkt))
-      {
-        LogError(
-            m_Parent->PrintableName(), " failed to decrypt session request from ", m_RemoteAddr);
-        return;
-      }
-      if (pkt.size() < token.size() + PacketOverhead)
-      {
-        LogError(
-            m_Parent->PrintableName(),
-            " bad session request size, ",
-            pkt.size(),
-            " < ",
-            token.size() + PacketOverhead,
-            " from ",
-            m_RemoteAddr);
-        return;
-      }
-      const auto begin = pkt.data() + PacketOverhead;
-      if (not std::equal(begin, begin + token.size(), token.data()))
-      {
-        LogError(m_Parent->PrintableName(), " token mismatch from ", m_RemoteAddr);
-        return;
-      }
-      m_LastRX = m_Parent->Now();
-      m_State = State::LinkIntro;
-      SendOurLIM();
+      auto now = m_Parent->Now();
+      msg.FlushUnAcked(util::memFn(&Session::EncryptAndSend, this), now);
     }
+    m_Stats.totalInFlightTX++;
+    log::debug(
+        logcat, "send message {} to {} hash={} {} bytes", msgid, m_RemoteAddr, msg.m_Digest, bufsz);
+  }
 
-    void
-    Session::HandleGotIntro(Packet_t pkt)
+  void
+  Session::VerifiedMessage(uint64_t msgid)
+  {
+    log::debug(logcat, "got verified message {} from {}", msgid, m_RemoteAddr);
+    if (m_RXMsgs.count(msgid))
+      HandleRecvMsgCompleted(m_RXMsgs[msgid]);
+    if (auto itr = m_PendingHash.find(msgid); itr != m_PendingHash.end())
+      m_PendingHash.erase(itr);
+  }
+
+  void
+  Session::DropMessage(uint64_t msgid)
+  {
+    if (auto itr = m_RXMsgs.find(msgid); itr != m_RXMsgs.end())
+      m_RXMsgs.erase(itr);
+    if (auto itr = m_PendingHash.find(msgid); itr != m_PendingHash.end())
+      m_PendingHash.erase(itr);
+  }
+
+  void
+  Session::SendMACK()
+  {
+    // send multi acks
+    while (not m_SendMACKs.empty())
     {
-      if (pkt.size() < (Introduction::SIZE + PacketOverhead))
-      {
-        LogWarn(m_Parent->PrintableName(), " intro too small from ", m_RemoteAddr);
-        return;
-      }
-      byte_t* ptr = pkt.data() + PacketOverhead;
-      TunnelNonce N;
-      std::copy_n(ptr, PubKey::SIZE, m_ExpectedIdent.data());
-      ptr += PubKey::SIZE;
-      std::copy_n(ptr, PubKey::SIZE, m_RemoteOnionKey.data());
-      ptr += PubKey::SIZE;
-      std::copy_n(ptr, TunnelNonce::SIZE, N.data());
-      ptr += TunnelNonce::SIZE;
-      Signature Z;
-      std::copy_n(ptr, Z.size(), Z.data());
-      const llarp_buffer_t verifybuf(
-          pkt.data() + PacketOverhead, Introduction::SIZE - Signature::SIZE);
-      if (!CryptoManager::instance()->verify(m_ExpectedIdent, verifybuf, Z))
-      {
-        LogError(m_Parent->PrintableName(), " intro verify failed from ", m_RemoteAddr);
-        return;
-      }
-      const PubKey pk = m_Parent->TransportSecretKey().toPublic();
-      LogDebug(
-          "got intro: remote-pk=",
-          m_RemoteOnionKey.ToHex(),
-          " N=",
-          N.ToHex(),
-          " local-pk=",
-          pk.ToHex());
-      if (not CryptoManager::instance()->transport_dh_server(
-              m_SessionKey, m_RemoteOnionKey, m_Parent->TransportSecretKey(), N))
-      {
-        LogError("failed to transport_dh_server on inbound intro from ", m_RemoteAddr);
-        return;
-      }
-      Packet_t reply(token.size() + PacketOverhead);
-      // random nonce
-      CryptoManager::instance()->randbytes(reply.data() + HMACSIZE, TUNNONCESIZE);
-      // set token
-      std::copy_n(token.data(), token.size(), reply.data() + PacketOverhead);
-      m_LastRX = m_Parent->Now();
-      EncryptAndSend(std::move(reply));
-      LogDebug("sent intro ack to ", m_RemoteAddr);
-      m_State = State::Introduction;
-    }
-
-    void
-    Session::HandleGotIntroAck(Packet_t pkt)
-    {
-      if (pkt.size() < (token.size() + PacketOverhead))
-      {
-        LogError(
-            m_Parent->PrintableName(),
-            " bad intro ack size ",
-            pkt.size(),
-            " < ",
-            token.size() + PacketOverhead,
-            " from ",
-            m_RemoteAddr);
-        return;
-      }
-      Packet_t reply(token.size() + PacketOverhead);
-      if (not DecryptMessageInPlace(pkt))
-      {
-        LogError(m_Parent->PrintableName(), " intro ack decrypt failed from ", m_RemoteAddr);
-        return;
-      }
-      m_LastRX = m_Parent->Now();
-      std::copy_n(pkt.data() + PacketOverhead, token.size(), token.data());
-      std::copy_n(token.data(), token.size(), reply.data() + PacketOverhead);
-      // random nounce
-      CryptoManager::instance()->randbytes(reply.data() + HMACSIZE, TUNNONCESIZE);
-      EncryptAndSend(std::move(reply));
-      LogDebug("sent session request to ", m_RemoteAddr);
-      m_State = State::LinkIntro;
-    }
-
-    bool
-    Session::DecryptMessageInPlace(Packet_t& pkt)
-    {
-      if (pkt.size() <= PacketOverhead)
-      {
-        LogError("packet too small from ", m_RemoteAddr);
-        return false;
-      }
-      const llarp_buffer_t buf(pkt);
-      ShortHash H;
-      llarp_buffer_t curbuf(buf.base, buf.sz);
-      curbuf.base += ShortHash::SIZE;
-      curbuf.sz -= ShortHash::SIZE;
-      if (not CryptoManager::instance()->hmac(H.data(), curbuf, m_SessionKey))
-      {
-        LogError("failed to caclulate keyed hash for ", m_RemoteAddr);
-        return false;
-      }
-      const ShortHash expected{buf.base};
-      if (H != expected)
-      {
-        LogDebug(
-            m_Parent->PrintableName(),
-            " keyed hash mismatch ",
-            H,
-            " != ",
-            expected,
-            " from ",
-            m_RemoteAddr,
-            " state=",
-            int(m_State),
-            " size=",
-            buf.sz);
-        return false;
-      }
-      const TunnelNonce N{curbuf.base};
-      curbuf.base += 32;
-      curbuf.sz -= 32;
-      LogTrace("decrypt: ", curbuf.sz, " bytes from ", m_RemoteAddr);
-      return CryptoManager::instance()->xchacha20(curbuf, m_SessionKey, N);
-    }
-
-    void
-    Session::Start()
-    {
-      if (m_Inbound)
-        return;
-      GenerateAndSendIntro();
-    }
-
-    void
-    Session::HandleSessionData(Packet_t pkt)
-    {
-      m_DecryptNext.emplace_back(std::move(pkt));
-      TriggerPump();
-    }
-
-    void
-    Session::DecryptWorker(CryptoQueue_t msgs)
-    {
-      auto itr = msgs.begin();
-      while (itr != msgs.end())
-      {
-        auto& pkt = *itr;
-        if (not DecryptMessageInPlace(pkt))
-        {
-          itr = msgs.erase(itr);
-          LogError("failed to decrypt session data from ", m_RemoteAddr);
-          continue;
-        }
-        if (pkt[PacketOverhead] != llarp::constants::proto_version)
-        {
-          LogError(
-              "protocol version mismatch ",
-              int(pkt[PacketOverhead]),
-              " != ",
-              llarp::constants::proto_version);
-          itr = msgs.erase(itr);
-          continue;
-        }
-        ++itr;
-      }
-
-      if (not msgs.empty())
-        m_PlaintextRecv.tryPushBack(std::move(msgs));
-
-      m_PlaintextEmpty.clear();
-      m_Parent->WakeupPlaintext();
-    }
-
-    void
-    Session::HandlePlaintext()
-    {
-      if (m_PlaintextEmpty.test_and_set())
-        return;
-      while (auto maybe_queue = m_PlaintextRecv.tryPopFront())
-      {
-        for (auto& result : *maybe_queue)
-        {
-          log::debug(logcat, "Command {} from {}", int(result[PacketOverhead + 1]), m_RemoteAddr);
-          switch (result[PacketOverhead + 1])
-          {
-            case Command::eXMIT:
-              HandleXMIT(std::move(result));
-              m_LastRX = m_Parent->Now();
-              break;
-            case Command::eDATA:
-              HandleDATA(std::move(result));
-              m_LastRX = m_Parent->Now();
-              break;
-            case Command::eACKS:
-              HandleACKS(std::move(result));
-              m_LastRX = m_Parent->Now();
-              break;
-            case Command::ePING:
-              HandlePING(std::move(result));
-              m_LastRX = m_Parent->Now();
-              break;
-            case Command::eNACK:
-              HandleNACK(std::move(result));
-              m_LastRX = m_Parent->Now();
-              break;
-            case Command::eCLOS:
-              HandleCLOS(std::move(result));
-              m_LastRX = m_Parent->Now();
-              break;
-            case Command::eMACK:
-              HandleMACK(std::move(result));
-              m_LastRX = m_Parent->Now();
-              break;
-            default:
-              LogError("invalid command ", int(result[PacketOverhead + 1]), " from ", m_RemoteAddr);
-          }
-        }
-      }
-      SendMACK();
-      m_Parent->WakeupPlaintext();
-    }
-
-    void
-    Session::HandleMACK(Packet_t data)
-    {
-      if (data.size() < (3 + PacketOverhead))
-      {
-        LogError("impossibly short mack from ", m_RemoteAddr);
-        return;
-      }
-      byte_t numAcks = data[CommandOverhead + PacketOverhead];
-      if (data.size() < 1 + CommandOverhead + PacketOverhead + (numAcks * sizeof(uint64_t)))
-      {
-        LogError("short mack from ", m_RemoteAddr);
-        return;
-      }
-      LogTrace("got ", int(numAcks), " mack from ", m_RemoteAddr);
-      byte_t* ptr = data.data() + CommandOverhead + PacketOverhead + 1;
+      const auto sz = m_SendMACKs.size();
+      const auto max = Session::MaxACKSInMACK;
+      auto numAcks = std::min(sz, max);
+      auto mack = CreatePacket(Command::eMACK, 1 + (numAcks * sizeof(uint64_t)));
+      mack[PacketOverhead + CommandOverhead] = byte_t{static_cast<byte_t>(numAcks)};
+      byte_t* ptr = mack.data() + 3 + PacketOverhead;
+      log::debug(logcat, "Send {} macks to {}", numAcks, m_RemoteAddr);
+      const auto& itr = m_SendMACKs.top();
       while (numAcks > 0)
       {
-        auto acked = oxenc::load_big_to_host<uint64_t>(ptr);
-        LogTrace("mack containing txid=", acked, " from ", m_RemoteAddr);
-        auto itr = m_TXMsgs.find(acked);
-        if (itr != m_TXMsgs.end())
-        {
-          m_Stats.totalAckedTX++;
-          m_Stats.totalInFlightTX--;
-          itr->second.Completed();
-          m_TXMsgs.erase(itr);
-        }
-        else
-        {
-          LogTrace("ignored mack for txid=", acked, " from ", m_RemoteAddr);
-        }
-        ptr += sizeof(uint64_t);
+        oxenc::write_host_as_big(itr, ptr);
+        m_SendMACKs.pop();
         numAcks--;
+        ptr += sizeof(uint64_t);
+      }
+      EncryptAndSend(std::move(mack));
+    }
+  }
+
+  void
+  Session::TriggerPump()
+  {
+    m_Parent->TriggerPump();
+  }
+
+  void
+  Session::Pump()
+  {
+    const auto now = m_Parent->Now();
+    if (m_State == State::Ready || m_State == State::LinkIntro)
+    {
+      if (ShouldPing())
+        SendKeepAlive();
+      for (auto& [id, msg] : m_RXMsgs)
+      {
+        if (msg.ShouldSendACKS(now))
+        {
+          msg.SendACKS(util::memFn(&Session::EncryptAndSend, this), now);
+        }
       }
     }
-
-    void
-    Session::HandleNACK(Packet_t data)
+    std::priority_queue<
+        OutboundMessage*,
+        std::vector<OutboundMessage*>,
+        ComparePtr<OutboundMessage*>>
+        to_resend;
+    for (auto& [id, msg] : m_TXMsgs)
     {
-      if (data.size() < (CommandOverhead + sizeof(uint64_t) + PacketOverhead))
+      if (msg.ShouldFlush(now))
+        to_resend.push(&msg);
+    }
+    if (not to_resend.empty())
+    {
+      for (auto& msg = to_resend.top(); not to_resend.empty(); to_resend.pop())
+        msg->FlushUnAcked(util::memFn(&Session::EncryptAndSend, this), now);
+    }
+
+    if (not m_EncryptNext.empty())
+    {
+      auto self = weak_from_this();
+      for (auto& msg : m_EncryptNext)
+        m_Parent->Router()->linkWorker()->Encrypt(self, std::move(msg));
+      m_EncryptNext.clear();
+    }
+
+    if (not m_DecryptNext.empty())
+    {
+      auto self = weak_from_this();
+      for (auto& msg : m_DecryptNext)
+        m_Parent->Router()->linkWorker()->Decrypt(self, std::move(msg));
+      m_DecryptNext.clear();
+    }
+  }
+
+  bool
+  Session::GotRenegLIM(const LinkIntroMessage* lim)
+  {
+    if (not lim->Verify())
+    {
+      LogError("Regen LIM verify failure from ", m_RemoteAddr);
+      return false;
+    }
+    LogDebug("renegotiate session on ", m_RemoteAddr);
+    return m_Parent->SessionRenegotiate(lim->rc, m_RemoteRC);
+  }
+
+  bool
+  Session::RenegotiateSession()
+  {
+    SendOurLIM();
+    return true;
+  }
+
+  bool
+  Session::ShouldPing() const
+  {
+    if (m_State == State::Ready)
+    {
+      const auto now = m_Parent->Now();
+      return now - m_LastTX > PingInterval;
+    }
+    return false;
+  }
+
+  SessionStats
+  Session::GetSessionStats() const
+  {
+    // TODO: thread safety
+    return m_Stats;
+  }
+
+  bool
+  Session::TimedOut(llarp_time_t now) const
+  {
+    if (m_State == State::Ready)
+    {
+      return now > m_LastRX
+          && now - m_LastRX
+          > (m_Inbound and not m_RemoteRC.IsPublicRouter() ? DefaultLinkSessionLifetime
+                                                           : SessionAliveTimeout);
+    }
+    return now - m_CreatedAt >= LinkLayerConnectTimeout;
+  }
+
+  bool
+  Session::ShouldResetRates(llarp_time_t now) const
+  {
+    return now >= m_ResetRatesAt;
+  }
+
+  void
+  Session::ResetRates()
+  {
+    m_Stats.currentRateTX = m_TXRate;
+    m_Stats.currentRateRX = m_RXRate;
+    m_RXRate = 0;
+    m_TXRate = 0;
+  }
+
+  void
+  Session::Tick(llarp_time_t now)
+  {
+    if (ShouldResetRates(now))
+    {
+      ResetRates();
+      m_ResetRatesAt = now + 1s;
+    }
+    // remove pending outbound messsages that timed out
+    // inform waiters
+    {
+      auto itr = m_TXMsgs.begin();
+      while (itr != m_TXMsgs.end())
       {
-        LogError("short nack from ", m_RemoteAddr);
-        return;
+        if (itr->second.IsTimedOut(now))
+        {
+          m_Stats.totalDroppedTX++;
+          m_Stats.totalInFlightTX--;
+          LogTrace("Dropped unacked packet to ", m_RemoteAddr);
+          itr->second.InformTimeout();
+          itr = m_TXMsgs.erase(itr);
+        }
+        else
+          ++itr;
       }
-      auto txid = oxenc::load_big_to_host<uint64_t>(data.data() + CommandOverhead + PacketOverhead);
-      LogTrace("got nack on ", txid, " from ", m_RemoteAddr);
-      auto itr = m_TXMsgs.find(txid);
+    }
+    {
+      // remove pending inbound messages that timed out
+      auto itr = m_RXMsgs.begin();
+      while (itr != m_RXMsgs.end())
+      {
+        if (itr->second.IsTimedOut(now))
+        {
+          m_ReplayFilter.emplace(itr->first, now);
+          itr = m_RXMsgs.erase(itr);
+        }
+        else
+          ++itr;
+      }
+    }
+    {
+      // decay replay window
+      auto itr = m_ReplayFilter.begin();
+      while (itr != m_ReplayFilter.end())
+      {
+        if (itr->second + ReplayWindow <= now)
+        {
+          itr = m_ReplayFilter.erase(itr);
+        }
+        else
+          ++itr;
+      }
+    }
+  }
+
+  static constexpr size_t INTROSIZE = PubKey::SIZE + PubKey::SIZE + TUNNONCESIZE + Signature::SIZE;
+  using Introduction = AlignedBuffer<INTROSIZE>;
+
+  void
+  Session::GenerateAndSendIntro()
+  {
+    TunnelNonce N;
+    Randomize(N);
+    {
+      ILinkSession::Packet_t req(INTROSIZE + PacketOverhead);
+      const auto pk = m_Parent->GetOurRC().pubkey;
+      const auto e_pk = m_Parent->RouterEncryptionSecret().toPublic();
+      auto itr = req.data() + PacketOverhead;
+      std::copy_n(pk.data(), pk.size(), itr);
+      itr += pk.size();
+      std::copy_n(e_pk.data(), e_pk.size(), itr);
+      itr += e_pk.size();
+      std::copy_n(N.data(), N.size(), itr);
+      Signature Z;
+      llarp_buffer_t signbuf(req.data() + PacketOverhead, INTROSIZE - Signature::SIZE);
+      m_Parent->Sign(Z, signbuf);
+      std::copy_n(Z.data(), Z.size(), req.data() + PacketOverhead + (INTROSIZE - Signature::SIZE));
+      CryptoManager::instance()->randbytes(req.data() + HMACSIZE, TUNNONCESIZE);
+      EncryptAndSend(std::move(req));
+    }
+    m_State = State::Introduction;
+    if (not CryptoManager::instance()->transport_dh_client(
+            m_SessionKey, m_ChosenAI.pubkey, m_Parent->RouterEncryptionSecret(), N))
+    {
+      LogError("failed to transport_dh_client on outbound session to ", m_RemoteAddr);
+      return;
+    }
+    LogTrace("sent intro to ", m_RemoteAddr);
+  }
+
+  void
+  Session::HandleCreateSessionRequest(Packet_t pkt)
+  {
+    if (not DecryptMessageInPlace(pkt))
+    {
+      LogError(m_Parent->PrintableName(), " failed to decrypt session request from ", m_RemoteAddr);
+      return;
+    }
+    if (pkt.size() < token.size() + PacketOverhead)
+    {
+      LogError(
+          m_Parent->PrintableName(),
+          " bad session request size, ",
+          pkt.size(),
+          " < ",
+          token.size() + PacketOverhead,
+          " from ",
+          m_RemoteAddr);
+      return;
+    }
+    const auto begin = pkt.data() + PacketOverhead;
+    if (not std::equal(begin, begin + token.size(), token.data()))
+    {
+      LogError(m_Parent->PrintableName(), " token mismatch from ", m_RemoteAddr);
+      return;
+    }
+    m_LastRX = m_Parent->Now();
+    m_State = State::LinkIntro;
+    SendOurLIM();
+  }
+
+  void
+  Session::HandleGotIntro(Packet_t pkt)
+  {
+    if (pkt.size() < (INTROSIZE + PacketOverhead))
+    {
+      LogWarn(m_Parent->PrintableName(), " intro too small from ", m_RemoteAddr);
+      return;
+    }
+    byte_t* ptr = pkt.data() + PacketOverhead;
+    TunnelNonce N;
+    std::copy_n(ptr, PubKey::SIZE, m_ExpectedIdent.data());
+    ptr += PubKey::SIZE;
+    std::copy_n(ptr, PubKey::SIZE, m_RemoteOnionKey.data());
+    ptr += PubKey::SIZE;
+    std::copy_n(ptr, TUNNONCESIZE, N.data());
+    ptr += TUNNONCESIZE;
+    Signature Z;
+    std::copy_n(ptr, Z.size(), Z.data());
+    const llarp_buffer_t verifybuf(pkt.data() + PacketOverhead, INTROSIZE - Signature::SIZE);
+    if (!CryptoManager::instance()->verify(m_ExpectedIdent, verifybuf, Z))
+    {
+      LogError(m_Parent->PrintableName(), " intro verify failed from ", m_RemoteAddr);
+      return;
+    }
+    const PubKey pk = m_Parent->TransportSecretKey().toPublic();
+    LogDebug("got intro: remote-pk=", m_RemoteOnionKey.ToHex(), " N=", N, " local-pk=", pk.ToHex());
+    if (not CryptoManager::instance()->transport_dh_server(
+            m_SessionKey, m_RemoteOnionKey, m_Parent->TransportSecretKey(), N))
+    {
+      LogError("failed to transport_dh_server on inbound intro from ", m_RemoteAddr);
+      return;
+    }
+    Packet_t reply(token.size() + PacketOverhead);
+    // random nonce
+    CryptoManager::instance()->randbytes(reply.data() + HMACSIZE, TUNNONCESIZE);
+    // set token
+    std::copy_n(token.data(), token.size(), reply.data() + PacketOverhead);
+    m_LastRX = m_Parent->Now();
+    EncryptAndSend(std::move(reply));
+    LogDebug("sent intro ack to ", m_RemoteAddr);
+    m_State = State::Introduction;
+  }
+
+  void
+  Session::HandleGotIntroAck(Packet_t pkt)
+  {
+    if (pkt.size() < (token.size() + PacketOverhead))
+    {
+      LogError(
+          m_Parent->PrintableName(),
+          " bad intro ack size ",
+          pkt.size(),
+          " < ",
+          token.size() + PacketOverhead,
+          " from ",
+          m_RemoteAddr);
+      return;
+    }
+    Packet_t reply(token.size() + PacketOverhead);
+    if (not DecryptMessageInPlace(pkt))
+    {
+      LogError(m_Parent->PrintableName(), " intro ack decrypt failed from ", m_RemoteAddr);
+      return;
+    }
+    m_LastRX = m_Parent->Now();
+    std::copy_n(pkt.data() + PacketOverhead, token.size(), token.data());
+    std::copy_n(token.data(), token.size(), reply.data() + PacketOverhead);
+    // random nounce
+    CryptoManager::instance()->randbytes(reply.data() + HMACSIZE, TUNNONCESIZE);
+    EncryptAndSend(std::move(reply));
+    LogDebug("sent session request to ", m_RemoteAddr);
+    m_State = State::LinkIntro;
+  }
+
+  bool
+  Session::DecryptMessageInPlace(Packet_t& pkt)
+  {
+    if (pkt.size() <= PacketOverhead)
+    {
+      LogError("packet too small from ", m_RemoteAddr);
+      return false;
+    }
+    const llarp_buffer_t buf(pkt);
+    ShortHash H;
+    llarp_buffer_t curbuf(buf.base, buf.sz);
+    curbuf.base += SHORTHASHSIZE;
+    curbuf.sz -= SHORTHASHSIZE;
+    if (not CryptoManager::instance()->hmac(H.data(), curbuf, m_SessionKey))
+    {
+      LogError("failed to caclulate keyed hash for ", m_RemoteAddr);
+      return false;
+    }
+    ShortHash expected{};
+    std::copy_n(buf.base, expected.size(), expected.begin());
+    if (H != expected)
+    {
+      LogDebug(
+          m_Parent->PrintableName(),
+          " keyed hash mismatch ",
+          H,
+          " != ",
+          expected,
+          " from ",
+          m_RemoteAddr,
+          " state=",
+          int(m_State),
+          " size=",
+          buf.sz);
+      return false;
+    }
+    TunnelNonce N{};
+    std::copy_n(curbuf.base, N.size(), N.begin());
+    curbuf.base += 32;
+    curbuf.sz -= 32;
+    LogTrace("decrypt: ", curbuf.sz, " bytes from ", m_RemoteAddr);
+    return CryptoManager::instance()->xchacha20(curbuf, m_SessionKey, N);
+  }
+
+  void
+  Session::Start()
+  {
+    if (m_Inbound)
+      return;
+    GenerateAndSendIntro();
+  }
+
+  void
+  Session::HandleSessionData(Packet_t pkt)
+  {
+    m_DecryptNext.emplace_back(std::move(pkt));
+    TriggerPump();
+  }
+
+  void
+  Session::HandlePlaintext()
+  {
+    if (m_PlaintextEmpty.test_and_set())
+      return;
+    util::descending_priority_queue<PlaintextEvent_t> queue{};
+    while (auto maybe = m_PlaintextRecv.tryPopFront())
+    {
+      queue.emplace(std::move(*maybe));
+    }
+    while (not queue.empty())
+    {
+      const auto& [seq, result] = queue.top();
+
+      log::debug(logcat, "Command {} from {}", int(result[PacketOverhead + 1]), m_RemoteAddr);
+      switch (result[PacketOverhead + 1])
+      {
+        case Command::eXMIT:
+          HandleXMIT(result);
+          m_LastRX = m_Parent->Now();
+          break;
+        case Command::eDATA:
+          HandleDATA(result);
+          m_LastRX = m_Parent->Now();
+          break;
+        case Command::eACKS:
+          HandleACKS(result);
+          m_LastRX = m_Parent->Now();
+          break;
+        case Command::ePING:
+          HandlePING(result);
+          m_LastRX = m_Parent->Now();
+          break;
+        case Command::eNACK:
+          HandleNACK(result);
+          m_LastRX = m_Parent->Now();
+          break;
+        case Command::eCLOS:
+          HandleCLOS(result);
+          m_LastRX = m_Parent->Now();
+          break;
+        case Command::eMACK:
+          HandleMACK(result);
+          m_LastRX = m_Parent->Now();
+          break;
+        default:
+          LogError("invalid command ", int(result[PacketOverhead + 1]), " from ", m_RemoteAddr);
+      }
+      queue.pop();
+    }
+    SendMACK();
+    m_Parent->WakeupPlaintext();
+  }
+
+  void
+  Session::HandleMACK(const Packet_t& data)
+  {
+    if (data.size() < (3 + PacketOverhead))
+    {
+      LogError("impossibly short mack from ", m_RemoteAddr);
+      return;
+    }
+    byte_t numAcks = data[CommandOverhead + PacketOverhead];
+    if (data.size() < 1 + CommandOverhead + PacketOverhead + (numAcks * sizeof(uint64_t)))
+    {
+      LogError("short mack from ", m_RemoteAddr);
+      return;
+    }
+    LogTrace("got ", int(numAcks), " mack from ", m_RemoteAddr);
+    const auto* ptr = data.data() + CommandOverhead + PacketOverhead + 1;
+    while (numAcks > 0)
+    {
+      auto acked = oxenc::load_big_to_host<uint64_t>(ptr);
+      LogTrace("mack containing txid=", acked, " from ", m_RemoteAddr);
+      auto itr = m_TXMsgs.find(acked);
       if (itr != m_TXMsgs.end())
       {
-        EncryptAndSend(itr->second.XMIT());
+        m_Stats.totalAckedTX++;
+        m_Stats.totalInFlightTX--;
+        itr->second.Completed();
+        m_TXMsgs.erase(itr);
       }
-    }
-
-    void
-    Session::HandleXMIT(Packet_t data)
-    {
-      static constexpr size_t XMITOverhead =
-          (CommandOverhead + PacketOverhead + sizeof(uint16_t) + sizeof(uint64_t)
-           + ShortHash::SIZE);
-      if (data.size() < XMITOverhead)
+      else
       {
-        LogError("short XMIT from ", m_RemoteAddr);
+        LogTrace("ignored mack for txid=", acked, " from ", m_RemoteAddr);
+      }
+      ptr += sizeof(uint64_t);
+      numAcks--;
+    }
+  }
+
+  void
+  Session::HandleNACK(const Packet_t& data)
+  {
+    if (data.size() < (CommandOverhead + sizeof(uint64_t) + PacketOverhead))
+    {
+      LogError("short nack from ", m_RemoteAddr);
+      return;
+    }
+    auto txid = oxenc::load_big_to_host<uint64_t>(data.data() + CommandOverhead + PacketOverhead);
+    LogTrace("got nack on ", txid, " from ", m_RemoteAddr);
+    auto itr = m_TXMsgs.find(txid);
+    if (itr != m_TXMsgs.end())
+    {
+      EncryptAndSend(itr->second.XMIT());
+    }
+  }
+
+  void
+  Session::HandleXMIT(const Packet_t& data)
+  {
+    static constexpr size_t XMITOverhead =
+        (CommandOverhead + PacketOverhead + sizeof(uint16_t) + sizeof(uint64_t) + SHORTHASHSIZE);
+    if (data.size() < XMITOverhead)
+    {
+      LogError("short XMIT from ", m_RemoteAddr);
+      return;
+    }
+    auto* pos = data.data() + CommandOverhead + PacketOverhead;
+    auto sz = oxenc::load_big_to_host<uint16_t>(pos);
+    pos += sizeof(sz);
+    auto rxid = oxenc::load_big_to_host<uint64_t>(pos);
+    pos += sizeof(rxid);
+    auto p2 = pos + SHORTHASHSIZE;
+    assert(p2 == data.data() + XMITOverhead);
+    LogTrace("rxid=", rxid, " sz=", sz, " h=", oxenc::to_hex(pos, p2), " from ", m_RemoteAddr);
+    {
+      // check for replay
+      auto itr = m_ReplayFilter.find(rxid);
+      if (itr != m_ReplayFilter.end())
+      {
+        m_SendMACKs.emplace(rxid);
+        LogTrace("duplicate rxid=", rxid, " from ", m_RemoteAddr);
         return;
       }
-      auto* pos = data.data() + CommandOverhead + PacketOverhead;
-      auto sz = oxenc::load_big_to_host<uint16_t>(pos);
-      pos += sizeof(sz);
-      auto rxid = oxenc::load_big_to_host<uint64_t>(pos);
-      pos += sizeof(rxid);
-      auto p2 = pos + ShortHash::SIZE;
-      assert(p2 == data.data() + XMITOverhead);
-      LogTrace("rxid=", rxid, " sz=", sz, " h=", oxenc::to_hex(pos, p2), " from ", m_RemoteAddr);
-      {
-        // check for replay
-        auto itr = m_ReplayFilter.find(rxid);
-        if (itr != m_ReplayFilter.end())
-        {
-          m_SendMACKs.emplace(rxid);
-          LogTrace("duplicate rxid=", rxid, " from ", m_RemoteAddr);
-          return;
-        }
-      }
-      {
-        const auto now = m_Parent->Now();
-        auto itr = m_RXMsgs.find(rxid);
-        if (itr == m_RXMsgs.end())
-        {
-          itr = m_RXMsgs.emplace(rxid, InboundMessage{rxid, sz, ShortHash{pos}, m_Parent->Now()})
-                    .first;
-          TriggerPump();
-
-          sz = std::min(sz, uint16_t{FragmentSize});
-          if ((data.size() - XMITOverhead) == sz)
-          {
-            const llarp_buffer_t buf(data.data() + (data.size() - sz), sz);
-            itr->second.HandleData(0, buf, now);
-            maybe_queue_verify(itr);
-          }
-        }
-        else
-          LogTrace("got duplicate xmit on ", rxid, " from ", m_RemoteAddr);
-      }
     }
-
-    void
-    Session::HandleDATA(Packet_t data)
     {
-      if (data.size() < (CommandOverhead + sizeof(uint16_t) + sizeof(uint64_t) + PacketOverhead))
-      {
-        LogError("short DATA from ", m_RemoteAddr, " ", data.size());
-        return;
-      }
-      auto sz = oxenc::load_big_to_host<uint16_t>(data.data() + CommandOverhead + PacketOverhead);
-      auto rxid = oxenc::load_big_to_host<uint64_t>(
-          data.data() + CommandOverhead + sizeof(uint16_t) + PacketOverhead);
+      const auto now = m_Parent->Now();
       auto itr = m_RXMsgs.find(rxid);
       if (itr == m_RXMsgs.end())
       {
-        if (m_ReplayFilter.find(rxid) == m_ReplayFilter.end())
+        ShortHash h{};
+        std::copy_n(pos, h.size(), h.begin());
+        itr = m_RXMsgs.emplace(rxid, InboundMessage{rxid, sz, std::move(h), m_Parent->Now()}).first;
+        TriggerPump();
+
+        sz = std::min(sz, uint16_t{FragmentSize});
+        if ((data.size() - XMITOverhead) == sz)
         {
-          LogTrace("no rxid=", rxid, " for ", m_RemoteAddr);
-          auto nack = CreatePacket(Command::eNACK, 8);
-          oxenc::write_host_as_big(rxid, nack.data() + PacketOverhead + CommandOverhead);
-          EncryptAndSend(std::move(nack));
+          const llarp_buffer_t buf(data.data() + (data.size() - sz), sz);
+          itr->second.HandleData(0, buf, now);
+          maybe_queue_verify(itr);
         }
-        else
-        {
-          LogTrace("replay hit for rxid=", rxid, " for ", m_RemoteAddr);
-          m_SendMACKs.emplace(rxid);
-        }
-        return;
       }
-
-      {
-        const llarp_buffer_t buf(
-            data.data() + PacketOverhead + 12, data.size() - (PacketOverhead + 12));
-        itr->second.HandleData(sz, buf, m_Parent->Now());
-      }
-      maybe_queue_verify(itr);
+      else
+        LogTrace("got duplicate xmit on ", rxid, " from ", m_RemoteAddr);
     }
+  }
 
-    void
-    Session::HandleRecvMsgCompleted(const InboundMessage& msg)
+  void
+  Session::HandleDATA(const Packet_t& data)
+  {
+    if (data.size() < (CommandOverhead + sizeof(uint16_t) + sizeof(uint64_t) + PacketOverhead))
     {
-      const auto rxid = msg.m_MsgID;
-      if (m_ReplayFilter.emplace(rxid, m_Parent->Now()).second)
-      {
-        m_Parent->HandleMessage(this, msg.m_Data);
-        m_SendMACKs.emplace(rxid);
-      }
-      m_RXMsgs.erase(rxid);
+      LogError("short DATA from ", m_RemoteAddr, " ", data.size());
+      return;
     }
-
-    void
-    Session::HandleACKS(Packet_t data)
+    auto sz = oxenc::load_big_to_host<uint16_t>(data.data() + CommandOverhead + PacketOverhead);
+    auto rxid = oxenc::load_big_to_host<uint64_t>(
+        data.data() + CommandOverhead + sizeof(uint16_t) + PacketOverhead);
+    auto itr = m_RXMsgs.find(rxid);
+    if (itr == m_RXMsgs.end())
     {
-      if (data.size() < (11 + PacketOverhead))
+      if (m_ReplayFilter.find(rxid) == m_ReplayFilter.end())
       {
-        LogError("short ACKS from ", m_RemoteAddr);
-        return;
-      }
-      const auto now = m_Parent->Now();
-      auto txid = oxenc::load_big_to_host<uint64_t>(data.data() + 2 + PacketOverhead);
-      auto itr = m_TXMsgs.find(txid);
-      if (itr == m_TXMsgs.end())
-      {
-        LogTrace("no txid=", txid, " for ", m_RemoteAddr);
-        return;
-      }
-      itr->second.Ack(data[10 + PacketOverhead]);
-
-      if (itr->second.IsTransmitted())
-      {
-        LogDebug("sent message ", itr->first, " to ", m_RemoteAddr);
-        itr->second.Completed();
-        itr = m_TXMsgs.erase(itr);
+        LogTrace("no rxid=", rxid, " for ", m_RemoteAddr);
+        auto nack = CreatePacket(Command::eNACK, 8);
+        oxenc::write_host_as_big(rxid, nack.data() + PacketOverhead + CommandOverhead);
+        EncryptAndSend(std::move(nack));
       }
       else
       {
-        itr->second.FlushUnAcked(util::memFn(&Session::EncryptAndSend, this), now);
+        LogTrace("replay hit for rxid=", rxid, " for ", m_RemoteAddr);
+        m_SendMACKs.emplace(rxid);
       }
+      return;
     }
 
-    void
-    Session::HandleCLOS(Packet_t)
     {
-      LogInfo("remote closed by ", m_RemoteAddr);
-      Close();
+      const llarp_buffer_t buf(
+          data.data() + PacketOverhead + 12, data.size() - (PacketOverhead + 12));
+      itr->second.HandleData(sz, buf, m_Parent->Now());
     }
+    maybe_queue_verify(itr);
+  }
 
-    void
-    Session::HandlePING(Packet_t)
-    {}
-
-    bool
-    Session::SendKeepAlive()
+  void
+  Session::HandleRecvMsgCompleted(const InboundMessage& msg)
+  {
+    const auto rxid = msg.m_MsgID;
+    if (m_ReplayFilter.emplace(rxid, m_Parent->Now()).second)
     {
-      if (m_State == State::Ready)
-      {
-        EncryptAndSend(CreatePacket(Command::ePING, 0));
-        return true;
-      }
-      return false;
+      m_Parent->HandleMessage(this, msg.m_Data);
+      m_SendMACKs.emplace(rxid);
     }
+    m_RXMsgs.erase(rxid);
+  }
 
-    bool
-    Session::IsEstablished() const
+  void
+  Session::HandleACKS(const Packet_t& data)
+  {
+    if (data.size() < (11 + PacketOverhead))
     {
-      return m_State == State::Ready || m_State == State::LinkIntro;
+      LogError("short ACKS from ", m_RemoteAddr);
+      return;
     }
-
-    bool
-    Session::Recv_LL(ILinkSession::Packet_t data)
+    const auto now = m_Parent->Now();
+    auto txid = oxenc::load_big_to_host<uint64_t>(data.data() + 2 + PacketOverhead);
+    auto itr = m_TXMsgs.find(txid);
+    if (itr == m_TXMsgs.end())
     {
-      m_RXRate += data.size();
-      log::debug(
-          logcat,
-          "session to {} got {} bytes state={}",
-          m_RemoteAddr,
-          data.size(),
-          StateToString(m_State));
-      // TODO: differentiate between good and bad RX packets here
-      m_Stats.totalPacketsRX++;
-      switch (m_State)
-      {
-        case State::Initial:
-          if (m_Inbound)
+      LogTrace("no txid=", txid, " for ", m_RemoteAddr);
+      return;
+    }
+    itr->second.Ack(data[10 + PacketOverhead]);
+
+    if (itr->second.IsTransmitted())
+    {
+      LogDebug("sent message ", itr->first, " to ", m_RemoteAddr);
+      itr->second.Completed();
+      itr = m_TXMsgs.erase(itr);
+    }
+    else
+    {
+      itr->second.FlushUnAcked(util::memFn(&Session::EncryptAndSend, this), now);
+    }
+  }
+
+  void
+  Session::HandleCLOS(const Packet_t&)
+  {
+    LogInfo("remote closed by ", m_RemoteAddr);
+    Close();
+  }
+
+  void
+  Session::HandlePING(const Packet_t&)
+  {}
+
+  bool
+  Session::SendKeepAlive()
+  {
+    if (m_State == State::Ready)
+    {
+      EncryptAndSend(CreatePacket(Command::ePING, 0));
+      return true;
+    }
+    return false;
+  }
+
+  bool
+  Session::IsEstablished() const
+  {
+    return m_State == State::Ready || m_State == State::LinkIntro;
+  }
+
+  bool
+  Session::Recv_LL(ILinkSession::Packet_t data)
+  {
+    m_RXRate += data.size();
+    log::debug(
+        logcat,
+        "session to {} got {} bytes state={}",
+        m_RemoteAddr,
+        data.size(),
+        StateToString(m_State));
+    // TODO: differentiate between good and bad RX packets here
+    m_Stats.totalPacketsRX++;
+    switch (m_State)
+    {
+      case State::Initial:
+        if (m_Inbound)
+        {
+          // initial data
+          // enter introduction phase
+          if (DecryptMessageInPlace(data))
           {
-            // initial data
-            // enter introduction phase
-            if (DecryptMessageInPlace(data))
-            {
-              HandleGotIntro(std::move(data));
-            }
-            else
-            {
-              LogDebug("bad intro from ", m_RemoteAddr);
-              return false;
-            }
-          }
-          break;
-        case State::Introduction:
-          if (m_Inbound)
-          {
-            // we are replying to an intro ack
-            HandleCreateSessionRequest(std::move(data));
+            HandleGotIntro(std::move(data));
           }
           else
           {
-            // we got an intro ack
-            // send a session request
-            HandleGotIntroAck(std::move(data));
+            LogDebug("bad intro from ", m_RemoteAddr);
+            return false;
           }
-          break;
-        case State::LinkIntro:
-        default:
-          HandleSessionData(std::move(data));
-          break;
-      }
-      return true;
+        }
+        break;
+      case State::Introduction:
+        if (m_Inbound)
+        {
+          // we are replying to an intro ack
+          HandleCreateSessionRequest(std::move(data));
+        }
+        else
+        {
+          // we got an intro ack
+          // send a session request
+          HandleGotIntroAck(std::move(data));
+        }
+        break;
+      case State::LinkIntro:
+      default:
+        HandleSessionData(std::move(data));
+        break;
     }
+    return true;
+  }
 
-    std::string
-    Session::StateToString(State state)
+  std::string
+  Session::StateToString(State state)
+  {
+    switch (state)
     {
-      switch (state)
-      {
-        case State::Initial:
-          return "Initial";
-        case State::Introduction:
-          return "Introduction";
-        case State::LinkIntro:
-          return "LinkIntro";
-        case State::Ready:
-          return "Ready";
-        case State::Closed:
-          return "Close";
-        default:
-          return "Invalid";
-      }
+      case State::Initial:
+        return "Initial";
+      case State::Introduction:
+        return "Introduction";
+      case State::LinkIntro:
+        return "LinkIntro";
+      case State::Ready:
+        return "Ready";
+      case State::Closed:
+        return "Close";
+      default:
+        return "Invalid";
     }
+  }
 
-    template <typename Iter_t>
-    void
-    Session::maybe_queue_verify(Iter_t itr)
+  template <typename Iter_t>
+  void
+  Session::maybe_queue_verify(Iter_t itr)
+  {
+    if (itr->second.IsCompleted())
     {
-      if (itr->second.IsCompleted())
-      {
-        log::debug(logcat, "message {} is completed", itr->first);
-        m_PendingHash.emplace(itr->first);
-        m_Parent->hasher()->async_verify_hash(itr->second, m_RemoteAddr);
-      }
-      else
-        log::debug(logcat, "message {} is not completed", itr->first);
+      log::debug(logcat, "message {} is completed", itr->first);
+      m_PendingHash.emplace(itr->first);
+      m_Parent->hasher()->async_verify_hash(itr->second, weak_from_this());
     }
-  }  // namespace iwp
-}  // namespace llarp
+    else
+      log::debug(logcat, "message {} is not completed", itr->first);
+  }
+}  // namespace llarp::iwp

@@ -167,14 +167,15 @@ namespace llarp
       inline bool
       IsBogonIP(const net::ipaddr_t& addr) const
       {
-        return IsBogonIP(var::visit(
-            [](auto&& ip) {
-              if constexpr (std::is_same_v<net::ipv4addr_t, std::decay_t<decltype(ip)>>)
-                return ExpandV4(ip);
-              else
-                return ip;
-            },
-            addr));
+        return IsBogonIP(
+            var::visit(
+                [](auto&& ip) {
+                  if constexpr (std::is_same_v<net::ipv4addr_t, std::decay_t<decltype(ip)>>)
+                    return ExpandV4(ip);
+                  else
+                    return ip;
+                },
+                addr));
       }
       inline bool
       IsBogonIP(const net::ipv6addr_t& addr) const

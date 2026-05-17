@@ -45,7 +45,6 @@ namespace llarp
     void
     handle()
     {
-      router->NotifyRouterEvent<tooling::PathStatusReceivedEvent>(router->pubkey(), pathid, status);
       hop->HandleLRSM(status, frames, router);
     }
 

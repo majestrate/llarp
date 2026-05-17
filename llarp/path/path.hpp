@@ -6,22 +6,17 @@
 #include <llarp/messages/relay.hpp>
 #include "ihophandler.hpp"
 #include "path_types.hpp"
-#include "pathbuilder.hpp"
 #include "pathset.hpp"
 #include <llarp/router_id.hpp>
 #include <llarp/routing/handler.hpp>
-#include <llarp/routing/message.hpp>
 #include <llarp/service/intro.hpp>
 #include <llarp/util/aligned.hpp>
-#include <llarp/util/compare_ptr.hpp>
 #include <llarp/util/thread/threading.hpp>
-#include <llarp/util/time.hpp>
+#include <llarp/util/thread/queue.hpp>
 
 #include <algorithm>
 #include <functional>
-#include <list>
 #include <map>
-#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -65,11 +60,46 @@ namespace llarp
           < std::tie(rhs.txID, rhs.rxID, rhs.rc, rhs.upstream, rhs.lifetime);
     }
 
-    /// A path we made
-    struct Path final : public IHopHandler,
-                        public routing::IMessageHandler,
-                        public std::enable_shared_from_this<Path>
+    struct Path;
+    struct PathContext;
+
+    class PathWorker
     {
+      using Ptr_t = std::weak_ptr<Path>;
+      thread::Queue<std::pair<Ptr_t, IHopHandler::TrafficEvent_t>> m_UpstreamSubmit;
+      thread::Queue<std::pair<Ptr_t, RelayUpstreamMessage>> m_UpstreamGather;
+      thread::Queue<std::pair<Ptr_t, IHopHandler::TrafficEvent_t>> m_DownstreamSubmit;
+      thread::Queue<std::pair<Ptr_t, RelayDownstreamMessage>> m_DownstreamGather;
+      std::vector<std::jthread> m_Workers;
+      PathContext& m_PathContext;
+      std::shared_ptr<EventLoopWakeup> m_Wakeup;
+
+      void
+      UpstreamWork();
+
+      void
+      DownstreamWork();
+
+      void
+      Wakeup();
+
+      static constexpr size_t queue_size = 128;
+
+     public:
+      explicit PathWorker(PathContext&, const EventLoop_ptr&);
+      ~PathWorker();
+      void
+      Start(size_t upstream_threads, size_t downstream_threads);
+      void
+      SubmitUpstream(std::weak_ptr<Path> path, IHopHandler::TrafficEvent_t ev);
+      void
+      SubmitDownstream(std::weak_ptr<Path> path, IHopHandler::TrafficEvent_t ev);
+    };
+
+    /// A path we made
+    struct Path final : IHopHandler, routing::IMessageHandler, std::enable_shared_from_this<Path>
+    {
+      friend PathWorker;
       using BuildResultHookFunc = std::function<void(Path_ptr)>;
       using CheckForDeadFunc = std::function<bool(Path_ptr, llarp_time_t)>;
       using DropHandlerFunc = std::function<bool(Path_ptr, const PathID_t&, uint64_t)>;
@@ -375,18 +405,9 @@ namespace llarp
       SendExitClose(const routing::CloseExitMessage& msg, AbstractRouter* r);
 
       void
-      FlushUpstream(AbstractRouter* r) override;
-
-      void
-      FlushDownstream(AbstractRouter* r) override;
+      DecayFilters(llarp_time_t now) override;
 
      protected:
-      void
-      UpstreamWork(TrafficQueue_t queue, AbstractRouter* r) override;
-
-      void
-      DownstreamWork(TrafficQueue_t queue, AbstractRouter* r) override;
-
       void
       HandleAllUpstream(std::vector<RelayUpstreamMessage> msgs, AbstractRouter* r) override;
 
@@ -423,6 +444,22 @@ namespace llarp
       uint64_t m_TXRate = 0;
       std::deque<llarp_time_t> m_LatencySamples;
       const std::string m_shortName;
+      util::DecayingHashSet<TunnelNonce> m_UpstreamReplayFilter;
+      util::DecayingHashSet<TunnelNonce> m_DownstreamReplayFilter;
     };
   }  // namespace path
 }  // namespace llarp
+
+namespace std
+{
+  template <>
+  struct hash<llarp::path::Path>
+  {
+    std::hash<llarp::PathID_t> m_hasher{};
+    size_t
+    operator()(const llarp::path::Path& path) const
+    {
+      return m_hasher(path.RXID()) ^ m_hasher(path.TXID());
+    }
+  };
+}  // namespace std

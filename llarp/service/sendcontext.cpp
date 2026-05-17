@@ -29,8 +29,10 @@ namespace llarp
     SendContext::Send(std::shared_ptr<ProtocolFrame> msg, path::Path_ptr path)
     {
       if (path->IsReady()
-          and m_SendQueue.tryPushBack(std::make_pair(
-                  std::make_shared<routing::PathTransferMessage>(*msg, remoteIntro.pathID), path))
+          and m_SendQueue.tryPushBack(
+                  std::make_pair(
+                      std::make_shared<routing::PathTransferMessage>(*msg, remoteIntro.pathID),
+                      path))
               == thread::QueueReturn::Success)
       {
         m_Endpoint->Router()->TriggerPump();
@@ -43,84 +45,91 @@ namespace llarp
     SendContext::FlushUpstream()
     {
       auto r = m_Endpoint->Router();
-      std::unordered_set<path::Path_ptr, path::Path::Ptr_Hash> flushpaths;
       auto rttRMS = 0ms;
+      size_t num{};
       while (auto maybe = m_SendQueue.tryPopFront())
       {
         auto& [msg, path] = *maybe;
         msg->S = path->NextSeqNo();
         if (path->SendRoutingMessage(*msg, r))
         {
+          m_Endpoint->m_Overhead.RecordOverhead(*msg);
           lastGoodSend = r->Now();
-          flushpaths.emplace(path);
           m_Endpoint->ConvoTagTX(msg->T.T);
           const auto rtt = (path->intro.latency + remoteIntro.latency) * 2;
           rttRMS += rtt * rtt.count();
+          ++num;
         }
       }
-      // flush the select path's upstream
-      for (const auto& path : flushpaths)
-      {
-        path->FlushUpstream(r);
-      }
-      if (flushpaths.empty())
-        return;
-      estimatedRTT = std::chrono::milliseconds{
-          static_cast<int64_t>(std::sqrt(rttRMS.count() / flushpaths.size()))};
+      if (num > 0)
+        estimatedRTT =
+            std::chrono::milliseconds{static_cast<int64_t>(std::sqrt(rttRMS.count() / num))};
     }
 
     /// send on an established convo tag
     void
-    SendContext::EncryptAndSendTo(const llarp_buffer_t& payload, ProtocolType t)
+    SendContext::EncryptAndSendTo(std::vector<std::vector<byte_t>> datas, ProtocolType t)
     {
-      SharedSecret shared;
-      auto f = std::make_shared<ProtocolFrame>();
-      f->R = 0;
-      f->N.Randomize();
-      f->T = currentConvoTag;
-      f->S = ++sequenceNo;
-
+      SharedSecret shared{};
       auto path = m_PathSet->GetPathByRouter(remoteIntro.router);
-      if (!path)
+      if (not path)
       {
         LogWarn(m_PathSet->Name(), " cannot encrypt and send: no path for intro ", remoteIntro);
         markedBad = true;
         return;
       }
-
-      if (!m_DataHandler->GetCachedSessionKeyFor(f->T, shared))
+      if (!m_DataHandler->GetCachedSessionKeyFor(currentConvoTag, shared))
       {
         LogWarn(
-            m_PathSet->Name(), " could not send, has no cached session key on session T=", f->T);
+            m_PathSet->Name(),
+            " could not send, has no cached session key on session T=",
+            currentConvoTag);
         markedBad = true;
         return;
       }
 
-      auto m = std::make_shared<ProtocolMessage>();
-      m_DataHandler->PutIntroFor(f->T, remoteIntro);
-      m_DataHandler->PutReplyIntroFor(f->T, path->intro);
-      m->proto = t;
-      if (auto maybe = m_Endpoint->GetSeqNoForConvo(f->T))
+      m_DataHandler->PutIntroFor(currentConvoTag, remoteIntro);
+      m_DataHandler->PutReplyIntroFor(currentConvoTag, path->intro);
+
+      Introduction introReply{};
+      std::deque<ProtocolMessage> msgs;
+      size_t idx{};
+      for (auto& data : datas)
       {
-        m->seqno = *maybe;
+        auto& msg = msgs.emplace_back();
+        llarp_buffer_t buf{data};
+        msg.PutBuffer(buf);
+        msg.sender = m_Endpoint->GetIdentity().pub;
+        msg.proto = t;
+        if (auto maybe = m_Endpoint->GetSeqNoForConvo(currentConvoTag); maybe != std::nullopt)
+          msg.seqno = *maybe;
+        if (idx++)
+          continue;
+        msg.introReply = path->intro;
+        introReply = path->intro;
       }
-      else
-      {
-        LogWarn(m_PathSet->Name(), " could not get sequence number for session T=", f->T);
-        return;
-      }
-      m->introReply = path->intro;
-      f->F = m->introReply.pathID;
-      m->sender = m_Endpoint->GetIdentity().pub;
-      m->tag = f->T;
-      m->PutBuffer(payload);
-      m_Endpoint->Router()->QueueWork([f, m, shared, path, this] {
-        if (not f->EncryptAndSign(*m, shared, m_Endpoint->GetIdentity()))
+
+      m_Endpoint->Router()->QueueWork([introReply = std::move(introReply),
+                                       msgs = std::move(msgs),
+                                       shared,
+                                       path,
+                                       ident = m_Endpoint->GetIdentity(),
+                                       this]() mutable {
+        while (not msgs.empty())
         {
-          LogError(m_PathSet->Name(), " failed to sign message");
-          return;
+          auto f = std::make_shared<ProtocolFrame>();
+          f->R = 0;
+          Randomize(f->N);
+          f->T = currentConvoTag;
+          f->S = ++sequenceNo;
+          f->F = introReply.pathID;
+          if (not f->EncryptAndSign(msgs, shared, ident))
+          {
+            LogError(m_PathSet->Name(), " failed to sign message");
+            return;
+          }
+          Send(f, path);
         }
-        Send(f, path);
       });
     }
 
@@ -139,11 +148,11 @@ namespace llarp
     }
 
     void
-    SendContext::AsyncEncryptAndSendTo(const llarp_buffer_t& data, ProtocolType protocol)
+    SendContext::AsyncEncryptAndSendTo(std::vector<std::vector<byte_t>> msgs, ProtocolType protocol)
     {
       if (IntroSent())
       {
-        EncryptAndSendTo(data, protocol);
+        EncryptAndSendTo(msgs, protocol);
         return;
       }
       // have we generated the initial intro but not sent it yet? bail here so we don't cause
@@ -165,7 +174,8 @@ namespace llarp
       }
       else
       {
-        AsyncGenIntro(data, protocol);
+        llarp_buffer_t buf{msgs[0]};
+        AsyncGenIntro(buf, protocol);
       }
     }
   }  // namespace service

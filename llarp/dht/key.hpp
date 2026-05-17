@@ -6,71 +6,76 @@
 
 #include <array>
 
+namespace llarp::dht
+{
+  struct Key_t;
+
+}
+
 namespace llarp
 {
-  namespace dht
+  template <>
+  constexpr inline bool is_aligned_buffer<dht::Key_t> = true;
+}
+
+namespace llarp::dht
+{
+
+  struct Key_t
   {
-    struct Key_t : public AlignedBuffer<32>
+    static_assert(is_aligned_buffer<Key_t>);
+    ALIGNED_BUFFER_MEMBERS(Key_t, 32)
+   public:
+    /// get snode address string
+    std::string
+    SNode() const
     {
-      explicit Key_t(const byte_t* buf) : AlignedBuffer<SIZE>(buf)
-      {}
+      const RouterID rid{data()};
+      return rid.ToString();
+    }
 
-      explicit Key_t(const Data& data) : AlignedBuffer<SIZE>(data)
-      {}
+    std::string
+    ToString() const
+    {
+      return SNode();
+    }
+    /*
+          template <typename Kind_t>
+          requires is_aligned_buffer<Kind_t>
+          Key_t
+          constexpr operator^(const Kind_t & other) const
+          {
+            static_assert(other.size() == SIZE);
+            Key_t dist{};
+            std::transform(begin(), end(), other.begin(), dist.begin(), std::bit_xor<byte_t>());
+            return dist;
+          }
+          */
 
-      explicit Key_t(const AlignedBuffer<SIZE>& data) : AlignedBuffer<SIZE>(data)
-      {}
+    auto
+    operator<=>(const Key_t& other) const
+    {
+      return as_array() <=> other.as_array();
+    }
 
-      Key_t() : AlignedBuffer<SIZE>()
-      {}
+    RouterID
+    Router() const
+    {
+      return RouterID{data()};
+    }
 
-      /// get snode address string
-      std::string
-      SNode() const
-      {
-        const RouterID rid{as_array()};
-        return rid.ToString();
-      }
-
-      std::string
-      ToString() const
-      {
-        return SNode();
-      }
-
-      Key_t
-      operator^(const Key_t& other) const
-      {
-        Key_t dist;
-        std::transform(begin(), end(), other.begin(), dist.begin(), std::bit_xor<byte_t>());
-        return dist;
-      }
-
-      bool
-      operator==(const Key_t& other) const
-      {
-        return as_array() == other.as_array();
-      }
-
-      bool
-      operator!=(const Key_t& other) const
-      {
-        return as_array() != other.as_array();
-      }
-
-      bool
-      operator<(const Key_t& other) const
-      {
-        return as_array() < other.as_array();
-      }
-
-      bool
-      operator>(const Key_t& other) const
-      {
-        return as_array() > other.as_array();
-      }
-    };
-  }  // namespace dht
+    template <typename Kind_t>
+      requires is_aligned_buffer<Kind_t>
+    bool
+    operator==(const Kind_t& other) const
+    {
+      static_assert(other.size() == size());
+      return as_array() == other.as_array();
+    }
+  };
+}  // namespace llarp::dht
+namespace llarp
+{
   template <>
   inline constexpr bool IsToStringFormattable<dht::Key_t> = true;
 }  // namespace llarp

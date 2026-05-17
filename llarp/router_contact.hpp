@@ -24,8 +24,16 @@ namespace oxenc
 namespace llarp
 {
   /// NetID
-  struct NetID final : public AlignedBuffer<8>
+  struct NetID final
   {
+    ALIGNED_BUFFER_MEMBERS_NO_OPERS(NetID, 8)
+   public:
+    static constexpr size_t
+    max_size()
+    {
+      return SIZE;
+    }
+
     static NetID&
     DefaultValue();
 
@@ -50,11 +58,14 @@ namespace llarp
     ToString() const;
 
     bool
-    BDecode(llarp_buffer_t* buf);
+    BEncode(llarp_buffer_t*) const;
 
     bool
-    BEncode(llarp_buffer_t* buf) const;
+    BDecode(llarp_buffer_t*);
   };
+
+  template <>
+  constexpr inline bool is_aligned_buffer<NetID> = true;
 
   /// RouterContact
   struct RouterContact

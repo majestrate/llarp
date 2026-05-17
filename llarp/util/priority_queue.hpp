@@ -65,7 +65,7 @@ namespace llarp::util
       typename Visit_t,
       typename Queue_t = std::priority_queue<T>,
       typename Container_t = std::vector<T>>
-  inline auto
+  auto
   with_inplace_priority_queue(
       Container_t& vec,
       Visit_t&& visit,

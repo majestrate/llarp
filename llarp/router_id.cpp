@@ -1,5 +1,8 @@
 #include <llarp/util/alloc.h>
 #include "router_id.hpp"
+
+#include <llarp/crypto/types.hpp>
+
 #include <oxenc/base32z.h>
 
 namespace llarp
@@ -36,5 +39,11 @@ namespace llarp
       return false;
     oxenc::from_base32z(str.begin(), str.end(), begin());
     return true;
+  }
+
+  bool
+  RouterID::operator==(const PubKey& pk) const
+  {
+    return as_array() == pk.as_array();
   }
 }  // namespace llarp

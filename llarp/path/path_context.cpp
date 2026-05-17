@@ -300,20 +300,6 @@ namespace llarp
       return nullptr;
     }
 
-    void
-    PathContext::PumpUpstream()
-    {
-      m_TransitPaths.ForEach([&](auto& ptr) { ptr->FlushUpstream(m_Router); });
-      m_OurPaths.ForEach([&](auto& ptr) { ptr->FlushUpstream(m_Router); });
-    }
-
-    void
-    PathContext::PumpDownstream()
-    {
-      m_TransitPaths.ForEach([&](auto& ptr) { ptr->FlushDownstream(m_Router); });
-      m_OurPaths.ForEach([&](auto& ptr) { ptr->FlushDownstream(m_Router); });
-    }
-
     uint64_t
     PathContext::CurrentTransitPaths()
     {
@@ -414,5 +400,6 @@ namespace llarp
     void
     PathContext::RemovePathSet(PathSet_ptr)
     {}
+
   }  // namespace path
 }  // namespace llarp

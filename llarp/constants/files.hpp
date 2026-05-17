@@ -10,12 +10,11 @@
 
 namespace llarp
 {
-  constexpr auto our_rc_filename = "self.signed";
-  constexpr auto our_identity_filename = "identity.key";
-  constexpr auto our_enc_key_filename = "encryption.key";
-  constexpr auto our_transport_key_filename = "transport.key";
-
-  constexpr auto nodedb_dirname = "nodedb";
+  const static inline fs::path our_rc_filename = "self.signed";
+  const static inline fs::path our_identity_filename = "identity.key";
+  const static inline fs::path our_enc_key_filename = "encryption.key";
+  const static inline fs::path our_transport_key_filename = "transport.key";
+  const static inline fs::path nodedb_dirname = "nodedb";
 
   inline fs::path
   GetDefaultDataDir()

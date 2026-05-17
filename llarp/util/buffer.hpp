@@ -29,7 +29,7 @@ struct ManagedBuffer;
 /// TODO: replace usage of these with std::span (via a backport until we move to C++20).  That's a
 /// fairly big job, though, as llarp_buffer_t is currently used a bit differently (i.e. maintains
 /// both start and current position, plus has some value reading/writing methods).
-struct [[deprecated("this type is stupid, use something else")]] llarp_buffer_t
+struct llarp_buffer_t
 {
   /// starting memory address
   byte_t* base{nullptr};
@@ -254,57 +254,21 @@ namespace llarp
   // convertible to a llarp_buffer_t.
   struct OwnedBuffer
   {
-#if defined(__APPLE__) || defined(ANDROID)
-    // apple does not implement std::pmr even though they have it in the headers because of course
-    // they don't, why would they?
-    using alloc_t = std::allocator<byte_t>;
-#else
-    using alloc_t = std::pmr::polymorphic_allocator<byte_t>;
-#endif
-    struct destroyer
-    {
-      alloc_t& alloc;
-      size_t sz;
-      void
-      operator()(byte_t* ptr)
-      {
-        alloc.deallocate(ptr, sz);
-      }
-    };
-    using bufptr_t = std::unique_ptr<byte_t[], destroyer>;
-    alloc_t _alloc;
+    using bufptr_t = std::unique_ptr<byte_t[]>;
+
     bufptr_t buf;
     size_t sz;
 
-#if defined(__APPLE__) || defined(ANDROID)
     // Create a new, uninitialized owned buffer of the given size.
-    explicit OwnedBuffer(size_t sz)
-        : _alloc{}, buf{bufptr_t{_alloc.allocate(sz), destroyer{_alloc, sz}}}, sz{sz}
+    explicit OwnedBuffer(size_t sz) : buf{new byte_t[std::max(sz, size_t{1})]}, sz{sz}
     {}
-#else
-    // Create a new, uninitialized owned buffer of the given size.
-    explicit OwnedBuffer(std::pmr::memory_resource* res, size_t sz)
-        : _alloc{res}, buf{bufptr_t{_alloc.allocate(sz), destroyer{_alloc, sz}}}, sz{sz}
-    {}
-#endif
 
-#if defined(__APPLE__) || defined(ANDROID)
     // copy content from existing memory
     explicit OwnedBuffer(const byte_t* ptr, size_t sz) : OwnedBuffer{sz}
     {
       std::copy_n(ptr, sz, buf.get());
     }
-#else
-    // copy content from existing memory
-    explicit OwnedBuffer(
-        const byte_t* ptr,
-        size_t sz,
-        std::pmr::memory_resource* res = std::pmr::get_default_resource())
-        : OwnedBuffer{res, sz}
-    {
-      std::copy_n(ptr, sz, buf.get());
-    }
-#endif
+
     OwnedBuffer(const OwnedBuffer&) = delete;
     OwnedBuffer&
     operator=(const OwnedBuffer&) = delete;

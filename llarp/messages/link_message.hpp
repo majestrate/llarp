@@ -1,7 +1,6 @@
 #pragma once
 
 #include <llarp/link/session.hpp>
-#include <llarp/router_id.hpp>
 #include <llarp/util/bencode.hpp>
 #include <llarp/path/path_types.hpp>
 

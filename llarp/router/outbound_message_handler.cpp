@@ -11,7 +11,7 @@
 
 namespace llarp
 {
-  const PathID_t OutboundMessageHandler::zeroID;
+  const PathID_t OutboundMessageHandler::zeroID{};
 
   using namespace std::chrono_literals;
 

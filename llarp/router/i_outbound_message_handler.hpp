@@ -1,6 +1,5 @@
 #pragma once
-
-#include <cstdint>
+#include <llarp/path/path_types.hpp>
 #include <functional>
 
 namespace llarp
@@ -17,7 +16,6 @@ namespace llarp
 
   struct ILinkMessage;
   struct RouterID;
-  struct PathID_t;
 
   using SendStatusHandler = std::function<void(SendStatus)>;
 

@@ -7,41 +7,38 @@
 
 #include <vector>
 
-namespace llarp
+namespace llarp::dht
 {
-  namespace dht
+  constexpr size_t MAX_MSG_SIZE = 2048;
+
+  struct IMessage
   {
-    constexpr size_t MAX_MSG_SIZE = 2048;
+    virtual ~IMessage() = default;
 
-    struct IMessage
-    {
-      virtual ~IMessage() = default;
+    /// construct
+    IMessage(const Key_t& from) : From(from)
+    {}
 
-      /// construct
-      IMessage(const Key_t& from) : From(from)
-      {}
+    using Ptr_t = std::unique_ptr<IMessage>;
 
-      using Ptr_t = std::unique_ptr<IMessage>;
+    virtual bool
+    HandleMessage(struct llarp_dht_context* dht, std::vector<Ptr_t>& replies) const = 0;
 
-      virtual bool
-      HandleMessage(struct llarp_dht_context* dht, std::vector<Ptr_t>& replies) const = 0;
+    virtual bool
+    BEncode(llarp_buffer_t* buf) const = 0;
 
-      virtual bool
-      BEncode(llarp_buffer_t* buf) const = 0;
+    virtual bool
+    DecodeKey(const llarp_buffer_t& key, llarp_buffer_t* val) = 0;
 
-      virtual bool
-      DecodeKey(const llarp_buffer_t& key, llarp_buffer_t* val) = 0;
+    Key_t From;
+    PathID_t pathID;
+    uint64_t version = llarp::constants::proto_version;
+  };
 
-      Key_t From;
-      PathID_t pathID;
-      uint64_t version = llarp::constants::proto_version;
-    };
+  IMessage::Ptr_t
+  DecodeMessage(const Key_t& from, llarp_buffer_t* buf, bool relayed = false);
 
-    IMessage::Ptr_t
-    DecodeMessage(const Key_t& from, llarp_buffer_t* buf, bool relayed = false);
-
-    bool
-    DecodeMesssageList(
-        Key_t from, llarp_buffer_t* buf, std::vector<IMessage::Ptr_t>& dst, bool relayed = false);
-  }  // namespace dht
-}  // namespace llarp
+  bool
+  DecodeMesssageList(
+      Key_t from, llarp_buffer_t* buf, std::vector<IMessage::Ptr_t>& dst, bool relayed = false);
+}  // namespace llarp::dht

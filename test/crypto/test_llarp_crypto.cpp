@@ -19,15 +19,15 @@ TEST_CASE("Identity key")
 
   SECTION("Sign-verify")
   {
-    AlignedBuffer<128> random;
-    random.Randomize();
+    AlignedBuffer<32> random;
+    Randomize(random);
     Signature sig;
     const PubKey pk = secret.toPublic();
 
     const llarp_buffer_t buf(random.data(), random.size());
     REQUIRE(crypto.sign(sig, secret, buf));
     REQUIRE(crypto.verify(pk, buf, sig));
-    random.Randomize();
+    Randomize(random);
     // mangle body
     REQUIRE_FALSE(crypto.verify(pk, buf, sig));
   }
@@ -43,7 +43,9 @@ TEST_CASE("PQ crypto")
   auto c = &crypto;
 
   REQUIRE(keys.size() == PQ_KEYPAIRSIZE);
-  REQUIRE(c->pqe_encrypt(block, shared, PQPubKey(pq_keypair_to_public(keys))));
+  PQPubKey pk{};
+  std::copy_n(pq_keypair_to_public(keys), pk.size(), pk.begin());
+  REQUIRE(c->pqe_encrypt(block, shared, pk));
   REQUIRE(c->pqe_decrypt(block, otherShared, pq_keypair_to_secret(keys)));
   REQUIRE(otherShared == shared);
 }

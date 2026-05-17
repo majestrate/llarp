@@ -1,16 +1,31 @@
 #pragma once
-
+#include "aligned.hpp"
 #include "buffer.hpp"
 #include "mem.h"
 
 #include <cctype>
 #include <cstdio>
-#include <memory>
 
 namespace llarp
 {
   void
   Zero(void* ptr, size_t sz);
+
+  template <typename T>
+    requires is_aligned_buffer<T>
+  void
+  Zero(T& t)
+  {
+    Zero(t.data(), t.size());
+  }
+
+  template <typename T>
+    requires is_aligned_buffer<T>
+  bool
+  IsZero(const T& t)
+  {
+    return ::sodium_is_zero(t.data(), t.size());
+  }
 
   template <typename T>
   void

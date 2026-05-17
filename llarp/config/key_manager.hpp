@@ -1,12 +1,14 @@
 #pragma once
 
 #include <atomic>
-#include "config.hpp"
 #include <llarp/crypto/types.hpp>
 #include <llarp/router_contact.hpp>
 
 namespace llarp
 {
+
+  struct Config;
+
   /// KeyManager manages the cryptographic keys stored on disk for the local
   /// node. This includes private keys as well as the self-signed router contact
   /// file (e.g. "self.signed").

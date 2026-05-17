@@ -1,4 +1,5 @@
 #pragma once
+#ifdef WITH_IO_URING
 #include "ev.hpp"
 #include <llarp/util/thread/queue.hpp>
 #include <liburing.h>
@@ -25,6 +26,7 @@ namespace llarp::io_uring
     std::shared_ptr<EventLoopWakeup> m_TickerWaker;
     std::vector<std::function<void()>> m_Tickers;
     std::atomic<bool> m_Run;
+    std::shared_ptr<TCPConnectionPool> m_ConnectionPool;
 
     void
     flush_logic();
@@ -107,6 +109,11 @@ namespace llarp::io_uring
 
     size_t
     num_worker_threads() const override;
+
+    TCPConnectionPool&
+    connection_pool() override;
   };
 
 }  // namespace llarp::io_uring
+
+#endif

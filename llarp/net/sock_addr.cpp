@@ -182,18 +182,21 @@ namespace llarp
     return *this;
   }
 
-  SockAddr::operator const sockaddr*() const
+  SockAddr::
+  operator const sockaddr*() const
   {
     return isIPv4() ? reinterpret_cast<const sockaddr*>(&m_addr4)
                     : reinterpret_cast<const sockaddr*>(&m_addr);
   }
 
-  SockAddr::operator const sockaddr_in*() const
+  SockAddr::
+  operator const sockaddr_in*() const
   {
     return &m_addr4;
   }
 
-  SockAddr::operator const sockaddr_in6*() const
+  SockAddr::
+  operator const sockaddr_in6*() const
   {
     return &m_addr;
   }

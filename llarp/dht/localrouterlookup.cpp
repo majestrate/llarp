@@ -13,6 +13,11 @@ namespace llarp
 {
   namespace dht
   {
+    namespace
+    {
+      auto logcat = log::Cat("dht");
+    }
+
     LocalRouterLookup::LocalRouterLookup(
         const PathID_t& path, uint64_t txid, const RouterID& _target, AbstractContext* ctx)
         : RecursiveRouterLookup(TXOwner{ctx->OurKey(), txid}, _target, ctx, nullptr)
@@ -23,13 +28,14 @@ namespace llarp
     LocalRouterLookup::SendReply()
     {
       auto path =
-          parent->GetRouter()->pathContext().GetByUpstream(parent->OurKey().as_array(), localPath);
+          parent->GetRouter()->pathContext().GetByUpstream(parent->OurKey().Router(), localPath);
       if (!path)
       {
-        llarp::LogWarn(
+        log::warning(
+            logcat,
             "did not send reply for relayed dht request, no such local path "
-            "for pathid=",
-            localPath);
+            "for pathid={}",
+            localPath.ToHex());
         return;
       }
       if (valuesFound.size())
@@ -58,7 +64,7 @@ namespace llarp
         llarp::LogWarn(
             "failed to send routing message when informing result of dht "
             "request, pathid=",
-            localPath);
+            localPath.ToHex());
       }
     }
   }  // namespace dht

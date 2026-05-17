@@ -71,7 +71,7 @@ namespace llarp
   bool
   NetID::BDecode(llarp_buffer_t* buf)
   {
-    Zero();
+    Zero(data(), size());
     llarp_buffer_t strbuf;
     if (!bencode_read_string(buf, &strbuf))
       return false;
@@ -120,7 +120,7 @@ namespace llarp
     auto out = std::back_inserter(result);
     for (const auto& addr : addrs)
       fmt::format_to(out, "ai_addr={}:{}; ai_pk={}; ", addr.IP(), addr.port, addr.pubkey);
-    fmt::format_to(out, "updated={}; onion_pk={}; ", last_updated.count(), enckey.ToHex());
+    fmt::format_to(out, "updated={}; onion_pk={}; ", last_updated.count(), enckey);
     if (routerVersion.has_value())
       fmt::format_to(out, "router_version={}; ", *routerVersion);
     return result;
@@ -205,7 +205,7 @@ namespace llarp
       if (!bencode_write_bytestring(buf, "x", 1))
         return false;
       /* no exits anymore in RCs */
-      const std::vector<AlignedBuffer<8>> exits{};
+      const std::vector<PubKey> exits{};
       if (!BEncodeWriteList(exits.begin(), exits.end(), buf))
         return false;
     }
@@ -227,13 +227,13 @@ namespace llarp
   {
     addrs.clear();
     signature.Zero();
-    nickname.Zero();
+    Zero(nickname.data(), nickname.size());
     enckey.Zero();
     pubkey.Zero();
-    routerVersion = std::optional<RouterVersion>{};
+    routerVersion = std::nullopt;
     last_updated = 0s;
     srvRecords.clear();
-    version = llarp::constants::proto_version;
+    version = constants::proto_version;
   }
 
   bool
@@ -336,11 +336,11 @@ namespace llarp
       {
         return false;
       }
-      if (strbuf.sz > llarp::AlignedBuffer<(32)>::size())
+      if (strbuf.sz > nickname.size())
       {
         return false;
       }
-      nickname.Zero();
+      Zero(nickname.data(), nickname.size());
       std::copy(strbuf.base, strbuf.base + strbuf.sz, nickname.begin());
       return true;
     }
@@ -385,7 +385,7 @@ namespace llarp
   void
   RouterContact::SetNick(std::string_view nick)
   {
-    nickname.Zero();
+    Zero(nickname.data(), nickname.size());
     std::copy(
         nick.begin(), nick.begin() + std::min(nick.size(), nickname.size()), nickname.begin());
   }
@@ -567,13 +567,13 @@ namespace llarp
   {
     return fmt::format(
         "[RC k={} updated={} netid={} v={} ai={} e={} z={}]",
-        pubkey,
+        pubkey.ToHex(),
         last_updated.count(),
         netID,
         version,
         fmt::format("{}", fmt::join(addrs, ",")),
-        enckey,
-        signature);
+        enckey.ToHex(),
+        signature.ToHex());
   }
 
 }  // namespace llarp

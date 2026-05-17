@@ -58,12 +58,14 @@ namespace llarp
     {
       std::function<void(net::IPPacket)> m_Reply;
       net::ipaddr_t m_OurIP;
-      llarp::DnsConfig m_Config;
+      std::vector<SockAddr> m_Upstreams;
 
      public:
       explicit DnsInterceptor(
           std::function<void(net::IPPacket)> reply, net::ipaddr_t our_ip, llarp::DnsConfig conf)
-          : m_Reply{std::move(reply)}, m_OurIP{std::move(our_ip)}, m_Config{std::move(conf)}
+          : m_Reply{std::move(reply)}
+          , m_OurIP{std::move(our_ip)}
+          , m_Upstreams{std::move(conf.m_upstreamDNS)}
       {}
 
       ~DnsInterceptor() override = default;
@@ -79,7 +81,7 @@ namespace llarp
       }
 
       void
-      Stop() override{};
+      Stop() override {};
 
       std::optional<SockAddr>
       BoundOn() const override
@@ -87,14 +89,19 @@ namespace llarp
         return std::nullopt;
       }
 
+      void
+      SetUpstreams(std::vector<SockAddr> upstreams)
+      {
+        m_Upstreams = std::move(upstreams);
+      }
+
       bool
       WouldLoop(const SockAddr& to, const SockAddr& from) const override
       {
-        if (auto maybe_addr = m_Config.m_QueryBind)
+        for (const auto& upstream : m_Upstreams)
         {
-          const auto& addr = *maybe_addr;
-          // omit traffic to and from our dns socket
-          return addr == to or addr == from;
+          if (upstream == to or upstream == from)
+            return true;
         }
         return false;
       }
@@ -102,7 +109,7 @@ namespace llarp
 
     class TunDNS : public dns::Server
     {
-      std::optional<SockAddr> m_QueryBind;
+      std::shared_ptr<DnsInterceptor> m_Interceptor;
       net::ipaddr_t m_OurIP;
       TunEndpoint* const m_Endpoint;
 
@@ -112,10 +119,7 @@ namespace llarp
       virtual ~TunDNS() = default;
 
       explicit TunDNS(TunEndpoint* ep, const llarp::DnsConfig& conf)
-          : dns::Server{ep->Router()->loop(), conf, 0}
-          , m_QueryBind{conf.m_QueryBind}
-          , m_OurIP{ep->GetIfAddr()}
-          , m_Endpoint{ep}
+          : dns::Server{ep->Router()->loop(), conf, 0}, m_OurIP{ep->GetIfAddr()}, m_Endpoint{ep}
       {}
 
       std::shared_ptr<dns::PacketSource_Base>
@@ -127,8 +131,16 @@ namespace llarp
             },
             m_OurIP,
             conf);
+        m_Interceptor = ptr;
         PacketSource = std::static_pointer_cast<dns::PacketSource_Base>(ptr);
         return PacketSource;
+      }
+
+      void
+      SetUpstreams(std::vector<SockAddr> upstreams)
+      {
+        if (m_Interceptor)
+          m_Interceptor->SetUpstreams(std::move(upstreams));
       }
     };
 
@@ -182,6 +194,10 @@ namespace llarp
     void
     TunEndpoint::ReconfigureDNS(std::vector<SockAddr> servers)
     {
+      if (m_DnsConfig.m_raw_dns)
+        if (auto* tundns = dynamic_cast<TunDNS*>(m_DNS.get()))
+          tundns->SetUpstreams(servers);
+
       if (m_DNS)
       {
         for (auto weak : m_DNS->GetAllResolvers())
@@ -331,16 +347,16 @@ namespace llarp
               }
               if (const auto* loki = std::get_if<service::Address>(&addr))
               {
-                m_IPToAddr.emplace(ip, loki->data());
-                m_AddrToIP.emplace(loki->data(), ip);
-                m_SNodes[*loki] = false;
+                m_IPToAddr.emplace(ip, loki->as_array());
+                m_AddrToIP.emplace(loki->as_array(), ip);
+                m_SNodes[loki->as_array()] = false;
                 LogInfo(Name(), " remapped ", ip, " to ", *loki);
               }
               if (const auto* snode = std::get_if<RouterID>(&addr))
               {
-                m_IPToAddr.emplace(ip, snode->data());
-                m_AddrToIP.emplace(snode->data(), ip);
-                m_SNodes[*snode] = true;
+                m_IPToAddr.emplace(ip, snode->as_array());
+                m_AddrToIP.emplace(snode->as_array(), ip);
+                m_SNodes[snode->as_array()] = true;
                 LogInfo(Name(), " remapped ", ip, " to ", *snode);
               }
               if (m_NextIP < ToHost(ip))
@@ -376,7 +392,7 @@ namespace llarp
         m_NetworkToUserPktQueue.pop();
       }
 
-      service::Endpoint::Pump(now);
+      Endpoint::Pump(now);
     }
 
     static bool
@@ -408,9 +424,9 @@ namespace llarp
       if (itr == m_IPToAddr.end())
         return std::nullopt;
       if (m_SNodes.at(itr->second))
-        return RouterID{itr->second.as_array()};
+        return RouterID{itr->second};
       else
-        return service::Address{itr->second.as_array()};
+        return service::Address{itr->second};
     }
 
     bool
@@ -716,8 +732,8 @@ namespace llarp
           }
           else
           {
-            return ReplyToSNodeDNSWhenReady(
-                addr.as_array(), std::make_shared<dns::Message>(msg), isV6);
+            const RouterID snode{addr.data()};
+            return ReplyToSNodeDNSWhenReady(snode, std::make_shared<dns::Message>(msg), isV6);
           }
         }
         else if (service::NameIsValid(lnsName))
@@ -849,15 +865,14 @@ namespace llarp
       auto itr = m_IPToAddr.find(ip);
       if (itr != m_IPToAddr.end())
       {
-        llarp::LogWarn(
-            ip, " already mapped to ", service::Address(itr->second.as_array()).ToString());
+        llarp::LogWarn(ip, " already mapped to ", service::Address(itr->second).ToString());
         return false;
       }
       llarp::LogInfo(Name() + " map ", addr.ToString(), " to ", ip);
 
-      m_IPToAddr[ip] = addr;
-      m_AddrToIP[addr] = ip;
-      m_SNodes[addr] = SNode;
+      m_IPToAddr[ip] = addr.as_array();
+      m_AddrToIP[addr.as_array()] = ip;
+      m_SNodes[addr.as_array()] = SNode;
       MarkIPActiveForever(ip);
       MarkAddressOutbound(addr);
       return true;
@@ -938,8 +953,9 @@ namespace llarp
         return false;
       }
 
-      m_OurIPv6 = net::ipv6addr_t::from_host(llarp::uint128_t{
-          0xfd2e'6c6f'6b69'0000, ToHost(llarp::net::TruncateV6(m_OurRange.addr)).h});
+      m_OurIPv6 = net::ipv6addr_t::from_host(
+          llarp::uint128_t{
+              0xfd2e'6c6f'6b69'0000, ToHost(llarp::net::TruncateV6(m_OurRange.addr)).h});
 
       if (auto maybe = m_router->Net().GetInterfaceIPv6Address(m_IfName))
       {
@@ -953,7 +969,7 @@ namespace llarp
       LogInfo(Name(), " setting up dns...");
       SetupDNS();
       Loop()->call_soon([this]() { m_router->routePoker()->SetDNSMode(false); });
-      return HasAddress(ourAddr);
+      return HasAddress(ourAddr.as_array());
     }
 
     std::unordered_map<std::string, std::string>
@@ -1003,7 +1019,7 @@ namespace llarp
           {
             if (not m_SNodes.at(addr))
             {
-              const service::Address a{addr.as_array()};
+              const service::Address a{addr};
               if (HasInboundConvo(a))
                 addrmap[ip.ToString()] = a.ToString();
             }
@@ -1104,7 +1120,6 @@ namespace llarp
                 if (extra_cb)
                   extra_cb();
                 ctx->SendPacketToRemote(pkt.ConstBuffer(), service::ProtocolType::Exit);
-                Router()->TriggerPump();
                 return;
               }
               LogWarn("cannot ensure path to exit ", addr, " so we drop some packets");
@@ -1116,12 +1131,12 @@ namespace llarp
       service::ProtocolType type;
       if (m_SNodes.at(itr->second))
       {
-        to = RouterID{itr->second.as_array()};
+        to = RouterID{itr->second};
         type = service::ProtocolType::TrafficV4;
       }
       else
       {
-        to = service::Address{itr->second.as_array()};
+        to = service::Address{itr->second};
         type = m_state->m_ExitEnabled and src != m_OurIP ? service::ProtocolType::Exit
                                                          : pkt.ServiceProtocol();
       }
@@ -1143,7 +1158,6 @@ namespace llarp
         if (SendToOrQueue(*maybe, pkt.ConstBuffer(), type))
         {
           MarkIPActive(dst);
-          Router()->TriggerPump();
           return;
         }
       }
@@ -1163,7 +1177,6 @@ namespace llarp
             if (SendToOrQueue(*maybe, pkt.ConstBuffer(), type))
             {
               MarkIPActive(dst);
-              Router()->TriggerPump();
             }
             else
             {
@@ -1306,7 +1319,7 @@ namespace llarp
       }
       m_NetworkToUserPktQueue.push(std::move(write));
       // wake up so we ensure that all packets are written to user
-      Router()->TriggerPump();
+      m_PumpFlusher->Trigger();
       return true;
     }
 
@@ -1324,7 +1337,8 @@ namespace llarp
       AlignedBuffer<32> ident{};
       bool snode = false;
 
-      var::visit([&ident](auto&& val) { ident = val.data(); }, addr);
+      var::visit(
+          [&ident](auto&& val) { std::copy_n(val.data(), ident.size(), ident.data()); }, addr);
 
       if (std::get_if<RouterID>(&addr))
       {

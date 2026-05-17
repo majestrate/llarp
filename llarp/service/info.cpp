@@ -59,7 +59,7 @@ namespace llarp
         return false;
       if (!BEncodeWriteDictInt("v", llarp::constants::proto_version, buf))
         return false;
-      if (!vanity.IsZero())
+      if (not IsZero(vanity))
       {
         if (!BEncodeWriteDictEntry("x", vanity, buf))
           return false;
@@ -72,9 +72,10 @@ namespace llarp
     {
       if (m_CachedAddr.IsZero())
       {
-        Address addr;
-        CalculateAddress(addr.as_array());
-        return addr.ToString();
+        std::array<byte_t, 32> data{};
+        CalculateAddress(data);
+        static_assert(decltype(m_CachedAddr)::SIZE == data.size());
+        m_CachedAddr = data.data();
       }
       return m_CachedAddr.ToString();
     }
@@ -91,7 +92,11 @@ namespace llarp
     {
       if (m_CachedAddr.IsZero())
       {
-        return CalculateAddress(m_CachedAddr.as_array());
+        std::array<byte_t, 32> data{};
+        if (not CalculateAddress(data))
+          return false;
+        static_assert(decltype(m_CachedAddr)::SIZE == data.size());
+        m_CachedAddr = data.data();
       }
       return true;
     }

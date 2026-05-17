@@ -124,7 +124,7 @@ namespace llarp
       if (bencode_read_dict(*this, &copy))
       {
         msg->from = from;
-        LogDebug("handle routing message ", msg->S, " from ", from);
+        LogDebug("handle routing message ", msg->S, " from ", from.ToHex());
         result = msg->HandleMessage(h, r);
         if (!result)
         {
@@ -134,7 +134,6 @@ namespace llarp
       else
       {
         llarp::LogError("read dict failed in routing layer");
-        llarp::DumpBuffer<llarp_buffer_t, 128>(buf);
       }
       if (msg)
         msg->Clear();

@@ -68,7 +68,7 @@ endif()
 
 if(CMAKE_SYSTEM_NAME MATCHES "Linux")
   target_sources(lokinet-platform PRIVATE linux/dbus.cpp)
-  if(WITH_SYSTEMD)
+  if(WITH_SYSTEMD AND (NOT STATIC_LINK))
     target_sources(lokinet-platform PRIVATE linux/sd_service_manager.cpp)
   else()
     target_sources(lokinet-platform PRIVATE util/nop_service_manager.cpp)
@@ -96,7 +96,7 @@ add_library(lokinet-dns
 
 # platform specific bits and bobs for setting dns
 add_library(lokinet-dns-platform INTERFACE)
-if(WITH_SYSTEMD)
+if(WITH_SYSTEMD AND (NOT STATIC_LINK))
   add_library(lokinet-dns-systemd STATIC dns/nm_platform.cpp dns/sd_platform.cpp)
   target_link_libraries(lokinet-dns-platform INTERFACE lokinet-dns-systemd)
 endif()
@@ -205,6 +205,7 @@ add_library(lokinet-layer-wire
   iwp/linklayer.cpp
   iwp/message_buffer.cpp
   iwp/session.cpp
+  iwp/worker.cpp
 )
 
 # lokinet-layer-link is for our layer 2 analog which splits up layer 2 frames into
@@ -243,6 +244,7 @@ add_library(lokinet-layer-routing
   routing/path_latency_message.cpp
   routing/path_transfer_message.cpp
   routing/transfer_traffic_message.cpp
+  routing/message.cpp
 )
 
 # kitchen sink to be removed after refactor
@@ -289,15 +291,6 @@ add_library(lokinet-layer-platform
 
 # interal tooling for pybind
 add_library(lokinet-tooling INTERFACE)
-if(WITH_HIVE)
-  add_library(lokinet-hive-tooling
-    STATIC
-    tooling/router_hive.cpp
-    tooling/hive_router.cpp
-    tooling/hive_context.cpp
-  )
-  target_link_libraries(lokinet-tooling INTERFACE lokinet-hive-tooling)
-endif()
 
 
 # interface library for setting commone includes, linkage and flags.
@@ -326,9 +319,6 @@ lokinet_link_lib(lokinet-cryptography lokinet-libcrypt lokinet-util)
 lokinet_link_lib(lokinet-consensus lokinet-context)
 lokinet_link_lib(lokinet-layer-routing lokinet-dht)
 
-if(TARGET lokinet-hive-tooling)
-  lokinet_link_lib(lokinet-hive-tooling lokinet-context)
-endif()
 
 if(TARGET lokinet-dns-systemd)
   lokinet_link_lib(lokinet-dns-systemd
@@ -439,7 +429,7 @@ target_link_libraries(lokinet-layers INTERFACE
 
 # per component external deps
 
-target_link_libraries(lokinet-dns PUBLIC libunbound)
+
 
 target_link_libraries(lokinet-cryptography PUBLIC
   oxenc::oxenc

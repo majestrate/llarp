@@ -1,9 +1,13 @@
 #pragma once
 
+
 #include <unordered_map>
 #include <llarp/net/net.hpp>
 #include <llarp/ev/libuv.hpp>
 #include <oxenc/variant.h>
+
+#include <llarp/ev/udp_handle.hpp>
+#include <llarp/ev/tcp_handle.hpp>
 
 namespace mocks
 {
@@ -37,6 +41,90 @@ namespace mocks
     void
     close() override{};
   };
+  class MockAcceptor : public llarp::TCPAcceptor
+  {
+  public:
+    MockAcceptor(AcceptHandler h, llarp::TCPConnectionPool& pool) : llarp::TCPAcceptor{h, pool}
+    {}
+
+    ~MockAcceptor() override = default;
+
+    bool
+    Bind(llarp::SockAddr) override
+    {
+      return true;
+    }
+
+    std::optional<llarp::SockAddr>
+    LocalAddr() const override
+    {
+      return std::nullopt;
+    }
+
+    void
+    Close() override
+    {}
+  };
+
+  class MockConnection : public llarp::TCPConnection
+  {
+  public:
+    MockConnection(RecvHandler h, llarp::TCPConnectionPool& pool) : TCPConnection{h, pool}
+    {}
+    ~MockConnection() override = default;
+
+    void Send(llarp::OwnedBuffer , SendCompletionHandler ) override
+    {}
+    void Close() override
+    {}
+
+    llarp::SockAddr LocalAddr() const override
+    {
+      return llarp::SockAddr{};
+    }
+
+    llarp::SockAddr RemoteAddr() const override
+    {
+      return llarp::SockAddr{};
+    }
+
+    int
+    Bind(llarp::SockAddr) override
+    {
+      return 0;
+    }
+
+    bool
+    Start() override
+    {
+      return true;
+    }
+  };
+
+  class MockConnectionPool : public llarp::TCPConnectionPool
+  {
+  public:
+    ~MockConnectionPool() override = default;
+    void Connect(llarp::SockAddr, CompletionHandler, llarp::TCPConnection::RecvHandler, std::optional<llarp::SockAddr> laddr = std::nullopt) override
+    {
+      (void)laddr;
+    }
+    std::shared_ptr<llarp::TCPAcceptor>
+    CreateAcceptor(AcceptHandler acc) override
+    {
+      auto ptr = std::make_shared<MockAcceptor>(acc, *this);
+      return std::static_pointer_cast<llarp::TCPAcceptor>(ptr);
+    }
+    std::shared_ptr<llarp::TCPConnection>
+    MakeConnection(std::optional<llarp::SockAddr>, llarp::TCPConnection::RecvHandler recv_handler) override
+    {
+      auto ptr = std::make_shared<MockConnection>(std::move(recv_handler), *this);
+      return std::static_pointer_cast<llarp::TCPConnection>(ptr);
+    }
+
+    void CloseAll() override
+    {}
+  };
 
   class Network : public llarp::net::Platform, public llarp::EventLoop
   {
@@ -45,6 +133,7 @@ namespace mocks
 
     const Platform* const m_Default{Platform::Default_ptr()};
     llarp::EventLoop_ptr m_EventLoop;
+    MockConnectionPool m_MockPool;
 
    public:
     Network(
@@ -73,6 +162,11 @@ namespace mocks
     num_worker_threads() const override
     {
       return m_EventLoop->num_worker_threads();
+    }
+    llarp::TCPConnectionPool&
+      connection_pool() override
+    {
+      return m_MockPool;
     }
 
     void

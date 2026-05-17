@@ -4,20 +4,12 @@
 
 namespace llarp
 {
-  struct RouterID : public AlignedBuffer<32>
+  struct PubKey;
+
+  struct RouterID
   {
-    static constexpr size_t SIZE = 32;
-
-    using Data = std::array<byte_t, SIZE>;
-
-    RouterID() = default;
-
-    RouterID(const byte_t* buf) : AlignedBuffer<SIZE>(buf)
-    {}
-
-    RouterID(const Data& data) : AlignedBuffer<SIZE>(data)
-    {}
-
+    ALIGNED_BUFFER_MEMBERS(RouterID, 32)
+   public:
     std::string
     ToString() const;
 
@@ -27,19 +19,12 @@ namespace llarp
     bool
     FromString(std::string_view str);
 
-    RouterID&
-    operator=(const byte_t* ptr)
-    {
-      std::copy(ptr, ptr + SIZE, begin());
-      return *this;
-    }
+    bool
+    operator==(const PubKey&) const;
   };
 
-  inline bool
-  operator==(const RouterID& lhs, const RouterID& rhs)
-  {
-    return lhs.as_array() == rhs.as_array();
-  }
+  template <>
+  constexpr inline bool is_aligned_buffer<RouterID> = true;
 
   template <>
   constexpr inline bool IsToStringFormattable<RouterID> = true;
@@ -49,6 +34,13 @@ namespace llarp
 namespace std
 {
   template <>
-  struct hash<llarp::RouterID> : hash<llarp::AlignedBuffer<llarp::RouterID::SIZE>>
-  {};
+  struct hash<llarp::RouterID>
+  {
+    hash<array<uint8_t, llarp::RouterID::SIZE>> m_hasher;
+    size_t
+    operator()(const llarp::RouterID& id) const noexcept
+    {
+      return m_hasher(id.as_array());
+    }
+  };
 }  // namespace std

@@ -43,8 +43,7 @@ namespace llarp
     void
     ServiceAddressLookup::Start(const TXOwner& peer)
     {
-      parent->DHTSendTo(
-          peer.node.as_array(), new FindIntroMessage(peer.txid, location, relayOrder));
+      parent->DHTSendTo(peer.node.Router(), new FindIntroMessage(peer.txid, location, relayOrder));
     }
 
     void
@@ -66,7 +65,7 @@ namespace llarp
       {
         handleResult(valuesFound);
       }
-      parent->DHTSendTo(whoasked.node.as_array(), new GotIntroMessage(valuesFound, whoasked.txid));
+      parent->DHTSendTo(whoasked.node.Router(), new GotIntroMessage(valuesFound, whoasked.txid));
     }
   }  // namespace dht
 }  // namespace llarp

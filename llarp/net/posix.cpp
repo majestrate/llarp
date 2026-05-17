@@ -169,9 +169,8 @@ namespace llarp::net
             [&ip](auto&& x) {
               return std::visit(
                   [&x](auto&& y) {
-                    if constexpr (std::is_same_v<
-                                      std::decay_t<decltype(x)>,
-                                      std::decay_t<decltype(y)>>)
+                    if constexpr (
+                        std::is_same_v<std::decay_t<decltype(x)>, std::decay_t<decltype(y)>>)
                       return x == y;
                     return false;
                   },

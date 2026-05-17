@@ -29,6 +29,33 @@ namespace llarp
 
     using TransitHop_ptr = std::shared_ptr<TransitHop>;
 
+    struct CompareTransitHop
+    {
+      bool
+      operator()(const TransitHop_ptr& lhs, const TransitHop_ptr& rhs) const
+      {
+        return compare(lhs->info.txID, rhs->info.txID);
+      }
+      bool
+      operator()(const TransitHop_ptr& hop, const PathID_t& id) const
+      {
+        return compare(hop->info.txID, id);
+      }
+      bool
+      operator()(const PathID_t& id, const TransitHop_ptr& hop) const
+      {
+        return compare(id, hop->info.txID);
+      }
+      bool
+      operator()(const PathID_t& lhs, const PathID_t& rhs) const
+      {
+        return compare(lhs, rhs);
+      }
+
+      bool
+      compare(const PathID_t&, const PathID_t&) const;
+    };
+
     struct PathContext
     {
       explicit PathContext(AbstractRouter* router);
@@ -36,12 +63,6 @@ namespace llarp
       /// called from router tick function
       void
       ExpirePaths(llarp_time_t now);
-
-      void
-      PumpUpstream();
-
-      void
-      PumpDownstream();
 
       void
       AllowTransit();
@@ -115,7 +136,6 @@ namespace llarp
       RemovePathSet(PathSet_ptr set);
 
       using TransitHopsMap_t = std::unordered_multimap<PathID_t, TransitHop_ptr>;
-
       struct SyncTransitMap_t
       {
         using Mutex_t = util::NullMutex;

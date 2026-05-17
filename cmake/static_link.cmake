@@ -4,4 +4,7 @@ if(STATIC_LINK)
   else()
     link_libraries( -static-libstdc++ -static-libgcc )
   endif()
+
+  # For a fully static executable, add -static to the final link
+  string(APPEND CMAKE_EXE_LINKER_FLAGS " -static")
 endif()

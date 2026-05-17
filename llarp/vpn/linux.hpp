@@ -95,6 +95,11 @@ namespace llarp::vpn
           }
         }
       }
+
+      // set mtu
+      ifr.ifr_mtu = m_Info.mtu;
+      control_v4.ioctl(SIOCSIFMTU, &ifr);
+
       ifr.ifr_flags = static_cast<short>(flags | IFF_UP | IFF_NO_PI);
       control_v4.ioctl(SIOCSIFFLAGS, &ifr);
 

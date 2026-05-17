@@ -223,7 +223,7 @@ namespace llarp
       bool
       GetRCFromNodeDB(const Key_t& k, llarp::RouterContact& rc) const override
       {
-        if (const auto maybe = router->nodedb()->Get(k.as_array()); maybe.has_value())
+        if (const auto maybe = router->nodedb()->Get(k.Router()); maybe.has_value())
         {
           rc = *maybe;
           return true;
@@ -323,7 +323,7 @@ namespace llarp
       const TXOwner whoasked(OurKey(), txid);
       const RouterID K(askpeer.as_array());
       pendingExploreLookups().NewTX(
-          peer, whoasked, K, new ExploreNetworkJob(askpeer.as_array(), this));
+          peer, whoasked, K, new ExploreNetworkJob(askpeer.Router(), this));
     }
 
     void
@@ -380,7 +380,7 @@ namespace llarp
         replies.emplace_back(new GotRouterMessage(requester, txid, {router->rc()}, false));
         return;
       }
-      if (not GetRouter()->SessionToRouterAllowed(target.as_array()))
+      if (not GetRouter()->SessionToRouterAllowed(target.Router()))
       {
         // explicitly not allowed
         replies.emplace_back(new GotRouterMessage(requester, txid, {}, false));
@@ -395,7 +395,7 @@ namespace llarp
           if (rc.ExpiresSoon(llarp::time_now_ms()))
           {
             // ask target for their rc to keep it updated
-            LookupRouterRecursive(target.as_array(), requester, txid, next);
+            LookupRouterRecursive(target.Router(), requester, txid, next);
           }
           else
           {
@@ -409,7 +409,7 @@ namespace llarp
           if ((next ^ target) < (ourKey ^ target))
           {
             // yes it is closer, ask neighbour recursively
-            LookupRouterRecursive(target.as_array(), requester, txid, next);
+            LookupRouterRecursive(target.Router(), requester, txid, next);
           }
           else
           {
@@ -481,7 +481,7 @@ namespace llarp
         return false;
       if (not reply.M.empty())
       {
-        auto path = router->pathContext().GetByUpstream(router->pubkey(), id);
+        auto path = router->pathContext().GetByUpstream(RouterID{router->pubkey()}, id);
         return path && path->SendRoutingMessage(reply, router);
       }
       return true;
@@ -599,7 +599,7 @@ namespace llarp
       }
       for (const auto& f : foundRouters)
       {
-        const RouterID id = f.as_array();
+        const RouterID id{f.data()};
         // discard shit routers
         if (router->routerProfiling().IsBadForConnect(id))
           continue;

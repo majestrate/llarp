@@ -21,7 +21,7 @@ namespace llarp
         , m_ResendPriority{priority}
     {
       m_Acks.set(0);
-      m_Digest.Fill(0);
+      m_Digest.fill(0);
     }
 
     ILinkSession::Packet_t
@@ -51,7 +51,7 @@ namespace llarp
     bool
     OutboundMessage::ShouldFlush(llarp_time_t now) const
     {
-      if (m_Digest.IsZero())
+      if (IsZero(m_Digest))
         return false;
       return now - m_LastFlush >= TXFlushInterval;
     }

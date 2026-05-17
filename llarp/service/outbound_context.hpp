@@ -26,7 +26,7 @@ namespace llarp
       Tick(llarp_time_t now) override;
 
       void
-      BlacklistSNode(const RouterID) override{};
+      BlacklistSNode(const RouterID) override {};
 
       bool
       ShouldBundleRC() const override;
@@ -101,7 +101,7 @@ namespace llarp
       CheckPathIsDead(path::Path_ptr p, llarp_time_t dlt);
 
       void
-      AsyncGenIntro(const llarp_buffer_t& payload, ProtocolType t) override;
+      AsyncGenIntro(const llarp_buffer_t&, ProtocolType t) override;
 
       /// issues a lookup to find the current intro set of the remote service
       void
@@ -158,6 +158,9 @@ namespace llarp
       bool
       IntroSent() const override;
 
+      void
+      SendPacketsToRemote();
+
       const dht::Key_t location;
       const Address addr;
       uint64_t m_UpdateIntrosetTX = 0;
@@ -173,6 +176,9 @@ namespace llarp
       std::vector<std::function<void(OutboundContext*)>> m_ReadyHooks;
       llarp_time_t m_LastIntrosetUpdateAt = 0s;
       llarp_time_t m_LastKeepAliveAt = 0s;
+
+      std::unordered_map<ProtocolType, std::vector<std::vector<byte_t>>> m_WriteQueues;
+      std::shared_ptr<EventLoopWakeup> m_Wakeup;
     };
   }  // namespace service
 

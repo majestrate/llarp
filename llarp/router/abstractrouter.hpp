@@ -42,6 +42,7 @@ namespace llarp
   struct ILinkManager;
   struct I_RCLookupHandler;
   struct RoutePoker;
+  struct KeyManager;
 
   namespace dns
   {
@@ -58,10 +59,19 @@ namespace llarp
     struct Context;
   }
 
+  namespace iwp
+  {
+    class Worker;
+    struct Hasher;
+  }  // namespace iwp
+
   namespace path
   {
     struct PathContext;
-  }
+    class TransitWorker;
+    class PathWorker;
+    struct BuildLimiter;
+  }  // namespace path
 
   namespace routing
   {
@@ -94,6 +104,11 @@ namespace llarp
     virtual bool
     HandleRecvLinkMessageBuffer(ILinkSession* from, const llarp_buffer_t& msg) = 0;
 
+    virtual path::TransitWorker&
+    transitWorker() = 0;
+    virtual path::PathWorker&
+    pathWorker() = 0;
+
     virtual const net::Platform&
     Net() const = 0;
 
@@ -111,6 +126,9 @@ namespace llarp
 
     virtual path::PathContext&
     pathContext() = 0;
+
+    virtual const std::unique_ptr<iwp::Worker>&
+    linkWorker() const = 0;
 
     virtual const RouterContact&
     rc() const = 0;
@@ -135,6 +153,9 @@ namespace llarp
 
     virtual Profiling&
     routerProfiling() = 0;
+
+    virtual const std::unique_ptr<iwp::Hasher>&
+    linkHasher() = 0;
 
     virtual const EventLoop_ptr&
     loop() const = 0;
@@ -320,6 +341,12 @@ namespace llarp
       return false;
     };
 
+    RouterID
+    PublicKey() const
+    {
+      return RouterID{pubkey()};
+    }
+
     virtual path::BuildLimiter&
     pathBuildLimiter() = 0;
 
@@ -344,13 +371,8 @@ namespace llarp
     /// Templated convenience function to generate a RouterHive event and
     /// delegate to non-templated (and overridable) function for handling.
     template <class EventType, class... Params>
-    void
-    NotifyRouterEvent([[maybe_unused]] Params&&... args) const
-    {
-      // TODO: no-op when appropriate
-      auto event = std::make_unique<EventType>(args...);
-      HandleRouterEvent(std::move(event));
-    }
+    [[deprecated]] void
+    NotifyRouterEvent([[maybe_unused]] Params&&... args) const = delete;
 
     virtual int
     OutboundUDPSocket() const

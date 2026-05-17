@@ -47,11 +47,11 @@ namespace llarp
       for (const auto& [pathID, pk] : m_Paths)
       {
         if (pathID.as_array() == tag.as_array())
-          return RouterID{pk.as_array()};
+          return RouterID{pk.data()};
       }
       for (const auto& [rid, session] : m_SNodeSessions)
       {
-        PathID_t pathID{tag.as_array()};
+        const PathID_t pathID{tag.data()};
         if (session->GetPathByID(pathID))
           return rid;
       }
@@ -68,10 +68,10 @@ namespace llarp
           if (not ep)
             return false;
           if (auto path = ep->GetCurrentPath())
-            tag = service::ConvoTag{path->RXID().as_array()};
+            tag = service::ConvoTag{path->RXID().data()};
           return true;
         };
-        if (VisitEndpointsFor(PubKey{*rid}, visit) and not tag.IsZero())
+        if (VisitEndpointsFor(PubKey{rid->data()}, visit) and not tag.IsZero())
           return tag;
         auto itr = m_SNodeSessions.find(*rid);
         if (itr == m_SNodeSessions.end())
@@ -80,7 +80,7 @@ namespace llarp
         }
         if (auto path = itr->second->GetPathByRouter(*rid))
         {
-          tag = service::ConvoTag{path->RXID().as_array()};
+          tag = service::ConvoTag{path->RXID().data()};
           return tag;
         }
         return std::nullopt;
@@ -220,7 +220,7 @@ namespace llarp
         auto ip = ToNet(*maybe);
         if (ip == m_IfAddr)
         {
-          RouterID us = GetRouter()->pubkey();
+          const RouterID us{GetRouter()->PublicKey()};
           msg.AddAReply(us.ToString(), 300);
         }
         else
@@ -247,7 +247,7 @@ namespace llarp
         }
         else if (msg.questions[0].IsName("localhost.loki"))
         {
-          RouterID us = m_Router->pubkey();
+          const RouterID us{m_Router->PublicKey()};
           msg.AddAReply(us.ToString(), 1);
         }
         else
@@ -613,7 +613,7 @@ namespace llarp
       std::unordered_set<AddressVariant_t> remote;
       for (const auto& [path, pubkey] : m_Paths)
       {
-        remote.insert(RouterID{pubkey});
+        remote.emplace(RouterID{pubkey.data()});
       }
       return remote;
     }
@@ -779,15 +779,15 @@ namespace llarp
       if (wantInternet && !m_PermitExit)
         return false;
       path::HopHandler_ptr handler =
-          m_Router->pathContext().GetByUpstream(m_Router->pubkey(), path);
+          m_Router->pathContext().GetByUpstream(m_Router->PublicKey(), path);
       if (handler == nullptr)
         return false;
       auto ip = GetIPForIdent(pk);
-      if (GetRouter()->pathContext().TransitHopPreviousIsRouter(path, pk.as_array()))
+      if (GetRouter()->pathContext().TransitHopPreviousIsRouter(path, pk))
       {
         // we think this path belongs to a service node
         // mark it as such so we don't make an outbound session to them
-        m_SNodeKeys.emplace(pk.as_array());
+        m_SNodeKeys.emplace(pk);
       }
       m_ActiveExits.emplace(
           pk, std::make_unique<exit::Endpoint>(pk, handler, !wantInternet, ip, this));

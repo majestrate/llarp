@@ -38,10 +38,10 @@ namespace llarp
 
     /// path dh creator's side
     virtual bool
-    dh_client(SharedSecret&, const PubKey&, const SecretKey&, const TunnelNonce&) = 0;
+    dh_client(SharedSecret&, const PubKey&, const SecretKey&, const KeyExchangeNonce&) = 0;
     /// path dh relay side
     virtual bool
-    dh_server(SharedSecret&, const PubKey&, const SecretKey&, const TunnelNonce&) = 0;
+    dh_server(SharedSecret&, const PubKey&, const SecretKey&, const KeyExchangeNonce&) = 0;
     /// transport dh client side
     virtual bool
     transport_dh_client(SharedSecret&, const PubKey&, const SecretKey&, const TunnelNonce&) = 0;

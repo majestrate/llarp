@@ -2,12 +2,11 @@
 #include "test_util.hpp"
 
 #include <llarp/config/key_manager.hpp>
+#include <llarp/config/config.hpp>
 
-#include <llarp/crypto/crypto.hpp>
+#include <llarp/constants/files.hpp>
 #include <llarp/crypto/crypto_libsodium.hpp>
 
-#include <functional>
-#include <random>
 
 #include <string>
 #include <catch2/catch.hpp>

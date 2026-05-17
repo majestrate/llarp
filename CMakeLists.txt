@@ -22,11 +22,11 @@ endif()
 
 
 project(llarp
-    VERSION 0.10.0
+    VERSION 0.11.0
     DESCRIPTION "llarp - IP packet onion router"
     LANGUAGES ${LANGS})
 
-set(RELEASE_MOTTO "Just like me frfr" CACHE STRING "Release motto")
+set(RELEASE_MOTTO "Total Quango Death" CACHE STRING "Release motto")
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 
@@ -43,7 +43,6 @@ option(WITH_COVERAGE "generate coverage data" OFF)
 option(WARNINGS_AS_ERRORS "treat all warnings as errors. turn off for development, on for release" OFF)
 option(WITH_TESTS "build unit tests" OFF)
 option(BUILD_PACKAGE "builds extra components for making an installer (with 'make package')" OFF)
-option(WITH_PEERSTATS "build with experimental peerstats db support" OFF)
 option(WITH_IOURING "build with io_uring event loop (Experimental)" ${DEFAULT_IOURING})
 option(STRIP_SYMBOLS "strip off all debug symbols into an external archive for all executables built" OFF)
 
@@ -66,6 +65,10 @@ endif()
 if(BUILD_STATIC_DEPS)
   set(CMAKE_FIND_PACKAGE_PREFER_CONFIG TRUE)
   include(StaticBuild)
+endif()
+
+if(STATIC_LINK)
+  include(static_link)
 endif()
 
 if(NOT CMAKE_BUILD_TYPE)
@@ -108,8 +111,13 @@ include(cmake/solaris.cmake)
 include(MacroEnsureOutOfSourceBuild)
 macro_ensure_out_of_source_build("${PROJECT_NAME} requires an out-of-source build.  Create a build directory and run 'cmake ${CMAKE_SOURCE_DIR} [options]'.")
 
-# Always build PIC
-set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+# PIC is needed for shared libraries, but conflicts with -static linking.
+# For fully static builds, disable it.
+if(STATIC_LINK)
+  set(CMAKE_POSITION_INDEPENDENT_CODE OFF)
+else()
+  set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+endif()
 
 include(cmake/unix.cmake)
 include(cmake/check_for_std_optional.cmake)
@@ -236,12 +244,6 @@ set(GIT_VERSION "${GIT_VERSION_REAL}")
 
 find_package(PkgConfig REQUIRED)
 
-if (NOT BUILD_STATIC_DEPS)
-  pkg_check_modules(UNBOUND libunbound REQUIRED IMPORTED_TARGET)
-  add_library(libunbound INTERFACE)
-  target_link_libraries(libunbound INTERFACE PkgConfig::UNBOUND)
-endif()
-
 pkg_check_modules(SD libsystemd IMPORTED_TARGET)
 # Default WITH_SYSTEMD to true if we found it
 option(WITH_SYSTEMD "enable systemd integration for sd_notify" ${SD_FOUND})
@@ -249,12 +251,22 @@ option(WITH_SYSTEMD "enable systemd integration for sd_notify" ${SD_FOUND})
 # Base interface target where we set up global link libraries, definitions, includes, etc.
 add_library(base_libs INTERFACE)
 
-if(WITH_SYSTEMD AND (NOT ANDROID))
-  if(NOT SD_FOUND)
-    message(FATAL_ERROR "libsystemd not found")
+if(STATIC_LINK)
+  message(STATUS "Disabling systemd: static build")
+else()
+  if(WITH_SYSTEMD AND (NOT ANDROID))
+    if(NOT SD_FOUND)
+      message(FATAL_ERROR "libsystemd not found")
+    endif()
+    target_link_libraries(base_libs INTERFACE PkgConfig::SD)
+    target_compile_definitions(base_libs INTERFACE WITH_SYSTEMD)
   endif()
-  target_link_libraries(base_libs INTERFACE PkgConfig::SD)
-  target_compile_definitions(base_libs INTERFACE WITH_SYSTEMD)
+endif()
+
+if (WITH_IOURING)
+  target_compile_definitions(base_libs INTERFACE -DWITH_IO_URING)
+else()
+  target_compile_definitions(base_libs INTERFACE -DWITH_LIBUV)
 endif()
 
 add_subdirectory(external)
@@ -273,15 +285,19 @@ endif()
 
 option(WITH_GEOIP "enable GEOIP based peer selection" ON)
 add_library(GeoIP INTERFACE)
-if(WITH_GEOIP)
-  message(STATUS "checking for GEOIP Library")
-  pkg_check_modules(GEOIP geoip IMPORTED_TARGET)
-  if(GEOIP_FOUND)
-    message(STATUS "Found GeoIP Library: ${GEOIP_VERSION}")
-    target_link_libraries(GeoIP INTERFACE PkgConfig::GEOIP)
-    target_compile_definitions(base_libs INTERFACE WITH_GEOIP)
-  else()
-    message(WARNING "cannot find geoip library, disabling feature")
+if(STATIC_LINK)
+  message(STATUS "Disabling GeoIP: static build")
+else()
+  if(WITH_GEOIP)
+    message(STATUS "checking for GEOIP Library")
+    pkg_check_modules(GEOIP geoip IMPORTED_TARGET)
+    if(GEOIP_FOUND)
+      message(STATUS "Found GeoIP Library: ${GEOIP_VERSION}")
+      target_link_libraries(GeoIP INTERFACE PkgConfig::GEOIP)
+      target_compile_definitions(base_libs INTERFACE WITH_GEOIP)
+    else()
+      message(WARNING "cannot find geoip library, disabling feature")
+    endif()
   endif()
 endif()
 

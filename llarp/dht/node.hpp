@@ -5,51 +5,48 @@
 #include <llarp/service/intro_set.hpp>
 #include <utility>
 
-namespace llarp
+namespace llarp::dht
 {
-  namespace dht
+  struct RCNode
   {
-    struct RCNode
+    RouterContact rc{};
+    Key_t ID{};
+
+    RCNode()
     {
-      RouterContact rc;
-      Key_t ID;
+      ID.Zero();
+    }
 
-      RCNode()
-      {
-        ID.Zero();
-      }
+    RCNode(const RouterContact& other) : rc(other), ID(other.pubkey)
+    {}
 
-      RCNode(const RouterContact& other) : rc(other), ID(other.pubkey)
-      {}
-
-      bool
-      operator<(const RCNode& other) const
-      {
-        return rc.last_updated < other.rc.last_updated;
-      }
-    };
-
-    struct ISNode
+    bool
+    operator<(const RCNode& other) const
     {
-      service::EncryptedIntroSet introset;
+      return rc.last_updated < other.rc.last_updated;
+    }
+  };
 
-      Key_t ID;
+  struct ISNode
+  {
+    service::EncryptedIntroSet introset{};
 
-      ISNode()
-      {
-        ID.Zero();
-      }
+    Key_t ID{};
 
-      ISNode(service::EncryptedIntroSet other) : introset(std::move(other))
-      {
-        ID = Key_t(introset.derivedSigningKey.as_array());
-      }
+    ISNode()
+    {
+      ID.Zero();
+    }
 
-      bool
-      operator<(const ISNode& other) const
-      {
-        return introset.signedAt < other.introset.signedAt;
-      }
-    };
-  }  // namespace dht
-}  // namespace llarp
+    ISNode(service::EncryptedIntroSet other) : introset(std::move(other))
+    {
+      ID = Key_t(introset.derivedSigningKey.as_array());
+    }
+
+    bool
+    operator<(const ISNode& other) const
+    {
+      return introset.signedAt < other.introset.signedAt;
+    }
+  };
+}  // namespace llarp::dht

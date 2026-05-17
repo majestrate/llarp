@@ -17,11 +17,11 @@ namespace llarp
     template <typename K, typename V>
     struct TX
     {
-      K target;
+      K target{};
       AbstractContext* parent;
       std::set<Key_t> peersAsked;
       std::vector<V> valuesFound;
-      TXOwner whoasked;
+      TXOwner whoasked{};
 
       TX(const TXOwner& asker, const K& k, AbstractContext* p)
           : target(k), parent(p), whoasked(asker)

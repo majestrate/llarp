@@ -1,34 +1,27 @@
-#ifndef LLARP_DHT_RECURSIVEROUTERLOOKUP
-#define LLARP_DHT_RECURSIVEROUTERLOOKUP
-
+#pragma once
 #include "tx.hpp"
 
 #include <llarp/router_contact.hpp>
 #include <llarp/router_id.hpp>
 
-namespace llarp
+namespace llarp::dht
 {
-  namespace dht
+  struct RecursiveRouterLookup : public TX<RouterID, RouterContact>
   {
-    struct RecursiveRouterLookup : public TX<RouterID, RouterContact>
-    {
-      RouterLookupHandler resultHandler;
-      RecursiveRouterLookup(
-          const TXOwner& whoasked,
-          const RouterID& target,
-          AbstractContext* ctx,
-          RouterLookupHandler result);
+    RouterLookupHandler resultHandler;
+    RecursiveRouterLookup(
+        const TXOwner& whoasked,
+        const RouterID& target,
+        AbstractContext* ctx,
+        RouterLookupHandler result);
 
-      bool
-      Validate(const RouterContact& rc) const override;
+    bool
+    Validate(const RouterContact& rc) const override;
 
-      void
-      Start(const TXOwner& peer) override;
+    void
+    Start(const TXOwner& peer) override;
 
-      void
-      SendReply() override;
-    };
-  }  // namespace dht
-}  // namespace llarp
-
-#endif
+    void
+    SendReply() override;
+  };
+}  // namespace llarp::dht

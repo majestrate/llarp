@@ -62,7 +62,6 @@ Lokinet - реализация LLARP (протокол анонимной мар
 * C++ 17 capable C++ compiler
 * libuv >= 1.27.0
 * libsodium >= 1.0.18
-* libunbound
 * libzmq
 * cppzmq
 * sqlite3
@@ -149,7 +148,7 @@ Lokinet - реализация LLARP (протокол анонимной мар
 
 сборка:
 
-    $ pkg install cmake git curl libuv libsodium pkgconf libunbound
+    $ pkg install cmake git curl libuv libsodium pkgconf
     $ git clone --recursive https://github.com/oxen-io/lokinet
     $ cd lokinet
     $ mkdir build

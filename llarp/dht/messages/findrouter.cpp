@@ -152,9 +152,6 @@ namespace llarp
     {
       auto& dht = *ctx->impl;
 
-      auto router = dht.GetRouter();
-      router->NotifyRouterEvent<tooling::FindRouterReceivedEvent>(router->pubkey(), *this);
-
       if (!dht.AllowTransit())
       {
         llarp::LogWarn("Got DHT lookup from ", From, " when we are not allowing dht transit");
@@ -162,13 +159,13 @@ namespace llarp
       }
       if (dht.pendingRouterLookups().HasPendingLookupFrom({From, txid}))
       {
-        llarp::LogWarn("Duplicate FRM from ", From, " txid=", txid);
+        llarp::LogWarn("Duplicate FRM from ", From.ToHex(), " txid=", txid);
         return false;
       }
       RouterContact found;
       if (targetKey.IsZero())
       {
-        llarp::LogError("invalid FRM from ", From, " key is zero");
+        llarp::LogError("invalid FRM from ", From.ToHex(), " key is zero");
         return false;
       }
       const Key_t k(targetKey);

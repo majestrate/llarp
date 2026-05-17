@@ -1,10 +1,8 @@
+#ifdef WITH_IO_URING
 #include "io_uring.hpp"
-#include <asm-generic/errno.h>
-#include <bits/types/struct_iovec.h>
-#include <bits/types/struct_itimerspec.h>
 #include <liburing.h>
 #include <sys/socket.h>
-#include <cstdint>
+
 #include <ctime>
 #include <sys/timerfd.h>
 #include <llarp/util/logging.hpp>
@@ -16,7 +14,6 @@
 #include "llarp/util/types.hpp"
 #include "udp_handle.hpp"
 
-#include <memory_resource>
 #include <new>
 #include <queue>
 #include <stdexcept>
@@ -289,10 +286,9 @@ namespace llarp::io_uring
     struct UDPSender : public Resource
     {
       UDPSocket& m_Sock;
-      std::pmr::deque<send_buffer_t> m_SendQueue;
+      std::deque<send_buffer_t> m_SendQueue;
       bool m_Stop{false};
-      UDPSender(UDPSocket& sock, Loop& loop)
-          : Resource{loop}, m_Sock{sock}, m_SendQueue{&m_Sock.m_Mem} {};
+      UDPSender(UDPSocket& sock, Loop& loop) : Resource{loop}, m_Sock{sock}, m_SendQueue{} {};
 
       void
       completed(int st) override
@@ -361,9 +357,6 @@ namespace llarp::io_uring
     std::unique_ptr<recv_buffer_t> m_RecvMsg{new recv_buffer_t{}};
     using buf_t = std::array<uint8_t, max_packets * recv_buffer_t::buffer_size>;
     std::unique_ptr<buf_t> m_Buf{new buf_t{}};
-    std::pmr::monotonic_buffer_resource m_MemBuf{m_Buf->data(), m_Buf->size()};
-    std::pmr::unsynchronized_pool_resource m_Mem{
-        std::pmr::pool_options{1, recv_buffer_t::buffer_size}, &m_MemBuf};
     int m_FD{-1};
     bool m_Done{false};
 
@@ -447,8 +440,12 @@ namespace llarp::io_uring
       log::debug(cat, "udp socket recvmsg fd={} from={} result={}", m_FD, addr, result);
       try
       {
-        OwnedBuffer _pkt{reinterpret_cast<const byte_t*>(vec->iov_base), size_t(result), &m_Mem};
-        on_recv(*this, std::move(addr), std::move(_pkt));
+        if (result > 0)
+        {
+          OwnedBuffer _pkt{
+              reinterpret_cast<const byte_t*>(vec->iov_base), static_cast<size_t>(result)};
+          on_recv(*this, std::move(addr), std::move(_pkt));
+        }
       }
       catch (std::bad_alloc&)
       {
@@ -464,7 +461,7 @@ namespace llarp::io_uring
     }
 
     std::optional<int>
-    file_descriptor() override
+    file_descriptor() const override
     {
       if (m_FD == -1)
         return std::nullopt;
@@ -836,10 +833,8 @@ namespace llarp::io_uring
     m_EventLoopThreadID = std::this_thread::get_id();
     llarp::util::SetThreadName("llarpd-mainloop");
 
-    m_LogicWaker = std::make_shared<Wakeup>(
-        *this, [self = this]() { self->flush_logic(); }, false);
-    m_TickerWaker = std::make_shared<Wakeup>(
-        *this, [self = this]() { self->io_wakeup(); }, true);
+    m_LogicWaker = std::make_shared<Wakeup>(*this, [self = this]() { self->flush_logic(); }, false);
+    m_TickerWaker = std::make_shared<Wakeup>(*this, [self = this]() { self->io_wakeup(); }, true);
 
     auto cleanup_handles = make_repeater();
     cleanup_handles->start(1s, [self = this]() {
@@ -854,7 +849,7 @@ namespace llarp::io_uring
     for (size_t idx = 0; idx < worker_threads; ++idx)
     {
       auto t = std::make_shared<std::thread>(
-          [queue = &m_WorkCalls]() { run_thread_worker(queue, "llarpd-worker"); });
+          [queue = &m_WorkCalls]() { run_thread_worker(queue, "llarp-worker"); });
       m_WorkerThreads.push_back(t);
     }
     m_DiskThread = std::make_shared<std::thread>(
@@ -1018,3 +1013,4 @@ namespace llarp::io_uring
     return m_WorkerThreads.capacity();
   }
 }  // namespace llarp::io_uring
+#endif

@@ -1,18 +1,16 @@
 #pragma once
 
-#include <cstdint>
-#include <llarp/constants/link_layer.hpp>
-#include <llarp/crypto/crypto.hpp>
 #include <llarp/crypto/encrypted.hpp>
-#include <llarp/crypto/types.hpp>
 #include <llarp/link/server.hpp>
 #include <llarp/config/key_manager.hpp>
-
-#include <memory>
-
 #include <llarp/ev/ev.hpp>
 
 #include "hasher.hpp"
+#include "session.hpp"
+
+#include <memory>
+#include <optional>
+#include <unordered_set>
 
 namespace llarp::iwp
 {
@@ -56,20 +54,10 @@ namespace llarp::iwp
     PrintableName() const;
 
     Hasher*
-    hasher()
-    {
-      return &m_Hasher;
-    }
+    hasher();
 
     void
     TriggerHashing(std::shared_ptr<Session> s);
-
-   private:
-    void
-    HandleWakeupPlaintext();
-
-    void
-    HandleWorkerCompletion();
 
     struct SessionAddrHash
     {
@@ -83,11 +71,13 @@ namespace llarp::iwp
       }
     };
 
+   private:
+    void
+    HandleWakeupPlaintext();
+
     const std::shared_ptr<EventLoopWakeup> m_Wakeup, m_HashingWakeup;
     std::vector<ILinkSession*> m_WakingUp;
     std::unordered_set<std::shared_ptr<Session>, SessionAddrHash> m_CollectHash;
-
-    Hasher m_Hasher;
 
     const bool m_Inbound;
 
