@@ -426,7 +426,7 @@ namespace llarp
   RouterContact::Sign(const SecretKey& secretkey)
   {
     pubkey = llarp::seckey_topublic(secretkey);
-    std::array<byte_t, MAX_RC_SIZE> tmp;
+    std::array<byte_t, MAX_RC_SIZE> tmp{};
     llarp_buffer_t buf(tmp);
     signature.Zero();
     last_updated = time_now_ms();
