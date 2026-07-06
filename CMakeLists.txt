@@ -22,7 +22,7 @@ endif()
 
 
 project(llarp
-    VERSION 0.11.0
+    VERSION 0.11.1
     DESCRIPTION "llarp - IP packet onion router"
     LANGUAGES ${LANGS})
 
