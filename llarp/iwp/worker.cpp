@@ -115,8 +115,7 @@ namespace llarp::iwp
   void
   DecryptWorker::Submit(std::weak_ptr<Session> ptr, Packet_t pkt)
   {
-    m_SubmitQueue.pushBack(
-        std::make_pair(std::move(ptr), std::make_pair(m_Seq++, std::move(pkt))));
+    m_SubmitQueue.pushBack(std::make_pair(std::move(ptr), std::make_pair(m_Seq++, std::move(pkt))));
   }
 
   DecryptWorker::~DecryptWorker()
