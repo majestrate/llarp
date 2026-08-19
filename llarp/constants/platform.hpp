@@ -21,6 +21,15 @@ namespace llarp::platform
 #endif
       ;
 
+  ///  are we an apple platform ?
+  inline constexpr bool is_apple =
+#ifdef __APPLE__
+      true
+#else
+      false
+#endif
+      ;
+
   ///  are we freebsd ?
   inline constexpr bool is_freebsd =
 #ifdef __FreeBSD__
