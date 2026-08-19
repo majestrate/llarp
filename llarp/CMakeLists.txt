@@ -100,6 +100,10 @@ if(WITH_SYSTEMD AND (NOT STATIC_LINK))
   add_library(lokinet-dns-systemd STATIC dns/nm_platform.cpp dns/sd_platform.cpp)
   target_link_libraries(lokinet-dns-platform INTERFACE lokinet-dns-systemd)
 endif()
+if(APPLE)
+  add_library(lokinet-dns-apple STATIC dns/apple_platform.cpp)
+  target_link_libraries(lokinet-dns-platform INTERFACE lokinet-dns-apple)
+endif()
 
 # lokinet-nodedb holds all types and logic for storing parsing and constructing
 # nodedb data published to the network and versions of it stored locally
@@ -322,6 +326,13 @@ lokinet_link_lib(lokinet-layer-routing lokinet-dht)
 
 if(TARGET lokinet-dns-systemd)
   lokinet_link_lib(lokinet-dns-systemd
+    lokinet-dns
+    lokinet-platform
+  )
+endif()
+
+if(TARGET lokinet-dns-apple)
+  lokinet_link_lib(lokinet-dns-apple
     lokinet-dns
     lokinet-platform
   )
