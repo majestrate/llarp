@@ -2,11 +2,11 @@
 
 #include "platform.hpp"
 #include "common.hpp"
-#include <llarp/vpn/common.hpp>
 #include <llarp/util/bits.hpp>
 #include <llarp/util/fd.hpp>
 #include <llarp/util/logging.hpp>
-#include <llarp/util/non_blocking.hpp>
+#include <llarp/util/non_blocking.hpp
+#include <llarp/util/thread/threading.hpp>
 
 #include <sys/kern_control.h>
 #include <sys/sys_domain.h>
@@ -41,50 +41,9 @@
 
 namespace llarp::vpn
 {
-  // The lo0 host route for the tun address must be removed when the daemon
-  // exits, but the AppleInterface object is retained by event-loop handles
-  // beyond context teardown, so its destructor does not reliably run before
-  // process exit.  Track added routes and flush them via atexit(3); the
-  // handler must not log, as logging may already be torn down by then.
-  namespace apple_route_cleanup
+
+  namespace
   {
-    inline std::vector<std::string>&
-    Routes()
-    {
-      // Deliberately heap-allocated and never freed: atexit handlers and
-      // static destructors run interleaved in reverse registration order, so
-      // a plain static vector could be destroyed before Flush() runs and it
-      // would then iterate a dead object.  A leaked vector has no destructor
-      // to register, making Flush() safe no matter when it fires.
-      static auto* routes = new std::vector<std::string>();
-      return *routes;
-    }
-
-    inline void
-    Flush()
-    {
-      for (const auto& ip : Routes())
-        ::system(("/sbin/route -n delete -host " + ip + " -interface lo0").c_str());
-      Routes().clear();
-    }
-
-    inline void
-    Track(std::string ip)
-    {
-      static bool registered = (::atexit(&Flush), true);
-      (void)registered;
-      Routes().push_back(std::move(ip));
-    }
-  }  // namespace apple_route_cleanup
-
-  // UTUN_OPT_IFNAME from <net/if_utun.h>, hardcoded so we don't depend on that
-  // header existing in older SDKs.
-  inline constexpr int apple_utun_opt_ifname = 2;
-
-  class AppleInterface : public NetworkInterface
-  {
-    std::unique_ptr<util::FD> m_FD;
-
     static void
     Exec(const std::string& cmd, bool must_succeed = true)
     {
@@ -93,6 +52,66 @@ namespace llarp::vpn
       if (int ret = ::system(cmd.c_str()); ret != 0 and must_succeed)
         throw std::runtime_error{"command failed (" + std::to_string(ret) + "): " + cmd};
     }
+  }  // namespace
+
+  /** apple_route_manager */
+  // The lo0 host route for the tun address must be removed when the daemon
+  // exits, but the AppleInterface object is retained by event-loop handles
+  // beyond context teardown, so its destructor does not reliably run before
+  // process exit.  Track added routes and flush them via atexit(3); the
+  // handler must not log, as logging may already be torn down by then.
+  namespace detail
+  {
+    util::Mutex g_routes_mutex;
+
+    inline std::vector<std::string>&
+    _Routes()
+    {
+      // Deliberately heap-allocated and never freed: atexit handlers and
+      // static destructors run interleaved in reverse registration order, so
+      // a plain static vector could be destroyed before RouteFlush() runs and it
+      // would then iterate a dead object.  A leaked vector has no destructor
+      // to register, making Flush() safe no matter when it fires.
+      static auto* routes = new std::vector<std::string>();
+      return *routes;
+    }
+
+    template <typename Visit_t>
+    void
+    WithRoutes(Visit_t&& visit)
+    {
+      util::Lock lock{g_routes_mutex};
+      visit(_Routes());
+    }
+
+    inline void
+    RouteFlush()
+    {
+      WithRoutes([](auto& routes) {
+        for (const auto& ip : routes)
+        {
+          Exec("/sbin/route -n delete -host " + ip + " -interface lo0", false);
+        }
+        routes.clear();
+      });
+    }
+
+    inline void
+    RouteTrack(std::string ip)
+    {
+      static bool registered = (::atexit(&RouteFlush), true);
+      (void)registered;
+      WithRoutes([ip = std::move(ip)](auto& routes) mutable { routes.push_back(std::move(ip)); });
+    }
+  }  // namespace detail
+
+  // UTUN_OPT_IFNAME from <net/if_utun.h>, hardcoded so we don't depend on that
+  // header existing in older SDKs.
+  inline constexpr int apple_utun_opt_ifname = 2;
+
+  class AppleInterface : public NetworkInterface
+  {
+    std::unique_ptr<util::FD> m_FD;
 
     friend class AppleRouteManager;
 
@@ -160,7 +179,7 @@ namespace llarp::vpn
               + " -interface " + m_IfName);
           // our own tun address is local, macOS wants it via loopback:
           Exec("/sbin/route -n add -host " + addr.ToString() + " -interface lo0");
-          apple_route_cleanup::Track(addr.ToString());
+          detail::RouteTrack(addr.ToString());
         }
         else if (ifaddr.fam == AF_INET6)
         {
@@ -181,16 +200,18 @@ namespace llarp::vpn
       // Normally unreachable before process exit (see apple_route_cleanup);
       // when it does run, clean up here and de-register so the atexit flush
       // does not delete the same routes twice.
-      auto& routes = apple_route_cleanup::Routes();
-      for (const auto& ifaddr : m_Info.addrs)
-      {
-        if (ifaddr.fam == AF_INET)
+      // WithRoutes aquires mutex.
+      detail::WithRoutes([&](auto& routes) {
+        for (const auto& ifaddr : m_Info.addrs)
         {
-          const auto ip = net::TruncateV6(ifaddr.range.addr).ToString();
-          Exec("/sbin/route -n delete -host " + ip + " -interface lo0", false);
-          routes.erase(std::remove(routes.begin(), routes.end(), ip), routes.end());
+          if (ifaddr.fam == AF_INET)
+          {
+            const auto ip = net::TruncateV6(ifaddr.range.addr).ToString();
+            Exec("/sbin/route -n delete -host " + ip + " -interface lo0", false);
+            routes.erase(std::remove(routes.begin(), routes.end(), ip), routes.end());
+          }
         }
-      }
+      });
     }
 
     int
@@ -254,12 +275,6 @@ namespace llarp::vpn
 
   class AppleRouteManager : public IRouteManager
   {
-    static void
-    Exec(const std::string& cmd, bool must_succeed = true)
-    {
-      AppleInterface::Exec(cmd, must_succeed);
-    }
-
     static std::string
     FamilyFlag(const net::ipaddr_t& ip)
     {
@@ -368,11 +383,11 @@ namespace llarp::vpn
 
       int mib[6] = {CTL_NET, PF_ROUTE, 0, 0 /* all families */, NET_RT_FLAGS, RTF_GATEWAY};
       size_t needed = 0;
-      if (sysctl(mib, 6, nullptr, &needed, nullptr, 0) != 0)
+      if (::sysctl(mib, 6, nullptr, &needed, nullptr, 0) != 0)
         return gateways;
       std::vector<char> buf;
       buf.resize(needed);
-      if (sysctl(mib, 6, buf.data(), &needed, nullptr, 0) != 0)
+      if (::sysctl(mib, 6, buf.data(), &needed, nullptr, 0) != 0)
         return gateways;
 
       // routing socket sockaddrs are packed with 4-byte alignment; sa_len == 0
