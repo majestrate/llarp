@@ -18,6 +18,30 @@
 #include <llarp/util/fd.hpp>
 #include <uvw.hpp>
 
+#ifdef __APPLE__
+#ifndef MSG_NOSIGNAL
+#define MSG_NOSIGNAL 0
+#endif
+struct mmsghdr
+{
+  struct msghdr msg_hdr;
+  unsigned int msg_len;
+};
+static int
+sendmmsg(int fd, struct mmsghdr* msgvec, unsigned int vlen, int flags)
+{
+  unsigned int sent = 0;
+  for (; sent < vlen; sent++)
+  {
+    const ssize_t ret = ::sendmsg(fd, &msgvec[sent].msg_hdr, flags);
+    if (ret < 0)
+      return sent ? static_cast<int>(sent) : -1;
+    msgvec[sent].msg_len = static_cast<unsigned int>(ret);
+  }
+  return static_cast<int>(sent);
+}
+#endif  // __APPLE__
+
 namespace llarp::uv
 {
   static auto logcat = log::Cat("libuv");
