@@ -16,6 +16,7 @@ namespace llarp
     {
       eLinkUTP,
       eLinkIWP,
+      eLinkDTLS,
       eLinkMempipe,
       eLinkUnknown
     };

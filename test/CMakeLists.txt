@@ -26,6 +26,7 @@ add_executable(testAll
   net/test_sock_addr.cpp
   nodedb/test_nodedb.cpp
   path/test_path.cpp
+  link/test_link_factory.cpp
   router/test_llarp_router_version.cpp
   routing/test_llarp_routing_transfer_traffic.cpp
   routing/test_llarp_routing_obtainexitmessage.cpp
