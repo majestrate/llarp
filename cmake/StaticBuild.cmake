@@ -34,6 +34,13 @@ set(ZLIB_SOURCE zlib-${ZLIB_VERSION}.tar.xz)
 set(ZLIB_HASH SHA256=d7a0654783a4da529d1bb793b7ad9c3318020af77667bcae35f95d0e42a792f3
   CACHE STRING "zlib source hash")
 
+set(USRSCTP_VERSION 0.9.5.0 CACHE STRING "usrsctp version")
+set(USRSCTP_MIRROR ${LOCAL_MIRROR} https://github.com/sctplab/usrsctp/archive/refs/tags
+  CACHE STRING "usrsctp mirror(s)")
+set(USRSCTP_SOURCE ${USRSCTP_VERSION}.tar.gz)
+set(USRSCTP_HASH SHA512=7b28706449f9365ba9750fd39925e7171516a1e3145d123ec69a12486637ae2393ad4c587b056403298dc13c149f0b01a262cbe4852abca42e425d7680c77ee3
+  CACHE STRING "usrsctp source hash")
+
 include(ExternalProject)
 
 set(DEPS_DESTDIR ${CMAKE_BINARY_DIR}/static-deps)
@@ -189,6 +196,14 @@ build_external(zlib
 )
 add_static_target(zlib zlib_external libz.a)
 
+build_external(usrsctp
+  CONFIGURE_COMMAND ./bootstrap && ./configure ${cross_host} ${cross_rc} --prefix=${DEPS_DESTDIR} --disable-shared --enable-static --with-pic "CC=${deps_cc}" "CFLAGS=${deps_CFLAGS}"
+  BUILD_BYPRODUCTS
+    ${DEPS_DESTDIR}/lib/libusrsctp.a
+    ${DEPS_DESTDIR}/include/netinet/sctp.h
+)
+add_static_target(usrsctp usrsctp_external libusrsctp.a)
+
 
 set(openssl_system_env "")
 set(openssl_arch "")
@@ -227,8 +242,8 @@ endif()
 build_external(openssl
   CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env CC=${deps_cc} ${openssl_system_env} ${openssl_configure_command}
     --prefix=${DEPS_DESTDIR} --libdir=lib ${openssl_extra_opts}
-    no-shared no-capieng no-dso no-dtls1 no-ec_nistp_64_gcc_128 no-gost
-    no-md2 no-rc5 no-rdrand no-rfc3779 no-sctp no-ssl-trace no-ssl3
+    no-shared no-capieng no-dso no-ec_nistp_64_gcc_128 no-gost
+    no-md2 no-rc5 no-rdrand no-rfc3779 no-ssl-trace no-ssl3
     no-static-engine no-tests no-weak-ssl-ciphers no-zlib no-zlib-dynamic ${openssl_flags}
     ${openssl_arch}
   BUILD_COMMAND ${CMAKE_COMMAND} -E env ${openssl_system_env} ${_make}
