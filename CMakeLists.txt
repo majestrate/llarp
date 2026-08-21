@@ -185,6 +185,15 @@ if(NOT TARGET sctplib)
   endif()
 endif()
 
+if(NOT TARGET OpenSSL::SSL)
+  find_package(OpenSSL REQUIRED)
+endif()
+
+if(NOT TARGET openssl)
+  add_library(openssl INTERFACE)
+  target_link_libraries(openssl INTERFACE OpenSSL::SSL OpenSSL::Crypto)
+endif()
+
 set(warning_flags -Wall -Wextra -Wno-unknown-pragmas -Wno-unused-function -Werror=vla)
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   list(APPEND warning_flags -Wno-unknown-warning-option)

@@ -27,9 +27,9 @@ namespace llarp::dtls
     std::string error;
 
     // challenge-only markers from issue spec
-    bool relayMarker = false;
-    bool xMarker = false;
-    bool yMarker = false;
+    bool relayMarker = true;
+    bool xMarker = true;
+    bool yMarker = true;
 
     bool
     BEncode(llarp_buffer_t* buf) const;

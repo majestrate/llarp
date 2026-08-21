@@ -3,6 +3,7 @@
 #include <llarp/link/server.hpp>
 #include <llarp/config/key_manager.hpp>
 #include <llarp/ev/ev.hpp>
+#include "session.hpp"
 #include <memory>
 
 namespace llarp::dtls
@@ -38,6 +39,9 @@ namespace llarp::dtls
 
    private:
     bool m_Inbound;
+
+    std::shared_ptr<Session>
+    SessionForAddr(const SockAddr& addr) const;
   };
 
   using LinkLayer_ptr = std::shared_ptr<LinkLayer>;

@@ -98,7 +98,7 @@ namespace llarp::dtls
       m_DecodedSignature = signature.BDecode(buf);
       return m_DecodedSignature;
     }
-    log::warning(logcat, "invalid dialback key: {}", static_cast<char>(*key.cur));
+    log::warning(logcat, "invalid dialback key: {}", static_cast<char>(*key.base));
     return false;
   }
 
@@ -114,11 +114,10 @@ namespace llarp::dtls
         return m_DecodedRelayMarker and m_DecodedXMarker and m_DecodedYMarker and relayMarker
             and xMarker and yMarker and !m_DecodedError;
       case DialbackAction::Reply:
-        return !m_DecodedRelayMarker and !m_DecodedXMarker and !m_DecodedYMarker and !relayMarker
-            and !xMarker and !yMarker and !m_DecodedError;
+        return !m_DecodedRelayMarker and !m_DecodedXMarker and !m_DecodedYMarker and !m_DecodedError;
       case DialbackAction::Failure:
-        return !m_DecodedRelayMarker and !m_DecodedXMarker and !m_DecodedYMarker and !relayMarker
-            and !xMarker and !yMarker and m_DecodedError;
+        return !m_DecodedRelayMarker and !m_DecodedXMarker and !m_DecodedYMarker and m_DecodedError
+            and !error.empty();
     }
 
     return false;
@@ -142,19 +141,22 @@ namespace llarp::dtls
         return false;
     }
 
-    if (!BEncodeWriteDictInt("t", timestamp, buf))
-      return false;
-
     if (action == DialbackAction::Challenge)
     {
+      if (not(relayMarker and xMarker and yMarker))
+        return false;
       static constexpr std::string_view empty{};
       if (!BEncodeWriteDictString("r", empty, buf))
+        return false;
+      if (!BEncodeWriteDictInt("t", timestamp, buf))
         return false;
       if (!BEncodeWriteDictString("x", empty, buf))
         return false;
       if (!BEncodeWriteDictString("y", empty, buf))
         return false;
     }
+    else if (!BEncodeWriteDictInt("t", timestamp, buf))
+      return false;
 
     if (!BEncodeWriteDictEntry("z", signature, buf))
       return false;
