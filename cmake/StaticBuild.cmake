@@ -34,12 +34,12 @@ set(ZLIB_SOURCE zlib-${ZLIB_VERSION}.tar.xz)
 set(ZLIB_HASH SHA256=d7a0654783a4da529d1bb793b7ad9c3318020af77667bcae35f95d0e42a792f3
   CACHE STRING "zlib source hash")
 
-set(USRSCTP_VERSION 0.9.5.0 CACHE STRING "usrsctp version")
-set(USRSCTP_MIRROR ${LOCAL_MIRROR} https://github.com/sctplab/usrsctp/archive/refs/tags
-  CACHE STRING "usrsctp mirror(s)")
-set(USRSCTP_SOURCE ${USRSCTP_VERSION}.tar.gz)
-set(USRSCTP_HASH SHA512=7b28706449f9365ba9750fd39925e7171516a1e3145d123ec69a12486637ae2393ad4c587b056403298dc13c149f0b01a262cbe4852abca42e425d7680c77ee3
-  CACHE STRING "usrsctp source hash")
+set(SCTPLIB_VERSION 1.0.35 CACHE STRING "sctplib version")
+set(SCTPLIB_MIRROR ${LOCAL_MIRROR} https://github.com/dreibh/sctplib/archive/refs/tags
+  CACHE STRING "sctplib mirror(s)")
+set(SCTPLIB_SOURCE sctplib-${SCTPLIB_VERSION}.tar.gz)
+set(SCTPLIB_HASH SHA512=80c521ee4bed0f3442af9a62beec89f3fc15531ba6d46e4b244a49bf412cad0f2dc8274b223dee906da010823a065445d957392ad7553b58ce0dceebe5e5d6c8
+  CACHE STRING "sctplib source hash")
 
 include(ExternalProject)
 
@@ -196,13 +196,13 @@ build_external(zlib
 )
 add_static_target(zlib zlib_external libz.a)
 
-build_external(usrsctp
-  CONFIGURE_COMMAND ./bootstrap && ./configure ${cross_host} ${cross_rc} --prefix=${DEPS_DESTDIR} --disable-shared --enable-static --with-pic "CC=${deps_cc}" "CFLAGS=${deps_CFLAGS}"
+build_external(sctplib
+  CONFIGURE_COMMAND ./autogen.sh && ./configure ${cross_host} ${cross_rc} --prefix=${DEPS_DESTDIR} --disable-shared --enable-static --with-pic "CC=${deps_cc}" "CFLAGS=${deps_CFLAGS}"
   BUILD_BYPRODUCTS
-    ${DEPS_DESTDIR}/lib/libusrsctp.a
+    ${DEPS_DESTDIR}/lib/libsctplib.a
     ${DEPS_DESTDIR}/include/netinet/sctp.h
 )
-add_static_target(usrsctp usrsctp_external libusrsctp.a)
+add_static_target(sctplib sctplib_external libsctplib.a)
 
 
 set(openssl_system_env "")

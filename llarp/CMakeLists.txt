@@ -463,7 +463,7 @@ target_link_libraries(lokinet-util PUBLIC
 )
 
 target_link_libraries(lokinet-layer-wire PUBLIC
-  usrsctp
+  sctplib
 )
 
 
