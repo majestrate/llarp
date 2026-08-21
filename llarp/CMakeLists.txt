@@ -201,6 +201,7 @@ add_library(lokinet-layer-onion
 add_library(lokinet-layer-wire
   STATIC
   dtls/dtls.cpp
+  dtls/messages.cpp
   iwp/hasher.cpp
   iwp/iwp.cpp
   iwp/linklayer.cpp

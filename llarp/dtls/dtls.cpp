@@ -1,6 +1,7 @@
 #include <llarp/util/alloc.h>
 #include "dtls.hpp"
 #include "linklayer.hpp"
+#include "messages.hpp"
 #include <llarp/util/logging.hpp>
 #include <stdexcept>
 
@@ -49,9 +50,30 @@ namespace llarp::dtls
   }
 
   void
-  LinkLayer::RecvFrom(const SockAddr&, ILinkSession::Packet_t)
+  LinkLayer::RecvFrom(const SockAddr& from, ILinkSession::Packet_t pkt)
   {
-    log::warning(logcat, "dtls recv path is not implemented");
+    DialbackFrame frame;
+    llarp_buffer_t buf{pkt};
+    if (not frame.BDecode(&buf) or buf.cur != buf.base + buf.sz)
+    {
+      log::warning(logcat, "dropping malformed dtls dialback frame from {}", from);
+      return;
+    }
+
+    switch (frame.action)
+    {
+      case DialbackAction::Challenge:
+        log::info(logcat, "received dtls dialback challenge from {}", from);
+        break;
+      case DialbackAction::Reply:
+        log::info(logcat, "received dtls dialback reply from {}", from);
+        break;
+      case DialbackAction::Failure:
+        log::warning(logcat, "received dtls dialback failure from {}: {}", from, frame.error);
+        break;
+    }
+
+    log::warning(logcat, "dtls session handling is not implemented yet");
   }
 
   LinkLayer_ptr
