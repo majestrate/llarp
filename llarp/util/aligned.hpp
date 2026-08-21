@@ -10,6 +10,7 @@
 #include <cstddef>
 #include <memory>
 #include <numeric>
+#include <tuple>
 #include <type_traits>
 #include <compare>
 
@@ -63,6 +64,26 @@ namespace llarp
 
   template <size_t sz>
   constexpr inline bool is_std_array<std::array<uint8_t, sz>> = true;
+
+  template <typename T, typename = void>
+  struct aligned_buffer_size;
+
+  template <typename T>
+    requires(is_aligned_buffer<T> and not is_std_array<T>)
+  struct aligned_buffer_size<T>
+  {
+    static constexpr size_t value = T::SIZE;
+  };
+
+  template <typename T>
+    requires is_std_array<T>
+  struct aligned_buffer_size<T>
+  {
+    static constexpr size_t value = std::tuple_size_v<T>;
+  };
+
+  template <typename T>
+  inline constexpr size_t aligned_buffer_size_v = aligned_buffer_size<T>::value;
 
   template <typename T>
     requires is_aligned_buffer<T>
@@ -229,7 +250,7 @@ namespace std
     requires llarp::is_aligned_buffer<Other_t>                                    \
   constexpr _Kind_t operator^(const Other_t& other) const noexcept                \
   {                                                                               \
-    static_assert(Other_t::SIZE == SIZE);                                         \
+    static_assert(llarp::aligned_buffer_size_v<Other_t> == SIZE);                 \
     _Kind_t ret{};                                                                \
     std::transform(begin(), end(), other.begin(), ret.begin(), std::bit_xor<>{}); \
     return ret;                                                                   \
@@ -247,7 +268,7 @@ namespace std
     requires llarp::is_aligned_buffer<Kind_t>             \
   explicit _Kind_t(const Kind_t& data)                    \
   {                                                       \
-    static_assert(Kind_t::SIZE == SIZE);                  \
+    static_assert(llarp::aligned_buffer_size_v<Kind_t> == SIZE); \
     std::copy_n(data.begin(), size(), m_data.begin());    \
   }
 

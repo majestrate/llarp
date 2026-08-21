@@ -1,7 +1,6 @@
 #include <llarp/util/alloc.h>
 #include "dtls.hpp"
 #include "linklayer.hpp"
-#include "messages.hpp"
 #include <llarp/util/logging.hpp>
 #include <stdexcept>
 
@@ -29,12 +28,11 @@ namespace llarp::dtls
   {}
 
   std::shared_ptr<ILinkSession>
-  LinkLayer::NewOutboundSession(const RouterContact&, const AddressInfo&)
+  LinkLayer::NewOutboundSession(const RouterContact& rc, const AddressInfo& ai)
   {
     if (m_Inbound)
       throw std::logic_error{"inbound link cannot make outbound sessions"};
-    log::warning(logcat, "dtls outbound session creation is not implemented");
-    return nullptr;
+    return std::make_shared<Session>(this, rc, ai);
   }
 
   std::string_view
@@ -52,28 +50,45 @@ namespace llarp::dtls
   void
   LinkLayer::RecvFrom(const SockAddr& from, ILinkSession::Packet_t pkt)
   {
-    DialbackFrame frame;
-    llarp_buffer_t buf{pkt};
-    if (not frame.BDecode(&buf) or buf.cur != buf.base + buf.sz)
+    std::shared_ptr<ILinkSession> session;
+    auto itr = m_AuthedAddrs.find(from);
+    bool isNewSession = false;
+    if (itr == m_AuthedAddrs.end())
     {
-      log::warning(logcat, "dropping malformed dtls dialback frame from {}", from);
+      Lock_t lock{m_PendingMutex};
+      auto it = m_Pending.find(from);
+      if (it == m_Pending.end())
+      {
+        if (not m_Inbound)
+          return;
+        isNewSession = true;
+        it = m_Pending.emplace(from, std::make_shared<Session>(this, from)).first;
+      }
+      session = it->second;
+    }
+    else if (auto s_itr = m_AuthedLinks.find(itr->second); s_itr != m_AuthedLinks.end())
+      session = s_itr->second;
+
+    if (not session)
+    {
       return;
     }
 
-    switch (frame.action)
-    {
-      case DialbackAction::Challenge:
-        log::info(logcat, "received dtls dialback challenge from {}", from);
-        break;
-      case DialbackAction::Reply:
-        log::info(logcat, "received dtls dialback reply from {}", from);
-        break;
-      case DialbackAction::Failure:
-        log::warning(logcat, "received dtls dialback failure from {}: {}", from, frame.error);
-        break;
-    }
+    if (not session->Recv_LL(std::move(pkt)) and isNewSession)
+      m_Pending.erase(from);
+  }
 
-    log::warning(logcat, "dtls session handling is not implemented yet");
+  std::shared_ptr<Session>
+  LinkLayer::SessionForAddr(const SockAddr& addr) const
+  {
+    if (auto itr = m_Pending.find(addr); itr != m_Pending.end())
+      return std::dynamic_pointer_cast<Session>(itr->second);
+
+    if (auto itr = m_AuthedAddrs.find(addr); itr != m_AuthedAddrs.end())
+      if (auto sitr = m_AuthedLinks.find(itr->second); sitr != m_AuthedLinks.end())
+        return std::dynamic_pointer_cast<Session>(sitr->second);
+
+    return nullptr;
   }
 
   LinkLayer_ptr

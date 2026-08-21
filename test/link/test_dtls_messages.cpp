@@ -27,13 +27,13 @@ TEST_CASE("DTLS dialback challenge roundtrip")
 {
   llarp::dtls::DialbackFrame frame;
   frame.action = llarp::dtls::DialbackAction::Challenge;
-  frame.challenge.Fill(0x42);
+  frame.challenge.fill(0x42);
   frame.timestamp = 123456;
   frame.signature.Fill(0x24);
 
   const auto decoded = RoundTrip(frame);
   REQUIRE(decoded.action == llarp::dtls::DialbackAction::Challenge);
-  REQUIRE(decoded.challenge.as_array() == frame.challenge.as_array());
+  REQUIRE(decoded.challenge == frame.challenge);
   REQUIRE(decoded.timestamp == frame.timestamp);
   REQUIRE(decoded.signature.as_array() == frame.signature.as_array());
   REQUIRE(decoded.relayMarker);
@@ -45,13 +45,13 @@ TEST_CASE("DTLS dialback reply roundtrip")
 {
   llarp::dtls::DialbackFrame frame;
   frame.action = llarp::dtls::DialbackAction::Reply;
-  frame.challenge.Fill(0x09);
+  frame.challenge.fill(0x09);
   frame.timestamp = 98765;
   frame.signature.Fill(0x99);
 
   const auto decoded = RoundTrip(frame);
   REQUIRE(decoded.action == llarp::dtls::DialbackAction::Reply);
-  REQUIRE(decoded.challenge.as_array() == frame.challenge.as_array());
+  REQUIRE(decoded.challenge == frame.challenge);
   REQUIRE(decoded.timestamp == frame.timestamp);
   REQUIRE(decoded.signature.as_array() == frame.signature.as_array());
   REQUIRE_FALSE(decoded.relayMarker);
@@ -63,14 +63,14 @@ TEST_CASE("DTLS dialback failure roundtrip")
 {
   llarp::dtls::DialbackFrame frame;
   frame.action = llarp::dtls::DialbackAction::Failure;
-  frame.challenge.Fill(0x7f);
+  frame.challenge.fill(0x7f);
   frame.timestamp = 22222;
   frame.signature.Fill(0x11);
   frame.error = "dialback failed";
 
   const auto decoded = RoundTrip(frame);
   REQUIRE(decoded.action == llarp::dtls::DialbackAction::Failure);
-  REQUIRE(decoded.challenge.as_array() == frame.challenge.as_array());
+  REQUIRE(decoded.challenge == frame.challenge);
   REQUIRE(decoded.timestamp == frame.timestamp);
   REQUIRE(decoded.signature.as_array() == frame.signature.as_array());
   REQUIRE(decoded.error == frame.error);
@@ -81,7 +81,7 @@ TEST_CASE("DTLS dialback rejects invalid action")
   std::array<byte_t, 512> storage{};
   llarp::dtls::DialbackFrame frame;
   frame.action = llarp::dtls::DialbackAction::Reply;
-  frame.challenge.Fill(0x01);
+  frame.challenge.fill(0x01);
   frame.timestamp = 1;
   frame.signature.Fill(0x01);
 
