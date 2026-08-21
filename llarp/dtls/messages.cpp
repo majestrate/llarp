@@ -2,6 +2,7 @@
 #include "messages.hpp"
 
 #include <llarp/util/logging.hpp>
+#include <algorithm>
 
 namespace llarp::dtls
 {
@@ -29,7 +30,7 @@ namespace llarp::dtls
     llarp_buffer_t strbuf;
     if (!bencode_read_string(buf, &strbuf) || strbuf.sz != 1)
       return false;
-    const auto maybeAction = DialbackActionFromByte(*strbuf.cur);
+    const auto maybeAction = DialbackActionFromByte(*strbuf.base);
     if (!maybeAction)
       return false;
     action = *maybeAction;
@@ -49,7 +50,7 @@ namespace llarp::dtls
   }
 
   bool
-  DialbackFrame::DecodeMarker(llarp_buffer_t* buf, bool& marker)
+  DialbackFrame::DecodeMarker(llarp_buffer_t* buf, bool& marker, bool& decoded)
   {
     llarp_buffer_t strbuf;
     if (!bencode_read_string(buf, &strbuf))
@@ -57,6 +58,7 @@ namespace llarp::dtls
     if (strbuf.sz != 0)
       return false;
     marker = true;
+    decoded = true;
     return true;
   }
 
@@ -81,16 +83,16 @@ namespace llarp::dtls
     if (key.startswith("e"))
       return DecodeError(buf);
     if (key.startswith("r"))
-      return DecodeMarker(buf, relayMarker);
+      return DecodeMarker(buf, relayMarker, m_DecodedRelayMarker);
     if (key.startswith("t"))
     {
       m_DecodedTimestamp = bencode_read_integer(buf, &timestamp);
       return m_DecodedTimestamp;
     }
     if (key.startswith("x"))
-      return DecodeMarker(buf, xMarker);
+      return DecodeMarker(buf, xMarker, m_DecodedXMarker);
     if (key.startswith("y"))
-      return DecodeMarker(buf, yMarker);
+      return DecodeMarker(buf, yMarker, m_DecodedYMarker);
     if (key.startswith("z"))
     {
       m_DecodedSignature = signature.BDecode(buf);
@@ -109,11 +111,14 @@ namespace llarp::dtls
     switch (action)
     {
       case DialbackAction::Challenge:
-        return relayMarker and xMarker and yMarker and !m_DecodedError;
+        return m_DecodedRelayMarker and m_DecodedXMarker and m_DecodedYMarker and relayMarker
+            and xMarker and yMarker and !m_DecodedError;
       case DialbackAction::Reply:
-        return !relayMarker and !xMarker and !yMarker and !m_DecodedError;
+        return !m_DecodedRelayMarker and !m_DecodedXMarker and !m_DecodedYMarker and !relayMarker
+            and !xMarker and !yMarker and !m_DecodedError;
       case DialbackAction::Failure:
-        return !relayMarker and !xMarker and !yMarker and m_DecodedError;
+        return !m_DecodedRelayMarker and !m_DecodedXMarker and !m_DecodedYMarker and !relayMarker
+            and !xMarker and !yMarker and m_DecodedError;
     }
 
     return false;
@@ -165,6 +170,9 @@ namespace llarp::dtls
     m_DecodedTimestamp = false;
     m_DecodedSignature = false;
     m_DecodedError = false;
+    m_DecodedRelayMarker = false;
+    m_DecodedXMarker = false;
+    m_DecodedYMarker = false;
     relayMarker = false;
     xMarker = false;
     yMarker = false;
