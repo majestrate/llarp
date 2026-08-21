@@ -229,7 +229,7 @@ namespace std
     requires llarp::is_aligned_buffer<Other_t>                                    \
   constexpr _Kind_t operator^(const Other_t& other) const noexcept                \
   {                                                                               \
-    static_assert(other.size() == size());                                        \
+    static_assert(Other_t::SIZE == SIZE);                                         \
     _Kind_t ret{};                                                                \
     std::transform(begin(), end(), other.begin(), ret.begin(), std::bit_xor<>{}); \
     return ret;                                                                   \
@@ -247,7 +247,7 @@ namespace std
     requires llarp::is_aligned_buffer<Kind_t>             \
   explicit _Kind_t(const Kind_t& data)                    \
   {                                                       \
-    static_assert(data.size() == size());                 \
+    static_assert(Kind_t::SIZE == SIZE);                  \
     std::copy_n(data.begin(), size(), m_data.begin());    \
   }
 

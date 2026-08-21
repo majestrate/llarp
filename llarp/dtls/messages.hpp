@@ -46,6 +46,9 @@ namespace llarp::dtls
     bool m_DecodedTimestamp = false;
     bool m_DecodedSignature = false;
     bool m_DecodedError = false;
+    bool m_DecodedRelayMarker = false;
+    bool m_DecodedXMarker = false;
+    bool m_DecodedYMarker = false;
 
     bool
     DecodeAction(llarp_buffer_t* buf);
@@ -54,7 +57,7 @@ namespace llarp::dtls
     DecodeChallenge(llarp_buffer_t* buf);
 
     bool
-    DecodeMarker(llarp_buffer_t* buf, bool& marker);
+    DecodeMarker(llarp_buffer_t* buf, bool& marker, bool& decoded);
 
     bool
     DecodeError(llarp_buffer_t* buf);
