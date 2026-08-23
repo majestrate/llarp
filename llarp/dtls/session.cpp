@@ -1,6 +1,7 @@
 #include <llarp/util/alloc.h>
 #include "session.hpp"
 #include "linklayer.hpp"
+#include "sctp_multiplexer.hpp"
 
 #include <llarp/util/logging.hpp>
 

@@ -54,6 +54,21 @@ macro(system_or_submodule BIGNAME smallname pkgconf subdir)
   endif()
 endmacro()
 
+include(ExternalProject)
+include(${CMAKE_CURRENT_SOURCE_DIR}/../cmake/build_module.cmake)
+
+set(sctp_prefix ${CMAKE_CURRENT_BINARY_DIR}/sctplib)
+
+add_library(sctplib INTERFACE)
+build_external_module(sctplib
+        CONFIGURE_COMMAND ./autogen.sh && ./configure ${cross_host} ${cross_rc} --prefix=${sctp_prefix} --disable-shared --enable-static --with-pic "CC=${deps_cc}" "CFLAGS=${deps_CFLAGS}"
+        BUILD_BYPRODUCTS
+        ${sctp_prefix}/lib/libsctplib.a
+        ${sctp_prefix}/include/netinet/sctp.h
+)
+add_static_module_target(sctplib_impl sctplib_submodule libsctplib.a)
+target_link_libraries(sctplib INTERFACE sctplib_impl)
+target_include_directories(sctplib INTERFACE ${sctp_prefix}/include)
 
 system_or_submodule(FMT fmt libfmt>=12.1.0 fmt)
 system_or_submodule(SPDLOG spdlog libspdlog>=1.17.0 spdlog)
