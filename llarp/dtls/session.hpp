@@ -10,6 +10,43 @@ namespace llarp::dtls
 {
   struct LinkLayer;
 
+  struct BIO_Deleter
+  {
+    void
+    operator()(BIO* b) const
+    {
+      Delete(b);
+    }
+    static void
+    Delete(BIO* b);
+  };
+
+  struct SSL_CTX_Deleter
+  {
+    void
+    operator()(SSL_CTX* c) const
+    {
+      Delete(c);
+    }
+    static void
+    Delete(SSL_CTX* c);
+  };
+
+  struct SSL_Deleter
+  {
+    void
+    operator()(SSL* s) const
+    {
+      Delete(s);
+    }
+    static void
+    Delete(SSL* s);
+  };
+
+  using BIO_ptr = std::unique_ptr<BIO, BIO_Deleter>;
+  using SSL_CTX_ptr = std::unique_ptr<SSL_CTX, SSL_CTX_Deleter>;
+  using SSL_ptr = std::unique_ptr<SSL, SSL_Deleter>;
+
   struct Session final : ILinkSession, std::enable_shared_from_this<Session>
   {
     Session(LinkLayer* parent, const RouterContact& rc, const AddressInfo& ai);
@@ -116,10 +153,10 @@ namespace llarp::dtls
     const SockAddr m_RemoteAddr;
     RouterContact m_RemoteRC;
 
-    SSL_CTX* m_CTX = nullptr;
-    SSL* m_SSL = nullptr;
-    BIO* m_ReadBIO = nullptr;
-    BIO* m_WriteBIO = nullptr;
+    SSL_CTX_ptr m_CTX = nullptr;
+    SSL_ptr m_SSL = nullptr;
+    BIO_ptr m_ReadBIO = nullptr;
+    BIO_ptr m_WriteBIO = nullptr;
 
     bool m_Started = false;
     bool m_Established = false;

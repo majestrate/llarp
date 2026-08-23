@@ -1,7 +1,6 @@
 #include <llarp/util/alloc.h>
 #include "session.hpp"
 #include "linklayer.hpp"
-#include "sctp_multiplexer.hpp"
 
 #include <llarp/util/logging.hpp>
 
@@ -26,6 +25,27 @@ namespace llarp::dtls
     (void)initialized;
   }
 
+  void
+  BIO_Deleter::Delete(BIO* b)
+  {
+    if (b)
+      BIO_free(b);
+  }
+
+  void
+  SSL_CTX_Deleter::Delete(SSL_CTX* ctx)
+  {
+    if (ctx)
+      SSL_CTX_free(ctx);
+  }
+
+  void
+  SSL_Deleter::Delete(SSL* ssl)
+  {
+    if (ssl)
+      SSL_free(ssl);
+  }
+
   Session::Session(LinkLayer* parent, const RouterContact& rc, const AddressInfo& ai)
       : m_Parent(parent), m_Inbound(false), m_RemoteAddr(ai), m_RemoteRC(rc)
   {
@@ -47,12 +67,7 @@ namespace llarp::dtls
   }
 
   Session::~Session()
-  {
-    if (m_SSL)
-      SSL_free(m_SSL);
-    if (m_CTX)
-      SSL_CTX_free(m_CTX);
-  }
+  {}
 
   bool
   Session::InitTLS()
@@ -60,27 +75,27 @@ namespace llarp::dtls
     init_openssl_once();
 
     const SSL_METHOD* method = m_Inbound ? DTLS_server_method() : DTLS_client_method();
-    m_CTX = SSL_CTX_new(method);
-    if (not m_CTX)
+    m_CTX.reset(SSL_CTX_new(method));
+    if (m_CTX == nullptr)
       return false;
 
-    SSL_CTX_set_min_proto_version(m_CTX, DTLS1_2_VERSION);
-    SSL_CTX_set_cipher_list(m_CTX, "DEFAULT");
+    SSL_CTX_set_min_proto_version(m_CTX.get(), DTLS1_2_VERSION);
+    SSL_CTX_set_cipher_list(m_CTX.get(), "DEFAULT");
 
-    m_SSL = SSL_new(m_CTX);
-    if (not m_SSL)
+    m_SSL.reset(SSL_new(m_CTX.get()));
+    if (m_SSL == nullptr)
       return false;
 
-    m_ReadBIO = BIO_new(BIO_s_mem());
-    m_WriteBIO = BIO_new(BIO_s_mem());
-    if (not m_ReadBIO or not m_WriteBIO)
+    m_ReadBIO.reset(BIO_new(BIO_s_mem()));
+    m_WriteBIO.reset(BIO_new(BIO_s_mem()));
+    if (m_ReadBIO == nullptr or m_WriteBIO == nullptr)
       return false;
 
-    SSL_set_bio(m_SSL, m_ReadBIO, m_WriteBIO);
+    SSL_set_bio(m_SSL.get(), m_ReadBIO.get(), m_WriteBIO.get());
     if (m_Inbound)
-      SSL_set_accept_state(m_SSL);
+      SSL_set_accept_state(m_SSL.get());
     else
-      SSL_set_connect_state(m_SSL);
+      SSL_set_connect_state(m_SSL.get());
 
     return true;
   }
@@ -98,9 +113,9 @@ namespace llarp::dtls
       return false;
 
     std::array<byte_t, 4096> buf{};
-    while (BIO_ctrl_pending(m_WriteBIO) > 0)
+    while (BIO_ctrl_pending(m_WriteBIO.get()) > 0)
     {
-      const auto n = BIO_read(m_WriteBIO, buf.data(), buf.size());
+      const auto n = BIO_read(m_WriteBIO.get(), buf.data(), buf.size());
       if (n <= 0)
         break;
       llarp_buffer_t pkt{buf.data(), static_cast<size_t>(n)};
@@ -120,7 +135,7 @@ namespace llarp::dtls
     if (m_Established)
       return true;
 
-    const auto rc = SSL_do_handshake(m_SSL);
+    const auto rc = SSL_do_handshake(m_SSL.get());
     if (rc == 1)
     {
       m_Established = true;
@@ -130,7 +145,7 @@ namespace llarp::dtls
       return FlushCiphertext();
     }
 
-    const auto err = SSL_get_error(m_SSL, rc);
+    const auto err = SSL_get_error(m_SSL.get(), rc);
     FlushCiphertext();
     if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE)
       return true;
@@ -149,19 +164,17 @@ namespace llarp::dtls
     std::array<byte_t, 4096> plain{};
     while (true)
     {
-      const auto n = SSL_read(m_SSL, plain.data(), plain.size());
+      const auto n = SSL_read(m_SSL.get(), plain.data(), plain.size());
       if (n > 0)
       {
-        Message_t msg(static_cast<size_t>(n));
-        std::copy_n(plain.data(), n, msg.data());
-        llarp_buffer_t buf{msg};
-        (void)m_Parent->HandleMessage(this, buf);
+        const llarp_buffer_t buf{plain.data(), static_cast<size_t>(n)};
+        m_Parent->HandleMessage(this, buf);
         m_LastRX = m_Parent->Now();
         m_Stats.totalPacketsRX++;
         continue;
       }
 
-      const auto err = SSL_get_error(m_SSL, n);
+      const auto err = SSL_get_error(m_SSL.get(), n);
       if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE)
         return true;
 
@@ -183,7 +196,7 @@ namespace llarp::dtls
     if (m_Closed)
       return false;
 
-    const auto rc = SSL_write(m_SSL, msg.data(), msg.size());
+    const auto rc = SSL_write(m_SSL.get(), msg.data(), msg.size());
     FlushCiphertext();
     if (rc > 0)
     {
@@ -193,7 +206,7 @@ namespace llarp::dtls
       return true;
     }
 
-    const auto err = SSL_get_error(m_SSL, rc);
+    const auto err = SSL_get_error(m_SSL.get(), rc);
     if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE)
     {
       m_SendQueue.emplace_back(PendingSend{msg, std::move(handler), 0});
@@ -236,7 +249,7 @@ namespace llarp::dtls
     if (m_Closed)
       return;
     m_Closed = true;
-    SSL_shutdown(m_SSL);
+    SSL_shutdown(m_SSL.get());
   }
 
   bool
@@ -245,7 +258,7 @@ namespace llarp::dtls
     if (m_Closed)
       return false;
 
-    const auto written = BIO_write(m_ReadBIO, pkt.data(), pkt.size());
+    const auto written = BIO_write(m_ReadBIO.get(), pkt.data(), pkt.size());
     if (written <= 0)
       return false;
 

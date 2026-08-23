@@ -256,20 +256,20 @@ namespace std
     return ret;                                                                   \
   }
 
-#define ALIGNED_BUFFER_MEMBERS_NO_SERIALIZE(_Kind_t, _sz) \
-  ALIGNED_BUFFER_MEMBERS_NO_CTOR(_Kind_t, _sz)            \
- public:                                                  \
-  _Kind_t() = default;                                    \
-  explicit _Kind_t(const byte_t* buf)                     \
-  {                                                       \
-    *this = buf;                                          \
-  }                                                       \
-  template <typename Kind_t>                              \
-    requires llarp::is_aligned_buffer<Kind_t>             \
-  explicit _Kind_t(const Kind_t& data)                    \
-  {                                                       \
+#define ALIGNED_BUFFER_MEMBERS_NO_SERIALIZE(_Kind_t, _sz)        \
+  ALIGNED_BUFFER_MEMBERS_NO_CTOR(_Kind_t, _sz)                   \
+ public:                                                         \
+  _Kind_t() = default;                                           \
+  explicit _Kind_t(const byte_t* buf)                            \
+  {                                                              \
+    *this = buf;                                                 \
+  }                                                              \
+  template <typename Kind_t>                                     \
+    requires llarp::is_aligned_buffer<Kind_t>                    \
+  explicit _Kind_t(const Kind_t& data)                           \
+  {                                                              \
     static_assert(llarp::aligned_buffer_size_v<Kind_t> == SIZE); \
-    std::copy_n(data.begin(), size(), m_data.begin());    \
+    std::copy_n(data.begin(), size(), m_data.begin());           \
   }
 
 #define ALIGNED_BUFFER_MEMBERS(_kind_t, _sz)              \

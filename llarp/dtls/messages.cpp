@@ -114,7 +114,8 @@ namespace llarp::dtls
         return m_DecodedRelayMarker and m_DecodedXMarker and m_DecodedYMarker and relayMarker
             and xMarker and yMarker and !m_DecodedError;
       case DialbackAction::Reply:
-        return !m_DecodedRelayMarker and !m_DecodedXMarker and !m_DecodedYMarker and !m_DecodedError;
+        return !m_DecodedRelayMarker and !m_DecodedXMarker and !m_DecodedYMarker
+            and !m_DecodedError;
       case DialbackAction::Failure:
         return !m_DecodedRelayMarker and !m_DecodedXMarker and !m_DecodedYMarker and m_DecodedError
             and !error.empty();
@@ -129,7 +130,8 @@ namespace llarp::dtls
     if (!bencode_start_dict(buf))
       return false;
 
-    if (!BEncodeWriteDictString("a", std::string_view{reinterpret_cast<const char*>(&action), 1}, buf))
+    if (!BEncodeWriteDictString(
+            "a", std::string_view{reinterpret_cast<const char*>(&action), 1}, buf))
       return false;
 
     if (!BEncodeWriteDictEntry("c", challenge, buf))
