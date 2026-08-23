@@ -68,4 +68,4 @@ namespace llarp::dtls
 
   std::optional<DialbackAction>
   DialbackActionFromByte(byte_t action);
-}
+}  // namespace llarp::dtls
