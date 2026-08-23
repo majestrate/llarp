@@ -69,7 +69,7 @@ namespace llarp::dht
     bool
     operator==(const Kind_t& other) const
     {
-      static_assert(other.size() == size());
+      static_assert(llarp::aligned_buffer_size_v<Kind_t> == SIZE);
       return as_array() == other.as_array();
     }
   };

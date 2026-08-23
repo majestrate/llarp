@@ -204,6 +204,9 @@ add_library(lokinet-layer-onion
 # layer 2 frames into layer 1 symbols which in the case of iwp are encrypted udp/ip packets
 add_library(lokinet-layer-wire
   STATIC
+  dtls/dtls.cpp
+  dtls/messages.cpp
+  dtls/session.cpp
   iwp/hasher.cpp
   iwp/iwp.cpp
   iwp/linklayer.cpp
@@ -216,6 +219,7 @@ add_library(lokinet-layer-wire
 # a series of layer 1 symbols which are then transmitted between lokinet instances
 add_library(lokinet-layer-link
   STATIC
+  link/factory.cpp
   link/link_manager.cpp
   link/session.cpp
   link/server.cpp
@@ -459,6 +463,11 @@ target_link_libraries(lokinet-platform PUBLIC
 target_link_libraries(lokinet-util PUBLIC
   filesystem
   oxenc::oxenc
+)
+
+target_link_libraries(lokinet-layer-wire PUBLIC
+  openssl
+  sctplib
 )
 
 

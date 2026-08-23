@@ -34,6 +34,13 @@ set(ZLIB_SOURCE zlib-${ZLIB_VERSION}.tar.xz)
 set(ZLIB_HASH SHA256=d7a0654783a4da529d1bb793b7ad9c3318020af77667bcae35f95d0e42a792f3
   CACHE STRING "zlib source hash")
 
+set(SCTPLIB_VERSION 1.0.35 CACHE STRING "sctplib version")
+set(SCTPLIB_MIRROR ${LOCAL_MIRROR} https://github.com/dreibh/sctplib/archive/refs/tags
+  CACHE STRING "sctplib mirror(s)")
+set(SCTPLIB_SOURCE sctplib-${SCTPLIB_VERSION}.tar.gz)
+set(SCTPLIB_HASH SHA512=80c521ee4bed0f3442af9a62beec89f3fc15531ba6d46e4b244a49bf412cad0f2dc8274b223dee906da010823a065445d957392ad7553b58ce0dceebe5e5d6c8
+  CACHE STRING "sctplib source hash")
+
 include(ExternalProject)
 
 set(DEPS_DESTDIR ${CMAKE_BINARY_DIR}/static-deps)
@@ -189,6 +196,14 @@ build_external(zlib
 )
 add_static_target(zlib zlib_external libz.a)
 
+build_external(sctplib
+  CONFIGURE_COMMAND ./autogen.sh && ./configure ${cross_host} ${cross_rc} --prefix=${DEPS_DESTDIR} --disable-shared --enable-static --with-pic "CC=${deps_cc}" "CFLAGS=${deps_CFLAGS}"
+  BUILD_BYPRODUCTS
+    ${DEPS_DESTDIR}/lib/libsctplib.a
+    ${DEPS_DESTDIR}/include/netinet/sctp.h
+)
+add_static_target(sctplib sctplib_external libsctplib.a)
+
 
 set(openssl_system_env "")
 set(openssl_arch "")
@@ -227,8 +242,8 @@ endif()
 build_external(openssl
   CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env CC=${deps_cc} ${openssl_system_env} ${openssl_configure_command}
     --prefix=${DEPS_DESTDIR} --libdir=lib ${openssl_extra_opts}
-    no-shared no-capieng no-dso no-dtls1 no-ec_nistp_64_gcc_128 no-gost
-    no-md2 no-rc5 no-rdrand no-rfc3779 no-sctp no-ssl-trace no-ssl3
+    no-shared no-capieng no-dso no-ec_nistp_64_gcc_128 no-gost
+    no-md2 no-rc5 no-rdrand no-rfc3779 no-ssl-trace no-ssl3
     no-static-engine no-tests no-weak-ssl-ciphers no-zlib no-zlib-dynamic ${openssl_flags}
     ${openssl_arch}
   BUILD_COMMAND ${CMAKE_COMMAND} -E env ${openssl_system_env} ${_make}

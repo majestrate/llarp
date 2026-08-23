@@ -172,6 +172,28 @@ if(NOT TARGET sodium)
   export(TARGETS sodium NAMESPACE sodium:: FILE sodium-exports.cmake)
 endif()
 
+if(NOT TARGET sctplib)
+  if(NOT BUILD_STATIC_DEPS)
+    pkg_check_modules(SCTPLIB sctplib IMPORTED_TARGET)
+  endif()
+
+  add_library(sctplib INTERFACE)
+  if(SCTPLIB_FOUND AND NOT BUILD_STATIC_DEPS)
+    target_link_libraries(sctplib INTERFACE PkgConfig::SCTPLIB)
+  elseif(NOT BUILD_STATIC_DEPS)
+    message(STATUS "sctplib not found: SCTP-backed DTLS dialect support disabled")
+  endif()
+endif()
+
+if(NOT TARGET OpenSSL::SSL)
+  find_package(OpenSSL REQUIRED)
+endif()
+
+if(NOT TARGET openssl)
+  add_library(openssl INTERFACE)
+  target_link_libraries(openssl INTERFACE OpenSSL::SSL OpenSSL::Crypto)
+endif()
+
 set(warning_flags -Wall -Wextra -Wno-unknown-pragmas -Wno-unused-function -Werror=vla)
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   list(APPEND warning_flags -Wno-unknown-warning-option)

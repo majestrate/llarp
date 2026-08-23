@@ -16,20 +16,24 @@ namespace llarp
     {
       eLinkUTP,
       eLinkIWP,
+      eLinkDTLS,
       eLinkMempipe,
       eLinkUnknown
     };
 
     using Factory = std::function<LinkLayer_ptr(
         std::shared_ptr<KeyManager>,
+        std::shared_ptr<EventLoop>,
         GetRCFunc,
         LinkMessageHandler,
         SignBufferFunc,
+        BeforeConnectFunc_t,
         SessionEstablishedHandler,
         SessionRenegotiateHandler,
         TimeoutHandler,
         SessionClosedHandler,
-        PumpDoneHandler)>;
+        PumpDoneHandler,
+        WorkerFunc_t)>;
 
     /// get link type by name string
     /// if invalid returns eLinkUnspec
