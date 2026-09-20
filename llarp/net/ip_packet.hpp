@@ -271,6 +271,7 @@ namespace llarp::net
     inline const byte_t&
     icmp_code() const
     {
+      bounds_check(payload_offset() + 1);
       return view()[payload_offset() + 1];
     }
 
@@ -283,6 +284,7 @@ namespace llarp::net
     inline byte_t&
     icmp_code()
     {
+      bounds_check(payload_offset() + 1);
       return _buf[payload_offset() + 1];
     }
 
