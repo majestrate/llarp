@@ -126,9 +126,10 @@ namespace llarp::net
 
     /// throws a std::range_error if memory access at offset is out of bounds.
     void
-    bounds_check(size_t offset) const
+    bounds_check(size_t start_offset, size_t access_size = 1) const
     {
-      if ((1 + offset) >= _buf.size())
+      constexpr size_t offset = start_offset + access_size;
+      if (offset >= _buf.size())
         throw std::range_error{
             fmt::format("IPacket::bounds_check(): {} >= {}", offset, _buf.size())};
     }
@@ -293,7 +294,7 @@ namespace llarp::net
     {
       const byte_t* ptr = view().data();
       ptr += payload_offset() + 2;
-      bounds_check(payload_offset() + 2);
+      bounds_check(payload_offset() + 2, sizeof(uint16_t));
       return *reinterpret_cast<const uint16_t*>(ptr);
     }
 
@@ -302,7 +303,7 @@ namespace llarp::net
     {
       byte_t* ptr = data();
       ptr += payload_offset() + 2;
-      bounds_check(payload_offset() + 2);
+      bounds_check(payload_offset() + 2, sizeof(uint16_t));
       return reinterpret_cast<uint16_t*>(ptr);
     }
 

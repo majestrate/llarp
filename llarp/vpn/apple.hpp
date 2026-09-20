@@ -393,7 +393,7 @@ namespace llarp::vpn
       // routing socket sockaddrs are packed with 4-byte alignment; sa_len == 0
       // still occupies one alignment unit
       constexpr auto align = sizeof(uint32_t);
-const auto sa_size = [align](const sockaddr* sa) {
+      const auto sa_size = [align](const sockaddr* sa) {
         return sa->sa_len ? ((sa->sa_len + align - 1) & ~(align - 1)) : align;
       };
 
