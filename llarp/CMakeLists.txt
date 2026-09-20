@@ -465,10 +465,11 @@ target_link_libraries(lokinet-util PUBLIC
   oxenc::oxenc
 )
 
-target_link_libraries(lokinet-layer-wire PUBLIC
-  openssl
-  sctplib
-)
+if(BUILD_STATIC_DEPS)
+  target_link_libraries(lokinet-layer-wire PUBLIC OpenSSL::SSL OpenSSL::Crypto sctplib)
+else()
+  target_link_libraries(lokinet-layer-wire PUBLIC openssl sctplib)
+endif()
 
 
 if(WITH_EMBEDDED_LOKINET)
