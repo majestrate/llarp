@@ -128,7 +128,7 @@ namespace llarp::net
     void
     bounds_check(size_t offset) const
     {
-      if (offset >= _buf.size())
+      if ((1 + offset) >= _buf.size())
         throw std::range_error{
             fmt::format("IPacket::bounds_check(): {} >= {}", offset, _buf.size())};
     }
