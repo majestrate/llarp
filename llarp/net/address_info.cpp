@@ -61,7 +61,7 @@ namespace llarp
     {
       if (!bencode_read_string(buf, &strbuf))
         return false;
-      if (strbuf.sz > tmp.size())
+      if (strbuf.sz >= tmp.size())
         return false;
       std::copy_n(strbuf.base, strbuf.sz, tmp.data());
       tmp[strbuf.sz] = 0;
@@ -80,7 +80,7 @@ namespace llarp
     {
       if (!bencode_read_string(buf, &strbuf))
         return false;
-      if (strbuf.sz >= sizeof(tmp))
+      if (strbuf.sz >= tmp.size())
         return false;
       std::copy_n(strbuf.base, strbuf.sz, tmp.data());
       tmp[strbuf.sz] = 0;
