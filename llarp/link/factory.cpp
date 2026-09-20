@@ -42,10 +42,6 @@ namespace llarp
         if (permitInbound)
           return llarp::iwp::NewInboundLink;
         return llarp::iwp::NewOutboundLink;
-      case LinkType::eLinkDTLS:
-        if (permitInbound)
-          return llarp::dtls::NewInboundLink;
-        return llarp::dtls::NewOutboundLink;
       default:
         return nullptr;
     }
