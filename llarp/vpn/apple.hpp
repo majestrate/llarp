@@ -94,7 +94,7 @@ namespace llarp::vpn
       if (WIFEXITED(status))
         ret = WEXITSTATUS(status);
       if (ret != 0 and must_succeed)
-        throw std::runtime_error{fmt::format("llarp::vpn::Exec() failed to run command: {}", cmd))};
+        throw std::runtime_error{fmt::format("llarp::vpn::Exec() failed to run command: {}", cmd)};
     }
   }  // namespace
 
