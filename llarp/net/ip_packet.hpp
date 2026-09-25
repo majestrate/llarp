@@ -124,6 +124,15 @@ namespace llarp::net
     llarp_time_t timestamp;
     std::vector<byte_t> _buf;
 
+    /// throws a std::range_error if memory access at offset is out of bounds.
+    void
+    bounds_check(size_t start_offset, size_t access_size = 1) const
+    {
+      if (start_offset > _buf.size() || access_size > _buf.size() - start_offset)
+        throw std::range_error{
+            fmt::format("IPacket::bounds_check(): {} + {} > {}", start_offset, access_size, _buf.size())};
+    }
+
    public:
     IPPacket() : IPPacket{size_t{}}
     {}
@@ -249,6 +258,7 @@ namespace llarp::net
       {
         offset = 40;
       }
+      bounds_check(offset);
       return offset;
     }
 
@@ -261,6 +271,7 @@ namespace llarp::net
     inline const byte_t&
     icmp_code() const
     {
+      bounds_check(payload_offset() + 1);
       return view()[payload_offset() + 1];
     }
 
@@ -273,6 +284,7 @@ namespace llarp::net
     inline byte_t&
     icmp_code()
     {
+      bounds_check(payload_offset() + 1);
       return _buf[payload_offset() + 1];
     }
 
@@ -281,6 +293,7 @@ namespace llarp::net
     {
       const byte_t* ptr = view().data();
       ptr += payload_offset() + 2;
+      bounds_check(payload_offset() + 2, sizeof(uint16_t));
       return *reinterpret_cast<const uint16_t*>(ptr);
     }
 
@@ -289,6 +302,7 @@ namespace llarp::net
     {
       byte_t* ptr = data();
       ptr += payload_offset() + 2;
+      bounds_check(payload_offset() + 2, sizeof(uint16_t));
       return reinterpret_cast<uint16_t*>(ptr);
     }
 

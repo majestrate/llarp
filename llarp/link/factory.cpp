@@ -1,5 +1,6 @@
 #include <llarp/util/alloc.h>
 #include "factory.hpp"
+#include <llarp/dtls/dtls.hpp>
 #include <llarp/iwp/iwp.hpp>
 
 namespace llarp
@@ -9,6 +10,8 @@ namespace llarp
   {
     if (str == "iwp")
       return LinkType::eLinkIWP;
+    if (str == "dtls")
+      return LinkType::eLinkDTLS;
     if (str == "mempipe")
       return LinkType::eLinkMempipe;
     return LinkType::eLinkUnknown;
@@ -21,6 +24,8 @@ namespace llarp
     {
       case LinkType::eLinkIWP:
         return "iwp";
+      case LinkType::eLinkDTLS:
+        return "dtls";
       case LinkType::eLinkMempipe:
         return "mempipe";
       default:

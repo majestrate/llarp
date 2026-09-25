@@ -147,8 +147,16 @@ namespace llarp
     TunEndpoint::TunEndpoint(AbstractRouter* r, service::Context* parent)
         : service::Endpoint{r, parent}
     {
-      m_PacketRouter = std::make_shared<vpn::PacketRouter>(
-          [this](net::IPPacket pkt) { HandleGotUserPacket(std::move(pkt)); });
+      m_PacketRouter = std::make_shared<vpn::PacketRouter>([this](net::IPPacket pkt) {
+        try
+        {
+          HandleGotUserPacket(std::move(pkt));
+        }
+        catch (std::exception& e)
+        {
+          log::warning(logcat, "TunEndpoint::HandleGotUserPacket(): {}", e.what());
+        }
+      });
     }
 
     void
@@ -167,8 +175,14 @@ namespace llarp
           if (dns->MaybeHandlePacket(
                   std::move(dns_pkt_src), pkt.dst(), pkt.src(), *pkt.L4OwnedBuffer()))
             return;
-
-          HandleGotUserPacket(std::move(pkt));
+          try
+          {
+            HandleGotUserPacket(std::move(pkt));
+          }
+          catch (std::exception& e)
+          {
+            log::warning(logcat, "TunEndpoint::HandleGotUserPacket(): {}", e.what());
+          }
         });
       }
       else

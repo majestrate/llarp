@@ -10,20 +10,18 @@ namespace llarp::net
     protocol = ParseIPProtocol(std::string{parts[0]});
     if (parts.size() == 2)
     {
-      huint16_t portHost{};
       std::string portStr{parts[1]};
       std::string protoName = IPProtocolName(protocol);
       if (const auto* serv = ::getservbyname(portStr.c_str(), protoName.c_str()))
       {
-        portHost.h = serv->s_port;
+        port = net::port_t{static_cast<uint16_t>(serv->s_port)};
       }
       else if (const auto portInt = std::stoi(portStr); portInt > 0)
       {
-        portHost.h = portInt;
+        port = net::port_t::from_host(static_cast<uint16_t>(portInt));
       }
       else
         throw std::invalid_argument{"invalid port in protocol info: " + portStr};
-      port = ToNet(portHost);
     }
     else
       port = std::nullopt;

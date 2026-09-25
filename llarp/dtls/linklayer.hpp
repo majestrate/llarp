@@ -1,15 +1,18 @@
 #pragma once
 
 #include <llarp/link/server.hpp>
+#include <llarp/config/key_manager.hpp>
+#include <llarp/ev/ev.hpp>
+#include "session.hpp"
+#include <memory>
 
 namespace llarp::dtls
 {
-
-  struct LinkLayer : public ILinkLayer
+  struct LinkLayer final : public ILinkLayer
   {
     LinkLayer(
         std::shared_ptr<KeyManager> keyManager,
-        std::shared_ptr<EventLoop> ev,
+        std::shared_ptr<EventLoop> loop,
         GetRCFunc getrc,
         LinkMessageHandler h,
         SignBufferFunc sign,
@@ -19,7 +22,7 @@ namespace llarp::dtls
         TimeoutHandler timeout,
         SessionClosedHandler closed,
         PumpDoneHandler pumpDone,
-        WorkerFunc_t dowork,
+        WorkerFunc_t work,
         bool permitInbound);
 
     std::shared_ptr<ILinkSession>
@@ -33,6 +36,12 @@ namespace llarp::dtls
 
     void
     RecvFrom(const SockAddr& from, ILinkSession::Packet_t pkt) override;
+
+   private:
+    bool m_Inbound;
+
+    std::shared_ptr<Session>
+    SessionForAddr(const SockAddr& addr) const;
   };
 
   using LinkLayer_ptr = std::shared_ptr<LinkLayer>;
