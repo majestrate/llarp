@@ -33,6 +33,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/wait.h>
 #include <unistd.h>
 #include <errno.h>
 #include <algorithm>
@@ -44,13 +45,56 @@ namespace llarp::vpn
 
   namespace
   {
-    static void
-    Exec(const std::string& cmd, bool must_succeed = true)
+    static std::string
+    JoinArgs(const std::vector<std::string>& args)
     {
+      std::string cmd;
+      for (const auto& arg : args)
+      {
+        if (not cmd.empty())
+          cmd += " ";
+        cmd += arg;
+      }
+      return cmd;
+    }
+
+    static void
+    Exec(std::initializer_list<std::string> args, bool must_succeed = true)
+    {
+      std::vector<std::string> argv_storage{args};
+      if (argv_storage.empty())
+        throw std::invalid_argument{"llarp::vpn::Exec() empty args"};
+
+      std::vector<char*> argv;
+      argv.reserve(argv_storage.size() + 1);
+      for (auto& arg : argv_storage)
+        argv.push_back(arg.data());
+      argv.push_back(nullptr);
+
       static auto logcat = log::Cat("vpn.apple");
+      const auto cmd = JoinArgs(argv_storage);
       log::info(logcat, "exec: {}", cmd);
-      if (int ret = ::system(cmd.c_str()); ret != 0 and must_succeed)
-        throw std::runtime_error{"command failed (" + std::to_string(ret) + "): " + cmd};
+
+      const pid_t pid = ::fork();
+      if (pid == -1)
+        throw std::runtime_error{fmt::format("fork(): {}", strerror(errno))};
+      if (pid == 0)
+      {
+        ::execv(argv[0], argv.data());
+        _exit(127);
+      }
+
+      int status = 0;
+      while (::waitpid(pid, &status, 0) == -1)
+      {
+        if (errno != EINTR)
+          throw std::runtime_error{fmt::format("waitpid(): {}", strerror(errno))};
+      }
+      int ret = -1;
+      if (WIFEXITED(status))
+        ret = WEXITSTATUS(status);
+      if (ret != 0 and must_succeed)
+        throw std::runtime_error{fmt::format("llarp::vpn::Exec() failed to run command: {}", cmd)};
     }
   }  // namespace
 
@@ -90,7 +134,7 @@ namespace llarp::vpn
       WithRoutes([](auto& routes) {
         for (const auto& ip : routes)
         {
-          Exec("/sbin/route -n delete -host " + ip + " -interface lo0", false);
+          Exec({"/sbin/route", "-n", "delete", "-host", ip, "-interface", "lo0"}, false);
         }
         routes.clear();
       });
@@ -171,25 +215,58 @@ namespace llarp::vpn
           // utun is point-to-point only; use the OpenVPN-style "topology subnet"
           // trick: /32 p2p pair to the network base address, then route the whole
           // range at the interface.
-          Exec(
-              "/sbin/ifconfig " + m_IfName + " " + addr.ToString() + " " + daddr.ToString()
-              + " mtu " + std::to_string(m_Info.mtu) + " netmask 255.255.255.255 up");
-          Exec(
-              "/sbin/route -n add -net " + daddr.ToString() + " -netmask " + netmask.ToString()
-              + " -interface " + m_IfName);
+          Exec({
+              "/sbin/ifconfig",
+              m_IfName,
+              addr.ToString(),
+              daddr.ToString(),
+              "mtu",
+              std::to_string(m_Info.mtu),
+              "netmask",
+              "255.255.255.255",
+              "up",
+          });
+          Exec({
+              "/sbin/route",
+              "-n",
+              "add",
+              "-net",
+              daddr.ToString(),
+              "-netmask",
+              netmask.ToString(),
+              "-interface",
+              m_IfName,
+          });
           // our own tun address is local, macOS wants it via loopback:
-          Exec("/sbin/route -n add -host " + addr.ToString() + " -interface lo0");
+          Exec({"/sbin/route", "-n", "add", "-host", addr.ToString(), "-interface", "lo0"});
           detail::RouteTrack(addr.ToString());
         }
         else if (ifaddr.fam == AF_INET6)
         {
           const auto prefixlen = bits::count_bits(ifaddr.range.netmask_bits);
+          const auto prefixlen_str = std::to_string(prefixlen);
+          Exec({
+              "/sbin/ifconfig",
+              m_IfName,
+              "inet6",
+              ifaddr.range.addr.ToString(),
+              "prefixlen",
+              prefixlen_str,
+              "up",
+          });
           Exec(
-              "/sbin/ifconfig " + m_IfName + " inet6 " + ifaddr.range.addr.ToString()
-              + " prefixlen " + std::to_string(prefixlen) + " up");
-          Exec(
-              "/sbin/route -n add -inet6 -net " + ifaddr.range.addr.ToString() + " -prefixlen "
-                  + std::to_string(prefixlen) + " -interface " + m_IfName,
+              {
+                  "/sbin/route",
+                  "-n",
+                  "add",
+                  "-inet6",
+                  "-net",
+                  ifaddr.range.addr.ToString(),
+                  "-prefixlen",
+                  prefixlen_str,
+                  "-interface",
+                  m_IfName,
+              },
               false);
         }
       }
@@ -207,7 +284,7 @@ namespace llarp::vpn
           if (ifaddr.fam == AF_INET)
           {
             const auto ip = net::TruncateV6(ifaddr.range.addr).ToString();
-            Exec("/sbin/route -n delete -host " + ip + " -interface lo0", false);
+            Exec({"/sbin/route", "-n", "delete", "-host", ip, "-interface", "lo0"}, false);
             routes.erase(std::remove(routes.begin(), routes.end(), ip), routes.end());
           }
         }
@@ -275,14 +352,6 @@ namespace llarp::vpn
 
   class AppleRouteManager : public IRouteManager
   {
-    static std::string
-    FamilyFlag(const net::ipaddr_t& ip)
-    {
-      if (std::holds_alternative<net::ipv6addr_t>(ip))
-        return "-inet6 ";
-      return "";
-    }
-
    public:
     AppleRouteManager() = default;
     ~AppleRouteManager() override = default;
@@ -291,18 +360,23 @@ namespace llarp::vpn
     void
     AddRoute(net::ipaddr_t ip, net::ipaddr_t gateway) override
     {
-      Exec(
-          "/sbin/route -n add " + FamilyFlag(ip) + "-host " + llarp::net::ToString(ip) + " "
-          + llarp::net::ToString(gateway));
+      const auto ipstr = llarp::net::ToString(ip);
+      const auto gwstr = llarp::net::ToString(gateway);
+      if (std::holds_alternative<net::ipv6addr_t>(ip))
+        Exec({"/sbin/route", "-n", "add", "-inet6", "-host", ipstr, gwstr});
+      else
+        Exec({"/sbin/route", "-n", "add", "-host", ipstr, gwstr});
     }
 
     void
     DelRoute(net::ipaddr_t ip, net::ipaddr_t gateway) override
     {
-      Exec(
-          "/sbin/route -n delete " + FamilyFlag(ip) + "-host " + llarp::net::ToString(ip) + " "
-              + llarp::net::ToString(gateway),
-          false);
+      const auto ipstr = llarp::net::ToString(ip);
+      const auto gwstr = llarp::net::ToString(gateway);
+      if (std::holds_alternative<net::ipv6addr_t>(ip))
+        Exec({"/sbin/route", "-n", "delete", "-inet6", "-host", ipstr, gwstr}, false);
+      else
+        Exec({"/sbin/route", "-n", "delete", "-host", ipstr, gwstr}, false);
     }
 
     // Capture all traffic at the tun interface WITHOUT touching the existing
@@ -314,7 +388,7 @@ namespace llarp::vpn
     {
       const auto& ifname = vpn.Info().ifname;
       for (const auto* range : {"0.0.0.0/1", "128.0.0.0/1"})
-        Exec(std::string{"/sbin/route -n add -net "} + range + " -interface " + ifname);
+        Exec({"/sbin/route", "-n", "add", "-net", range, "-interface", ifname});
 
       bool have_v6 = false;
       for (const auto& addr : vpn.Info().addrs)
@@ -322,8 +396,16 @@ namespace llarp::vpn
       if (have_v6)
         for (const auto* base : {"::", "4000::", "8000::", "c000::"})
           Exec(
-              std::string{"/sbin/route -n add -inet6 -net "} + base + " -prefixlen 2 -interface "
-                  + ifname,
+              {"/sbin/route",
+               "-n",
+               "add",
+               "-inet6",
+               "-net",
+               base,
+               "-prefixlen",
+               "2",
+               "-interface",
+               ifname},
               false);
     }
 
@@ -332,12 +414,20 @@ namespace llarp::vpn
     {
       const auto& ifname = vpn.Info().ifname;
       for (const auto* range : {"0.0.0.0/1", "128.0.0.0/1"})
-        Exec(std::string{"/sbin/route -n delete -net "} + range + " -interface " + ifname, false);
+        Exec({"/sbin/route", "-n", "delete", "-net", range, "-interface", ifname}, false);
 
       for (const auto* base : {"::", "4000::", "8000::", "c000::"})
         Exec(
-            std::string{"/sbin/route -n delete -inet6 -net "} + base + " -prefixlen 2 -interface "
-                + ifname,
+            {"/sbin/route",
+             "-n",
+             "delete",
+             "-inet6",
+             "-net",
+             base,
+             "-prefixlen",
+             "2",
+             "-interface",
+             ifname},
             false);
     }
 
@@ -347,13 +437,33 @@ namespace llarp::vpn
     {
       const auto& ifname = vpn.Info().ifname;
       if (range.IsV4())
-        Exec(
-            "/sbin/route -n add -net " + net::TruncateV6(range.addr).ToString() + " -netmask "
-            + range.NetmaskString() + " -interface " + ifname);
+        Exec({
+            "/sbin/route",
+            "-n",
+            "add",
+            "-net",
+            net::TruncateV6(range.addr).ToString(),
+            "-netmask",
+            range.NetmaskString(),
+            "-interface",
+            ifname,
+        });
       else
-        Exec(
-            "/sbin/route -n add -inet6 -net " + range.addr.ToString() + " -prefixlen "
-            + std::to_string(bits::count_bits(range.netmask_bits)) + " -interface " + ifname);
+      {
+        const auto prefixlen = std::to_string(bits::count_bits(range.netmask_bits));
+        Exec({
+            "/sbin/route",
+            "-n",
+            "add",
+            "-inet6",
+            "-net",
+            range.addr.ToString(),
+            "-prefixlen",
+            prefixlen,
+            "-interface",
+            ifname,
+        });
+      }
     }
 
     void
@@ -362,14 +472,36 @@ namespace llarp::vpn
       const auto& ifname = vpn.Info().ifname;
       if (range.IsV4())
         Exec(
-            "/sbin/route -n delete -net " + net::TruncateV6(range.addr).ToString() + " -netmask "
-                + range.NetmaskString() + " -interface " + ifname,
+            {
+                "/sbin/route",
+                "-n",
+                "delete",
+                "-net",
+                net::TruncateV6(range.addr).ToString(),
+                "-netmask",
+                range.NetmaskString(),
+                "-interface",
+                ifname,
+            },
             false);
       else
+      {
+        const auto prefixlen = std::to_string(bits::count_bits(range.netmask_bits));
         Exec(
-            "/sbin/route -n delete -inet6 -net " + range.addr.ToString() + " -prefixlen "
-                + std::to_string(bits::count_bits(range.netmask_bits)) + " -interface " + ifname,
+            {
+                "/sbin/route",
+                "-n",
+                "delete",
+                "-inet6",
+                "-net",
+                range.addr.ToString(),
+                "-prefixlen",
+                prefixlen,
+                "-interface",
+                ifname,
+            },
             false);
+      }
     }
 
     // Enumerate default-route gateways that do NOT live on the tun interface,
