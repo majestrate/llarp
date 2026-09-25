@@ -88,7 +88,7 @@ namespace llarp::vpn
       while (::waitpid(pid, &status, 0) == -1)
       {
         if (errno != EINTR)
-          throw std::runtim_error{fmt::format("waitpid(): {}", strerror(errno))};
+throw std::runtime_error{fmt::format("waitpid(): {}", strerror(errno))};
       }
       int ret = -1;
       if (WIFEXITED(status))
