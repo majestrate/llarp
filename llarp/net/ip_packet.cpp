@@ -155,6 +155,7 @@ namespace llarp::net
     {
       case IPProtocol::TCP:
       case IPProtocol::UDP:
+        bounds_check((Header()->ihl * 4) + 2);
         return nuint16_t{*reinterpret_cast<const uint16_t*>(data() + (Header()->ihl * 4) + 2)};
       default:
         return std::nullopt;
@@ -164,11 +165,11 @@ namespace llarp::net
   std::optional<nuint16_t>
   IPPacket::SrcPort() const
   {
-    IPProtocol proto{Header()->protocol};
-    switch (proto)
+    switch (IPProtocol{Header()->protocol})
     {
       case IPProtocol::TCP:
       case IPProtocol::UDP:
+        bounds_check(Header()->ihl * 4);
         return nuint16_t{*reinterpret_cast<const uint16_t*>(data() + (Header()->ihl * 4))};
       default:
         return std::nullopt;
@@ -454,7 +455,7 @@ namespace llarp::net
       net::ipv6addr_t src, net::ipv6addr_t dst, std::optional<net::flowlabel_t> flowlabel)
   {
     const size_t ihs = 4 + 4 + 16 + 16;
-    const auto sz = size();
+    const auto sz = _buf.size();
     // XXX should've been checked at upper level?
     if (sz <= ihs)
       return;

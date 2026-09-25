@@ -1633,18 +1633,26 @@ namespace llarp::service
       auto session = std::make_shared<exit::SNodeSession>(
           snode,
           [this, snode, src, dst](const llarp_buffer_t& buf) -> bool {
-            net::IPPacket pkt;
-            if (not pkt.Load(buf))
+            try
+            {
+              net::IPPacket pkt;
+              if (not pkt.Load(buf))
+                return false;
+              pkt.UpdateIPv4Address(src, dst);
+              /// TODO: V6
+              auto itr = m_state->m_SNodeSessions.find(snode);
+              if (itr == m_state->m_SNodeSessions.end())
+                return false;
+              if (const auto maybe = itr->second->CurrentPath())
+                return HandleInboundPacket(
+                    ConvoTag{maybe->as_array()}, pkt.ConstBuffer(), ProtocolType::TrafficV4, 0);
               return false;
-            pkt.UpdateIPv4Address(src, dst);
-            /// TODO: V6
-            auto itr = m_state->m_SNodeSessions.find(snode);
-            if (itr == m_state->m_SNodeSessions.end())
+            }
+            catch (std::exception& e)
+            {
+              log::warning(logcat, "exit::SNodeSession writepkt(): {}", e.what());
               return false;
-            if (const auto maybe = itr->second->CurrentPath())
-              return HandleInboundPacket(
-                  ConvoTag{maybe->as_array()}, pkt.ConstBuffer(), ProtocolType::TrafficV4, 0);
-            return false;
+            }
           },
           Router(),
           1,
@@ -1781,12 +1789,19 @@ namespace llarp::service
         ++itr;
       }
     }
-    // send downstream packets to user for snode, writes on TUN.
-    for (const auto& [router, session] : m_state->m_SNodeSessions)
-      session->FlushDownstream();
-    // send upstream traffic to snode from what is currently queued.
-    for (const auto& [router, session] : m_state->m_SNodeSessions)
-      session->FlushUpstream();
+    try
+    {
+      // send downstream packets to user for snode, writes on TUN.
+      for (const auto& [router, session] : m_state->m_SNodeSessions)
+        session->FlushDownstream();
+      // send upstream traffic to snode from what is currently queued.
+      for (const auto& [router, session] : m_state->m_SNodeSessions)
+        session->FlushUpstream();
+    }
+    catch (std::exception& e)
+    {
+      log::warning(logcat, "Pump() Flush: {}", e.what());
+    }
 
     util::descending_priority_queue<SendEvent_t> sendq;
 

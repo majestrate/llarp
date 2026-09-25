@@ -9,6 +9,11 @@ namespace llarp
 {
   namespace exit
   {
+    namespace
+    {
+      auto logcat = log::Cat("llarp::exit::Endpoint");
+    }
+
     Endpoint::Endpoint(
         const llarp::PubKey& remoteIdent,
         const llarp::path::HopHandler_ptr& beginPath,
@@ -95,85 +100,101 @@ namespace llarp
     Endpoint::QueueOutboundTraffic(
         PathID_t path, std::vector<byte_t> buf, uint64_t counter, service::ProtocolType t)
     {
-      const service::ConvoTag tag{path.as_array()};
-      if (t == service::ProtocolType::QUIC)
+      try
       {
-        return false;
-      }
-      // queue overflow
-      if (m_UpstreamQueue.size() > MaxUpstreamQueueSize)
-        return false;
+        const service::ConvoTag tag{path.as_array()};
+        if (t == service::ProtocolType::QUIC)
+        {
+          return false;
+        }
+        // queue overflow
+        if (m_UpstreamQueue.size() > MaxUpstreamQueueSize)
+          return false;
 
-      llarp::net::IPPacket pkt{std::move(buf)};
-      if (pkt.empty())
-        return false;
+        llarp::net::IPPacket pkt{std::move(buf)};
+        if (pkt.empty())
+          return false;
 
-      if (pkt.IsV6() && m_Parent->SupportsV6())
-      {
-        net::ipv6addr_t dst;
-        if (m_RewriteSource)
-          dst = m_Parent->GetIfAddr();
+        if (pkt.IsV6() && m_Parent->SupportsV6())
+        {
+          net::ipv6addr_t dst;
+          if (m_RewriteSource)
+            dst = m_Parent->GetIfAddr();
+          else
+            dst = pkt.dstv6();
+          pkt.UpdateIPv6Address(m_IP, dst);
+        }
+        else if (pkt.IsV4() && !m_Parent->SupportsV6())
+        {
+          net::ipv4addr_t dst;
+          if (m_RewriteSource)
+            dst = net::TruncateV6(m_Parent->GetIfAddr());
+          else
+            dst = pkt.dstv4();
+          pkt.UpdateIPv4Address(net::TruncateV6(m_IP), dst);
+        }
         else
-          dst = pkt.dstv6();
-        pkt.UpdateIPv6Address(m_IP, dst);
+        {
+          return false;
+        }
+        m_TxRate += pkt.size();
+        m_UpstreamQueue.emplace(std::move(pkt), counter);
+        m_LastActive = m_Parent->Now();
+        return true;
       }
-      else if (pkt.IsV4() && !m_Parent->SupportsV6())
+      catch (std::exception& ex)
       {
-        net::ipv4addr_t dst;
-        if (m_RewriteSource)
-          dst = net::TruncateV6(m_Parent->GetIfAddr());
-        else
-          dst = pkt.dstv4();
-        pkt.UpdateIPv4Address(net::TruncateV6(m_IP), dst);
-      }
-      else
-      {
+        log::warning(logcat, "QueueOutboundTraffic(): {}", ex.what());
         return false;
       }
-      m_TxRate += pkt.size();
-      m_UpstreamQueue.emplace(std::move(pkt), counter);
-      m_LastActive = m_Parent->Now();
-      return true;
     }
 
     bool
     Endpoint::QueueInboundTraffic(std::vector<byte_t> buf, service::ProtocolType type)
     {
-      llarp::net::IPPacket pkt{std::move(buf)};
-      if (pkt.empty())
+      try
+      {
+        llarp::net::IPPacket pkt{std::move(buf)};
+        if (pkt.empty())
+          return false;
+
+        net::ipv6addr_t src;
+        if (m_RewriteSource)
+          src = m_Parent->GetIfAddr();
+        else
+          src = pkt.srcv6();
+        if (pkt.IsV6())
+          pkt.UpdateIPv6Address(src, m_IP);
+        else
+          pkt.UpdateIPv4Address(net::TruncateV6(src), net::TruncateV6(m_IP));
+
+        buf = pkt.steal();
+
+        const uint8_t queue_idx = buf.size() / llarp::routing::ExitPadSize;
+        if (m_DownstreamQueues.find(queue_idx) == m_DownstreamQueues.end())
+          m_DownstreamQueues.emplace(queue_idx, InboundTrafficQueue_t{});
+        auto& queue = m_DownstreamQueues.at(queue_idx);
+        if (queue.size() == 0)
+        {
+          queue.emplace_back();
+          queue.back().protocol = type;
+          return queue.back().PutBuffer(std::move(buf), m_Counter++);
+        }
+        auto& msg = queue.back();
+        if (msg.Size() + buf.size() > llarp::routing::ExitPadSize)
+        {
+          queue.emplace_back();
+          queue.back().protocol = type;
+          return queue.back().PutBuffer(std::move(buf), m_Counter++);
+        }
+        msg.protocol = type;
+        return msg.PutBuffer(std::move(buf), m_Counter++);
+      }
+      catch (std::exception& ex)
+      {
+        log::warning(logcat, "QueueInboundTraffic(): {}", ex.what());
         return false;
-
-      net::ipv6addr_t src;
-      if (m_RewriteSource)
-        src = m_Parent->GetIfAddr();
-      else
-        src = pkt.srcv6();
-      if (pkt.IsV6())
-        pkt.UpdateIPv6Address(src, m_IP);
-      else
-        pkt.UpdateIPv4Address(net::TruncateV6(src), net::TruncateV6(m_IP));
-
-      buf = pkt.steal();
-
-      const uint8_t queue_idx = buf.size() / llarp::routing::ExitPadSize;
-      if (m_DownstreamQueues.find(queue_idx) == m_DownstreamQueues.end())
-        m_DownstreamQueues.emplace(queue_idx, InboundTrafficQueue_t{});
-      auto& queue = m_DownstreamQueues.at(queue_idx);
-      if (queue.size() == 0)
-      {
-        queue.emplace_back();
-        queue.back().protocol = type;
-        return queue.back().PutBuffer(std::move(buf), m_Counter++);
       }
-      auto& msg = queue.back();
-      if (msg.Size() + buf.size() > llarp::routing::ExitPadSize)
-      {
-        queue.emplace_back();
-        queue.back().protocol = type;
-        return queue.back().PutBuffer(std::move(buf), m_Counter++);
-      }
-      msg.protocol = type;
-      return msg.PutBuffer(std::move(buf), m_Counter++);
     }
 
     bool

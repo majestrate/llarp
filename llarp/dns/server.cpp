@@ -20,6 +20,7 @@
 #include <llarp/util/logging.hpp>
 #include "sd_platform.hpp"
 #include "nm_platform.hpp"
+#include "apple_platform.hpp"
 
 namespace llarp::dns
 {
@@ -662,6 +663,8 @@ namespace llarp::dns
       plat->add_impl(std::make_unique<SD_Platform_t>());
       plat->add_impl(std::make_unique<NM_Platform_t>());
     }
+    if constexpr (llarp::platform::is_apple)
+      plat->add_impl(std::make_unique<Apple_Platform_t>());
     return plat;
   }
 

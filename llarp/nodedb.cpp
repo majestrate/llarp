@@ -122,7 +122,7 @@ namespace llarp
       std::string p;
       p += ch;
       fs::path sub = m_Root / p;
-
+      const auto now = llarp::time_now_ms();
       llarp::util::IterDir(sub, [&](const fs::path& f) -> bool {
         // skip files that are not suffixed with .signed
         if (not(fs::is_regular_file(f) and f.extension() == RC_FILE_EXT))
@@ -142,17 +142,9 @@ namespace llarp
           // skip entries that are not from our network
           return true;
         }
-
-        if (rc.IsExpired(time_now_ms()))
-        {
-          // rc expired dont load it and purge it later
-          purge.emplace(f);
-          return true;
-        }
-
         // validate signature and purge entries with invalid signatures
         // load ones with valid signatures
-        if (rc.VerifySignature())
+        if (rc.Verify(now))
           m_Entries.emplace(rc.pubkey, rc);
         else
           purge.emplace(f);
