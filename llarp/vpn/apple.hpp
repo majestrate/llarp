@@ -58,12 +58,12 @@ namespace llarp::vpn
       return cmd;
     }
 
-    static int
+    static void
     Exec(std::initializer_list<std::string> args, bool must_succeed = true)
     {
       std::vector<std::string> argv_storage{args};
       if (argv_storage.empty())
-        return -1;
+        throw std::invalid_value{"llarp::vpn::Exec() empty args"};
 
       std::vector<char*> argv;
       argv.reserve(argv_storage.size() + 1);
@@ -71,13 +71,13 @@ namespace llarp::vpn
         argv.push_back(arg.data());
       argv.push_back(nullptr);
 
-      const auto cmd = JoinArgs(argv_storage);
       static auto logcat = log::Cat("vpn.apple");
+      const auto cmd = JoinArgs(argv_storage);
       log::info(logcat, "exec: {}", cmd);
 
       const pid_t pid = ::fork();
       if (pid == -1)
-        return -1;
+        throw std::runtime_error{fmt::format("fork(): {}", strerror(errno))};
       if (pid == 0)
       {
         ::execv(argv[0], argv.data());
@@ -88,14 +88,13 @@ namespace llarp::vpn
       while (::waitpid(pid, &status, 0) == -1)
       {
         if (errno != EINTR)
-          return -1;
+          throw std::runtim_error{fmt::format("waitpid(): {}", strerror(errno))};
       }
       int ret = -1;
       if (WIFEXITED(status))
         ret = WEXITSTATUS(status);
       if (ret != 0 and must_succeed)
-        throw std::runtime_error{"command failed (" + std::to_string(ret) + "): " + cmd};
-      return ret;
+        throw std::runtime_error{fmt::format("llarp::vpn::Exec() failed to run command: {}", cmd))};
     }
   }  // namespace
 
@@ -363,7 +362,7 @@ namespace llarp::vpn
     {
       const auto ipstr = llarp::net::ToString(ip);
       const auto gwstr = llarp::net::ToString(gateway);
-      if (std::holds_alternative<net::ipv6addr_t>(ip))
+      if constexpr (std::holds_alternative<net::ipv6addr_t>(ip))
         Exec({"/sbin/route", "-n", "add", "-inet6", "-host", ipstr, gwstr});
       else
         Exec({"/sbin/route", "-n", "add", "-host", ipstr, gwstr});
@@ -374,7 +373,7 @@ namespace llarp::vpn
     {
       const auto ipstr = llarp::net::ToString(ip);
       const auto gwstr = llarp::net::ToString(gateway);
-      if (std::holds_alternative<net::ipv6addr_t>(ip))
+      if constexpr (std::holds_alternative<net::ipv6addr_t>(ip))
         Exec({"/sbin/route", "-n", "delete", "-inet6", "-host", ipstr, gwstr}, false);
       else
         Exec({"/sbin/route", "-n", "delete", "-host", ipstr, gwstr}, false);
@@ -396,7 +395,18 @@ namespace llarp::vpn
         have_v6 |= (addr.fam == AF_INET6);
       if (have_v6)
         for (const auto* base : {"::", "4000::", "8000::", "c000::"})
-          Exec({"/sbin/route", "-n", "add", "-inet6", "-net", base, "-prefixlen", "2", "-interface", ifname}, false);
+          Exec(
+              {"/sbin/route",
+               "-n",
+               "add",
+               "-inet6",
+               "-net",
+               base,
+               "-prefixlen",
+               "2",
+               "-interface",
+               ifname},
+              false);
     }
 
     void
@@ -408,7 +418,16 @@ namespace llarp::vpn
 
       for (const auto* base : {"::", "4000::", "8000::", "c000::"})
         Exec(
-            {"/sbin/route", "-n", "delete", "-inet6", "-net", base, "-prefixlen", "2", "-interface", ifname},
+            {"/sbin/route",
+             "-n",
+             "delete",
+             "-inet6",
+             "-net",
+             base,
+             "-prefixlen",
+             "2",
+             "-interface",
+             ifname},
             false);
     }
 
