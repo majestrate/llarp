@@ -30,9 +30,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/wait.h>
 #include <unistd.h>
 #include <errno.h>
 #include <variant>
+#include <vector>
 
 namespace llarp::vpn
 {
@@ -41,9 +43,30 @@ namespace llarp::vpn
     std::unique_ptr<util::FD> m_FD;
 
     static int
-    Exec(const std::string& cmd)
+    Exec(std::initializer_list<std::string> args)
     {
-      return system(cmd.c_str());
+      std::vector<std::string> argv_storage{args};
+      std::vector<char*> argv;
+      argv.reserve(argv_storage.size() + 1);
+      for (auto& arg : argv_storage)
+        argv.push_back(arg.data());
+      argv.push_back(nullptr);
+
+      const pid_t pid = ::fork();
+      if (pid == -1)
+        return -1;
+      if (pid == 0)
+      {
+        ::execv(argv[0], argv.data());
+        _exit(127);
+      }
+
+      int status = 0;
+      if (::waitpid(pid, &status, 0) == -1)
+        return -1;
+      if (WIFEXITED(status))
+        return WEXITSTATUS(status);
+      return -1;
     }
 
    public:
@@ -97,17 +120,31 @@ namespace llarp::vpn
           const huint32_t addr = net::TruncateV6(ifaddr.range.addr);
           const huint32_t netmask = net::TruncateV6(ifaddr.range.netmask_bits);
           const huint32_t daddr = addr & netmask;
-          Exec(
-              "/sbin/ifconfig " + m_IfName + " " + addr.ToString() + " " + daddr.ToString()
-              + " mtu 1500 netmask 255.255.255.255 up");
-          Exec(
-              "/sbin/route add " + daddr.ToString() + " -netmask " + netmask.ToString()
-              + " -interface " + m_IfName);
-          Exec("/sbin/route add " + addr.ToString() + " -interface lo0");
+          Exec({
+              "/sbin/ifconfig",
+              m_IfName,
+              addr.ToString(),
+              daddr.ToString(),
+              "mtu",
+              "1500",
+              "netmask",
+              "255.255.255.255",
+              "up",
+          });
+          Exec({
+              "/sbin/route",
+              "add",
+              daddr.ToString(),
+              "-netmask",
+              netmask.ToString(),
+              "-interface",
+              m_IfName,
+          });
+          Exec({"/sbin/route", "add", addr.ToString(), "-interface", "lo0"});
         }
         else if (ifaddr.fam == AF_INET6)
         {
-          Exec("/sbin/ifconfig " + m_IfName + " inet6 " + ifaddr.range.ToString());
+          Exec({"/sbin/ifconfig", m_IfName, "inet6", ifaddr.range.ToString()});
         }
       }
     }
@@ -178,21 +215,18 @@ namespace llarp::vpn
     void
     AddRoute(net::ipaddr_t ip, net::ipaddr_t gateway) override
     {
-      std::string cmd =
-          "/sbin/route add -host " + llarp::net::ToString(ip) + " " + llarp::net::ToString(gateway);
-      int ret = std::system(cmd.c_str());
+      int ret = Exec(
+          {"/sbin/route", "add", "-host", llarp::net::ToString(ip), llarp::net::ToString(gateway)});
       if (ret != 0)
-        throw std::runtime_error("AddRoute failed: " + cmd);
+        throw std::runtime_error("AddRoute failed");
     }
 
     void
     DelRoute(net::ipaddr_t ip, net::ipaddr_t gateway) override
     {
-      std::string cmd = "/sbin/route delete -host " + llarp::net::ToString(ip) + " "
-          + llarp::net::ToString(gateway);
-      int ret = std::system(cmd.c_str());
+      int ret = Exec({"/sbin/route", "delete", "-host", llarp::net::ToString(ip), llarp::net::ToString(gateway)});
       if (ret != 0)
-        throw std::runtime_error("DelRoute failed: " + cmd);
+        throw std::runtime_error("DelRoute failed");
     }
 
     // Add a default route via the VPN interface's first IPv4 address
@@ -204,10 +238,9 @@ namespace llarp::vpn
         throw std::runtime_error("No interface addresses found");
 
       std::string gateway = info.addrs[0].range.addr.ToString();
-      std::string cmd = "/sbin/route add default " + gateway;
-      int ret = std::system(cmd.c_str());
+      int ret = Exec({"/sbin/route", "add", "default", gateway});
       if (ret != 0)
-        throw std::runtime_error("AddDefaultRouteViaInterface failed: " + cmd);
+        throw std::runtime_error("AddDefaultRouteViaInterface failed");
     }
 
     void
@@ -218,31 +251,44 @@ namespace llarp::vpn
         throw std::runtime_error("No interface addresses found");
 
       std::string gateway = info.addrs[0].range.addr.ToString();
-      std::string cmd = "/sbin/route delete default " + gateway;
-      int ret = std::system(cmd.c_str());
+      int ret = Exec({"/sbin/route", "delete", "default", gateway});
       if (ret != 0)
-        throw std::runtime_error("DelDefaultRouteViaInterface failed: " + cmd);
+        throw std::runtime_error("DelDefaultRouteViaInterface failed");
     }
 
     // Add a route for a subnet via the VPN interface
     void
     AddRouteViaInterface(NetworkInterface& vpn, IPRange range) override
     {
-      std::string cmd = "/sbin/route add -net " + range.addr.ToString() + " -netmask "
-          + range.NetmaskString() + " -interface " + vpn.Info().ifname;
-      int ret = std::system(cmd.c_str());
+      int ret = Exec({
+          "/sbin/route",
+          "add",
+          "-net",
+          range.addr.ToString(),
+          "-netmask",
+          range.NetmaskString(),
+          "-interface",
+          vpn.Info().ifname,
+      });
       if (ret != 0)
-        throw std::runtime_error("AddRouteViaInterface failed: " + cmd);
+        throw std::runtime_error("AddRouteViaInterface failed");
     }
 
     void
     DelRouteViaInterface(NetworkInterface& vpn, IPRange range) override
     {
-      std::string cmd = "/sbin/route delete -net " + range.addr.ToString() + " -netmask "
-          + range.NetmaskString() + " -interface " + vpn.Info().ifname;
-      int ret = std::system(cmd.c_str());
+      int ret = Exec({
+          "/sbin/route",
+          "delete",
+          "-net",
+          range.addr.ToString(),
+          "-netmask",
+          range.NetmaskString(),
+          "-interface",
+          vpn.Info().ifname,
+      });
       if (ret != 0)
-        throw std::runtime_error("DelRouteViaInterface failed: " + cmd);
+        throw std::runtime_error("DelRouteViaInterface failed");
     }
 
     std::vector<net::ipaddr_t>
