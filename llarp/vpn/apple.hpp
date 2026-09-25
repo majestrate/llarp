@@ -88,7 +88,7 @@ namespace llarp::vpn
       while (::waitpid(pid, &status, 0) == -1)
       {
         if (errno != EINTR)
-throw std::runtime_error{fmt::format("waitpid(): {}", strerror(errno))};
+          throw std::runtime_error{fmt::format("waitpid(): {}", strerror(errno))};
       }
       int ret = -1;
       if (WIFEXITED(status))
@@ -362,7 +362,7 @@ throw std::runtime_error{fmt::format("waitpid(): {}", strerror(errno))};
     {
       const auto ipstr = llarp::net::ToString(ip);
       const auto gwstr = llarp::net::ToString(gateway);
-      if constexpr (std::holds_alternative<net::ipv6addr_t>(ip))
+      if (std::holds_alternative<net::ipv6addr_t>(ip))
         Exec({"/sbin/route", "-n", "add", "-inet6", "-host", ipstr, gwstr});
       else
         Exec({"/sbin/route", "-n", "add", "-host", ipstr, gwstr});
@@ -373,7 +373,7 @@ throw std::runtime_error{fmt::format("waitpid(): {}", strerror(errno))};
     {
       const auto ipstr = llarp::net::ToString(ip);
       const auto gwstr = llarp::net::ToString(gateway);
-      if constexpr (std::holds_alternative<net::ipv6addr_t>(ip))
+      if (std::holds_alternative<net::ipv6addr_t>(ip))
         Exec({"/sbin/route", "-n", "delete", "-inet6", "-host", ipstr, gwstr}, false);
       else
         Exec({"/sbin/route", "-n", "delete", "-host", ipstr, gwstr}, false);
