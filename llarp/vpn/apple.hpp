@@ -62,8 +62,11 @@ namespace llarp::vpn
       }
 
       int status = 0;
-      if (::waitpid(pid, &status, 0) == -1)
-        return -1;
+while (::waitpid(pid, &status, 0) == -1)
+      {
+        if (errno != EINTR)
+          return -1;
+      }
       if (WIFEXITED(status))
         return WEXITSTATUS(status);
       return -1;
