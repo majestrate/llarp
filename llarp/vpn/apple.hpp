@@ -63,7 +63,7 @@ namespace llarp::vpn
     {
       std::vector<std::string> argv_storage{args};
       if (argv_storage.empty())
-        throw std::invalid_value{"llarp::vpn::Exec() empty args"};
+        throw std::invalid_argument{"llarp::vpn::Exec() empty args"};
 
       std::vector<char*> argv;
       argv.reserve(argv_storage.size() + 1);
