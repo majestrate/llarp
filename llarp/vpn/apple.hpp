@@ -85,14 +85,13 @@ namespace llarp::vpn
       }
 
       int status = 0;
-      pid_t waited = 0;
-      do
+      while (::waitpid(pid, &status, 0) == -1)
       {
-        waited = ::waitpid(pid, &status, 0);
-      } while (waited == -1 and errno == EINTR);
-
+        if (errno != EINTR)
+          return -1;
+      }
       int ret = -1;
-      if (waited != -1 and WIFEXITED(status))
+      if (WIFEXITED(status))
         ret = WEXITSTATUS(status);
       if (ret != 0 and must_succeed)
         throw std::runtime_error{"command failed (" + std::to_string(ret) + "): " + cmd};
