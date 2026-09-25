@@ -215,18 +215,23 @@ namespace llarp::vpn
     void
     AddRoute(net::ipaddr_t ip, net::ipaddr_t gateway) override
     {
-      int ret = Exec(
-          {"/sbin/route", "add", "-host", llarp::net::ToString(ip), llarp::net::ToString(gateway)});
+      const auto ipstr = llarp::net::ToString(ip);
+      const auto gwstr = llarp::net::ToString(gateway);
+      int ret = Exec({"/sbin/route", "add", "-host", ipstr, gwstr});
       if (ret != 0)
-        throw std::runtime_error("AddRoute failed");
+        throw std::runtime_error(
+            "AddRoute failed (ret=" + std::to_string(ret) + "): " + ipstr + " via " + gwstr);
     }
 
     void
     DelRoute(net::ipaddr_t ip, net::ipaddr_t gateway) override
     {
-      int ret = Exec({"/sbin/route", "delete", "-host", llarp::net::ToString(ip), llarp::net::ToString(gateway)});
+      const auto ipstr = llarp::net::ToString(ip);
+      const auto gwstr = llarp::net::ToString(gateway);
+      int ret = Exec({"/sbin/route", "delete", "-host", ipstr, gwstr});
       if (ret != 0)
-        throw std::runtime_error("DelRoute failed");
+        throw std::runtime_error(
+            "DelRoute failed (ret=" + std::to_string(ret) + "): " + ipstr + " via " + gwstr);
     }
 
     // Add a default route via the VPN interface's first IPv4 address
@@ -240,7 +245,8 @@ namespace llarp::vpn
       std::string gateway = info.addrs[0].range.addr.ToString();
       int ret = Exec({"/sbin/route", "add", "default", gateway});
       if (ret != 0)
-        throw std::runtime_error("AddDefaultRouteViaInterface failed");
+        throw std::runtime_error(
+            "AddDefaultRouteViaInterface failed (ret=" + std::to_string(ret) + "): " + gateway);
     }
 
     void
@@ -253,42 +259,53 @@ namespace llarp::vpn
       std::string gateway = info.addrs[0].range.addr.ToString();
       int ret = Exec({"/sbin/route", "delete", "default", gateway});
       if (ret != 0)
-        throw std::runtime_error("DelDefaultRouteViaInterface failed");
+        throw std::runtime_error(
+            "DelDefaultRouteViaInterface failed (ret=" + std::to_string(ret) + "): " + gateway);
     }
 
     // Add a route for a subnet via the VPN interface
     void
     AddRouteViaInterface(NetworkInterface& vpn, IPRange range) override
     {
+      const auto addr = range.addr.ToString();
+      const auto netmask = range.NetmaskString();
+      const auto ifname = vpn.Info().ifname;
       int ret = Exec({
           "/sbin/route",
           "add",
           "-net",
-          range.addr.ToString(),
+          addr,
           "-netmask",
-          range.NetmaskString(),
+          netmask,
           "-interface",
-          vpn.Info().ifname,
+          ifname,
       });
       if (ret != 0)
-        throw std::runtime_error("AddRouteViaInterface failed");
+        throw std::runtime_error(
+            "AddRouteViaInterface failed (ret=" + std::to_string(ret) + "): " + addr + "/"
+            + netmask + " on " + ifname);
     }
 
     void
     DelRouteViaInterface(NetworkInterface& vpn, IPRange range) override
     {
+      const auto addr = range.addr.ToString();
+      const auto netmask = range.NetmaskString();
+      const auto ifname = vpn.Info().ifname;
       int ret = Exec({
           "/sbin/route",
           "delete",
           "-net",
-          range.addr.ToString(),
+          addr,
           "-netmask",
-          range.NetmaskString(),
+          netmask,
           "-interface",
-          vpn.Info().ifname,
+          ifname,
       });
       if (ret != 0)
-        throw std::runtime_error("DelRouteViaInterface failed");
+        throw std::runtime_error(
+            "DelRouteViaInterface failed (ret=" + std::to_string(ret) + "): " + addr + "/"
+            + netmask + " on " + ifname);
     }
 
     std::vector<net::ipaddr_t>
